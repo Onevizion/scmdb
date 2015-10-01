@@ -1,0 +1,14 @@
+.metadata
+.settings
+.project
+.classpath
+*target*
+/ps-web/src/main/webapp/css/*/configApp.css
+/ps-web/src/main/webapp/css/configApp.css
+*rebel.xml
+.idea
+*.iml
+mobile-wf/gen
+mobile-wf/gen-external-apklibs
+.recommenders
+gui-test/test-output
