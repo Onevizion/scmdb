@@ -46,6 +46,8 @@ public class CheckoutHelper {
         logger.debug("Searching new scripts in [{}]", scriptDir.getAbsolutePath());
         Collection<File> files = FileUtils.listFiles(scriptDir, new AgeFileFilter(dbScriptVo.getTs(), false), null);
         List<DbScriptVo> newDbScripts = createAll(files);
+        List<DbScriptVo> delDbScripts = new ArrayList<DbScriptVo>();
+        delDbScripts.addAll(newDbScripts);
         Iterator<DbScriptVo> iter = newDbScripts.iterator();
         while (iter.hasNext()) {
             DbScriptVo vo = iter.next();
@@ -56,10 +58,10 @@ public class CheckoutHelper {
 
         logger.debug("Searching deleted scripts in [{}]", scriptDir.getAbsolutePath());
         files = FileUtils.listFiles(scriptDir, new AgeFileFilter(dbScriptVo.getTs(), true), null);
-        List<DbScriptVo> delDbScripts = createAll(files);
+        delDbScripts.addAll(createAll(files));
 
         File file = new File(scriptDir.getAbsolutePath() + File.separator + dbScriptVo.getName());
-        if (file.exists()) {
+        if (file.exists() && !delDbScripts.contains(dbScriptVo)) {
             delDbScripts.add(dbScriptVo);
         }
 
