@@ -21,6 +21,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Resource;
 
 @Component
@@ -37,11 +38,12 @@ public class CheckoutHelper {
     public void createAllFromPath(File scriptDir) {
         Collection<File> files = FileUtils.listFiles(scriptDir, new String[]{"sql"}, false);
         List<DbScriptVo> dbScripts = createAll(files);
-        dbScriptDao.batchCreate(dbScripts);
+        DbScriptVo[] dbScriptArr = dbScripts.toArray(new DbScriptVo[dbScripts.size()]);
+        dbScriptDao.batchCreate(dbScriptArr);
     }
 
     @Transactional
-    public List<File> checkoutDbFromPath(File scriptDir, List<DbScriptVo> dbScripts) {
+    public List<File> checkoutDbFromPath(File scriptDir, Map<String, DbScriptVo> dbScripts) {
         DbScriptVo dbScriptVo = dbScriptDao.readNewest();
         logger.debug("Searching new scripts in [{}]", scriptDir.getAbsolutePath());
         Collection<File> files = FileUtils.listFiles(scriptDir, new AgeFileFilter(dbScriptVo.getTs(), false), null);
@@ -50,8 +52,12 @@ public class CheckoutHelper {
         delDbScripts.addAll(newDbScripts);
         Iterator<DbScriptVo> iter = newDbScripts.iterator();
         while (iter.hasNext()) {
-            DbScriptVo vo = iter.next();
-            if (dbScripts.contains(vo)) {
+            DbScriptVo vo1 = iter.next();
+            if (dbScripts.containsKey(vo1.getName())) {
+                DbScriptVo vo2 = dbScripts.get(vo1.getName());
+                if (!vo1.equals(vo2)) {
+                    logger.warn("Script file has changed [{}]", vo1.getName());
+                }
                 iter.remove();
             }
         }
@@ -67,7 +73,7 @@ public class CheckoutHelper {
 
         List<DbScriptVo> rollbackDbScripts = new ArrayList<DbScriptVo>();
         List<Long> delIds = new ArrayList<Long>();
-        iter = dbScripts.iterator();
+        iter = dbScripts.values().iterator();
         while (iter.hasNext()) {
             DbScriptVo vo = iter.next();
             if (!delDbScripts.contains(vo)) {
@@ -116,7 +122,8 @@ public class CheckoutHelper {
 
         if (!newDbScripts.isEmpty()) {
             logger.debug("Saving new scripts in db");
-            dbScriptDao.batchCreate(newDbScripts);
+            DbScriptVo[] newDbScriptArr = newDbScripts.toArray(new DbScriptVo[newDbScripts.size()]);
+            dbScriptDao.batchCreate(newDbScriptArr);
         }
 
         return result;

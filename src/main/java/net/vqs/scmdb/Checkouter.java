@@ -11,6 +11,7 @@ import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -45,7 +46,7 @@ public class Checkouter {
 
         logger.info("Checking out your database");
         logger.debug("Getting all scripts from db");
-        List<DbScriptVo> dbScripts = dbScriptDao.readAll();
+        Map<String, DbScriptVo> dbScripts = dbScriptDao.readAll();
         if (dbScripts.isEmpty()) {
             logger.debug("Saving all scripts in db");
             checkoutHelper.createAllFromPath(scriptDir);

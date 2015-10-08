@@ -16,9 +16,9 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import javax.annotation.Resource;
 
 @Component
@@ -49,18 +49,18 @@ public class DbScriptDao {
         }
     };
 
-    private ResultSetExtractor<List<DbScriptVo>> dbScriptsExtractor = new ResultSetExtractor<List<DbScriptVo>>() {
-        public List<DbScriptVo> extractData(ResultSet rs) throws SQLException, DataAccessException {
-            List<DbScriptVo> dbScripts = new ArrayList<DbScriptVo>();
+    private ResultSetExtractor<Map<String, DbScriptVo>> dbScriptsExtractor = new ResultSetExtractor<Map<String, DbScriptVo>>() {
+        public Map<String, DbScriptVo> extractData(ResultSet rs) throws SQLException, DataAccessException {
+            Map<String, DbScriptVo> dbScripts = new HashMap<String, DbScriptVo>();
             while (rs.next()) {
                 DbScriptVo dbScript = rowMapper.mapRow(rs, rs.getRow());
-                dbScripts.add(dbScript);
+                dbScripts.put(dbScript.getName(), dbScript);
             }
             return dbScripts;
         }
     };
 
-    public List<DbScriptVo> readAll() {
+    public Map<String, DbScriptVo> readAll() {
         return jdbcTemplate.query(READ_ALL, dbScriptsExtractor);
     }
 
@@ -68,20 +68,20 @@ public class DbScriptDao {
         return jdbcTemplate.queryForObject(READ_NEWEST, rowMapper);
     }
 
-    public void batchCreate(final List<DbScriptVo> dbScripts) {
+    public void batchCreate(final DbScriptVo[] dbScripts) {
         jdbcTemplate.batchUpdate(CREATE, new BatchPreparedStatementSetter() {
             public void setValues(PreparedStatement ps, int i) throws SQLException {
-                ps.setString(1, dbScripts.get(i).getName());
-                ps.setString(2, dbScripts.get(i).getFileHash());
-                ps.setString(3, dbScripts.get(i).getText());
-                ps.setDate(4, new Date(dbScripts.get(i).getTs().getTime()));
-                ps.setString(5, dbScripts.get(i).getOutput());
-                ps.setInt(6, dbScripts.get(i).getType().getTypeId());
-                ps.setInt(7, dbScripts.get(i).getStatus().getStatusId());
+                ps.setString(1, dbScripts[i].getName());
+                ps.setString(2, dbScripts[i].getFileHash());
+                ps.setString(3, dbScripts[i].getText());
+                ps.setDate(4, new Date(dbScripts[i].getTs().getTime()));
+                ps.setString(5, dbScripts[i].getOutput());
+                ps.setInt(6, dbScripts[i].getType().getTypeId());
+                ps.setInt(7, dbScripts[i].getStatus().getStatusId());
             }
 
             public int getBatchSize() {
-                return dbScripts.size();
+                return dbScripts.length;
             }
         });
 
