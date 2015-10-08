@@ -137,10 +137,10 @@ public class CheckoutHelper {
             DbScriptVo dbScriptVo = new DbScriptVo();
             dbScriptVo.setName(file.getName());
             try {
-                InputStream is = FileUtils.openInputStream(file);
-                String sha1Hex = DigestUtils.sha1Hex(is);
+                String fileStr = FileUtils.readFileToString(file);
+                fileStr = fileStr.replaceAll("\\r\\n", "\n");
+                String sha1Hex = DigestUtils.sha1Hex(fileStr);
                 dbScriptVo.setFileHash(sha1Hex);
-                is.close();
             } catch (IOException e) {
                 logger.warn("Can't generate hash for [{}]", file.getName(), e);
             }
