@@ -29,4 +29,6 @@
     </bean>
 
     <context:component-scan base-package="net.vqs.scmdb"/>
+
+    <import resource="classpath:app-context.xml" />
 </beans>

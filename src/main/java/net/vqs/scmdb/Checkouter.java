@@ -1,7 +1,7 @@
 package net.vqs.scmdb;
 
 import net.vqs.scmdb.dao.DbScriptDao;
-import net.vqs.scmdb.facade.CheckoutHelper;
+import net.vqs.scmdb.facade.CheckoutFacade;
 import net.vqs.scmdb.vo.DbScriptVo;
 import oracle.jdbc.pool.OracleDataSource;
 import org.slf4j.Logger;
@@ -42,16 +42,16 @@ public class Checkouter {
         ds.setURL(cnnProps[2]);
 
         DbScriptDao dbScriptDao = ctx.getBean(DbScriptDao.class);
-        CheckoutHelper checkoutHelper = ctx.getBean(CheckoutHelper.class);
+        CheckoutFacade checkoutFacade = ctx.getBean(CheckoutFacade.class);
 
         logger.info("Checking out your database");
         logger.debug("Getting all scripts from db");
         Map<String, DbScriptVo> dbScripts = dbScriptDao.readAll();
         if (dbScripts.isEmpty()) {
             logger.debug("Saving all scripts in db");
-            checkoutHelper.createAllFromPath(scriptDir);
+            checkoutFacade.createAllFromPath(scriptDir);
         } else {
-            List<File> files = checkoutHelper.checkoutDbFromPath(scriptDir, dbScripts);
+            List<File> files = checkoutFacade.checkoutDbFromPath(scriptDir, dbScripts);
             if (!files.isEmpty()) {
                 logger.info("You should execute following script files to checkout your database:");
                 for (File f : files) {

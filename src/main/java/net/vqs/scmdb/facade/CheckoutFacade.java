@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -25,11 +24,14 @@ import java.util.Map;
 import javax.annotation.Resource;
 
 @Component
-public class CheckoutHelper {
+public class CheckoutFacade {
     @Resource
     private DbScriptDao dbScriptDao;
 
-    private final String ROLLBACK_SUFX = "rollback";
+    @Resource
+    private DdlFacade ddlFacade;
+
+    private final String ROLLBACK_SUFX = "_rollback";
 
     private final String EXEC_FOLDER_NAME = "EXECUTE_ME";
 
@@ -79,15 +81,28 @@ public class CheckoutHelper {
             if (!delDbScripts.contains(vo)) {
                 if (DbScriptType.ROLLBACK.equals(vo.getType())) {
                     rollbackDbScripts.add(vo);
+                    delIds.add(vo.getDbScriptId());
+                } else {
+                    String rollbackScript = vo.getName() + ROLLBACK_SUFX;
+                    if (dbScripts.containsKey(rollbackScript)) {
+                        delIds.add(vo.getDbScriptId());
+                    }
                 }
-                delIds.add(vo.getDbScriptId());
             }
         }
 
+        File execDir = new File(scriptDir.getAbsolutePath() + File.separator + EXEC_FOLDER_NAME);
+        if (execDir.exists()) {
+            try {
+                FileUtils.deleteDirectory(execDir);
+            } catch (IOException e) {
+                logger.warn("Can't delete directory by path {[]}", execDir.getAbsolutePath());
+            }
+        }
+        
         List<File> result = new ArrayList<File>();
         for (DbScriptVo vo : rollbackDbScripts) {
-            File f = new File(scriptDir.getAbsolutePath() + File.separator + EXEC_FOLDER_NAME + File.separator
-                + vo.getName());
+            File f = new File(execDir.getAbsolutePath() + File.separator + vo.getName());
             try {
                 logger.debug("Creating rollback script [{}]", f.getAbsolutePath());
                 FileUtils.writeStringToFile(f, vo.getText());
@@ -103,8 +118,7 @@ public class CheckoutHelper {
                 continue;
             }
             File srcFile = new File(scriptDir.getAbsolutePath() + File.separator + vo.getName());
-            File destFile = new File(scriptDir.getAbsolutePath() + File.separator + EXEC_FOLDER_NAME
-                + File.separator + vo.getName());
+            File destFile = new File(execDir.getAbsolutePath() + File.separator + vo.getName());
             try {
                 logger.debug("Copying new script [{}]", destFile.getAbsolutePath());
                 FileUtils.copyFile(srcFile, destFile);
@@ -124,6 +138,9 @@ public class CheckoutHelper {
             logger.debug("Saving new scripts in db");
             DbScriptVo[] newDbScriptArr = newDbScripts.toArray(new DbScriptVo[newDbScripts.size()]);
             dbScriptDao.batchCreate(newDbScriptArr);
+
+            logger.info("Extract DDL for new scripts");
+            ddlFacade.generateDdl(newDbScripts, scriptDir);
         }
 
         return result;
