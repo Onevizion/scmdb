@@ -45,7 +45,7 @@ public class CheckoutFacade {
     }
 
     @Transactional
-    public List<File> checkoutDbFromPath(File scriptDir, Map<String, DbScriptVo> dbScripts) {
+    public List<File> checkoutDbFromPath(File scriptDir, Map<String, DbScriptVo> dbScripts, boolean isGenDdl) {
         DbScriptVo dbScriptVo = dbScriptDao.readNewest();
         logger.debug("Searching new scripts in [{}]", scriptDir.getAbsolutePath());
         Collection<File> files = FileUtils.listFiles(scriptDir, new AgeFileFilter(dbScriptVo.getTs(), false), null);
@@ -139,8 +139,10 @@ public class CheckoutFacade {
             DbScriptVo[] newDbScriptArr = newDbScripts.toArray(new DbScriptVo[newDbScripts.size()]);
             dbScriptDao.batchCreate(newDbScriptArr);
 
-            logger.info("Extract DDL for new scripts");
-            ddlFacade.generateDdl(newDbScripts, scriptDir);
+            if (isGenDdl) {
+                logger.info("Extract DDL for new scripts");
+                ddlFacade.generateDdl(newDbScripts, scriptDir);
+            }
         }
 
         return result;

@@ -4,6 +4,7 @@ import net.vqs.scmdb.dao.DbScriptDao;
 import net.vqs.scmdb.facade.CheckoutFacade;
 import net.vqs.scmdb.vo.DbScriptVo;
 import oracle.jdbc.pool.OracleDataSource;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
@@ -32,6 +33,10 @@ public class Checkouter {
         }
         String[] cnnProps = parseDbCnnStr(args[0]);
         File scriptDir = parseDbScriptDir(args[1]);
+        boolean isGenDdl = false;
+        if (args.length > 2) {
+            isGenDdl = parseDbGenDdl(args[2]);
+        }
 
         logger.debug("Initialize spring beans");
         ApplicationContext ctx = new ClassPathXmlApplicationContext("classpath:beans.xml");
@@ -51,7 +56,7 @@ public class Checkouter {
             logger.debug("Saving all scripts in db");
             checkoutFacade.createAllFromPath(scriptDir);
         } else {
-            List<File> files = checkoutFacade.checkoutDbFromPath(scriptDir, dbScripts);
+            List<File> files = checkoutFacade.checkoutDbFromPath(scriptDir, dbScripts, isGenDdl);
             if (!files.isEmpty()) {
                 logger.info("You should execute following script files to checkout your database:");
                 for (File f : files) {
@@ -60,6 +65,14 @@ public class Checkouter {
             }
         }
         logger.info("Your database is up-to-date");
+    }
+
+    private static boolean parseDbGenDdl(String arg) {
+        if (NumberUtils.isNumber(arg)) {
+            return NumberUtils.toInt(arg) == 1;
+        } else {
+            throw new IllegalArgumentException("Cannot parse generate ddl param using parameter: " + arg);
+        }
     }
 
     private static File parseDbScriptDir(String path) {
