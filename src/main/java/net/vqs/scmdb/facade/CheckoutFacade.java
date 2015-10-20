@@ -101,31 +101,33 @@ public class CheckoutFacade {
         }
         
         List<File> result = new ArrayList<File>();
-        for (DbScriptVo vo : rollbackDbScripts) {
-            File f = new File(execDir.getAbsolutePath() + File.separator + vo.getName());
-            try {
-                logger.debug("Creating rollback script [{}]", f.getAbsolutePath());
-                FileUtils.writeStringToFile(f, vo.getText());
-                result.add(f);
-            } catch (IOException e) {
-                logger.error("Can't create file [{}]", f.getAbsolutePath(), e);
-                throw new RuntimeException(e);
+        if (!isGenDdl) {
+            for (DbScriptVo vo : rollbackDbScripts) {
+                File f = new File(execDir.getAbsolutePath() + File.separator + vo.getName());
+                try {
+                    logger.debug("Creating rollback script [{}]", f.getAbsolutePath());
+                    FileUtils.writeStringToFile(f, vo.getText());
+                    result.add(f);
+                } catch (IOException e) {
+                    logger.error("Can't create file [{}]", f.getAbsolutePath(), e);
+                    throw new RuntimeException(e);
+                }
             }
-        }
 
-        for (DbScriptVo vo : newDbScripts) {
-            if (DbScriptType.ROLLBACK.equals(vo.getType())) {
-                continue;
-            }
-            File srcFile = new File(scriptDir.getAbsolutePath() + File.separator + vo.getName());
-            File destFile = new File(execDir.getAbsolutePath() + File.separator + vo.getName());
-            try {
-                logger.debug("Copying new script [{}]", destFile.getAbsolutePath());
-                FileUtils.copyFile(srcFile, destFile);
-                result.add(destFile);
-            } catch (IOException e) {
-                logger.error("Can't copy file [{}]", srcFile.getAbsolutePath(), e);
-                throw new RuntimeException(e);
+            for (DbScriptVo vo : newDbScripts) {
+                if (DbScriptType.ROLLBACK.equals(vo.getType())) {
+                    continue;
+                }
+                File srcFile = new File(scriptDir.getAbsolutePath() + File.separator + vo.getName());
+                File destFile = new File(execDir.getAbsolutePath() + File.separator + vo.getName());
+                try {
+                    logger.debug("Copying new script [{}]", destFile.getAbsolutePath());
+                    FileUtils.copyFile(srcFile, destFile);
+                    result.add(destFile);
+                } catch (IOException e) {
+                    logger.error("Can't copy file [{}]", srcFile.getAbsolutePath(), e);
+                    throw new RuntimeException(e);
+                }
             }
         }
 
