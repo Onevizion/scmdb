@@ -10,9 +10,9 @@
 
     <dependencies>
         <dependency>
-            <groupId>net.vqs</groupId>
+            <groupId>com.onevizion</groupId>
             <artifactId>maven-plugin-dbschema</artifactId>
-            <version>7.7.0</version>
+            <version>7.19.0</version>
         </dependency>
 
         <dependency>
@@ -144,7 +144,7 @@
                     <shadedArtifactAttached>true</shadedArtifactAttached>
                     <transformers>
                         <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                            <mainClass>net.vqs.scmdb.Checkouter</mainClass>
+                            <mainClass>com.onevizion.scmdb.Checkouter</mainClass>
                         </transformer>
                         <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
                             <resource>META-INF/spring.handlers</resource>
