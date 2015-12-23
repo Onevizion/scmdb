@@ -1,26 +1,25 @@
 package com.onevizion.scmdb.vo;
 
 public enum DbScriptStatus {
-    EXECUTED(0), NOT_EXECUTED(1);
+    EXECUTED(0L), NOT_EXECUTED(1L);
 
-    int statusId;
+    Long statusId;
 
-    DbScriptStatus(int statusId) {
+    DbScriptStatus(Long statusId) {
         this.statusId = statusId;
     }
 
-    public int getStatusId() {
+    public Long getStatusId() {
         return statusId;
     }
 
-    public static DbScriptStatus getForInt(int statusId) {
-        switch (statusId) {
-            case 0:
-                return EXECUTED;
-            case 1:
-                return NOT_EXECUTED;
-            default:
-                throw new IllegalArgumentException("Not supported db script statusId: [" + statusId + "]");
+    public static DbScriptStatus getForId(Long statusId) {
+        if (Long.valueOf(0L).equals(statusId)) {
+            return EXECUTED;
+        } else if (Long.valueOf(1L).equals(statusId)) {
+            return NOT_EXECUTED;
+        } else {
+            throw new IllegalArgumentException("Not supported db script statusId: [" + statusId + "]");
         }
     }
 }

@@ -60,20 +60,24 @@ public class DbScriptVo {
         this.output = output;
     }
 
-    public DbScriptType getType() {
-        return type;
+    public Long getType() {
+        return type.getTypeId();
+    }
+
+    public void setType(Long type) {
+        this.type = DbScriptType.getForId(type);
     }
 
     public void setType(DbScriptType type) {
         this.type = type;
     }
 
-    public DbScriptStatus getStatus() {
-        return status;
+    public Long getStatus() {
+        return status.getStatusId();
     }
 
-    public void setStatus(DbScriptStatus status) {
-        this.status = status;
+    public void setStatus(Long status) {
+        this.status = DbScriptStatus.getForId(status);
     }
 
     @Override

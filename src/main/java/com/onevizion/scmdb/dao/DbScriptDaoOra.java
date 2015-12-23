@@ -20,11 +20,11 @@ import java.util.Map;
 
 @Repository
 public class DbScriptDaoOra extends AbstractDaoOra {
-    @TextFile("com/onevizion/scmdb/dao/DbScriptDaoSql/update.sql")
-    private String UPDATE;
+//    @TextFile("com/onevizion/scmdb/dao/DbScriptDaoSql/update.sql")
+    private String UPDATE = "update db_script set name = :name,file_hash = :fileHash,text = :text,ts = :ts,output = :output,type = :type,status = :status where db_script_id = :dbScriptId";
 
-    @TextFile("com/onevizion/scmdb/dao/DbScriptDaoSql/create.sql")
-    private String CREATE;
+//    @TextFile("com/onevizion/scmdb/dao/DbScriptDaoSql/create.sql")
+    private String CREATE = "insert into db_script (name,file_hash,text,ts,output,type,status) values (:name,:fileHash,:text,:ts,:output,:type,:status)";
 
     private final String DELETE_BY_IDS = "delete from db_script where db_script_id in (:p_ids)";
     private final String READ_ALL = "select * from db_script";
@@ -39,8 +39,8 @@ public class DbScriptDaoOra extends AbstractDaoOra {
 //            dbScript.setText(rs.getString("TEXT"));
 //            dbScript.setTs(rs.getDate("TS"));
 //            dbScript.setOutput(rs.getString("OUTPUT"));
-//            dbScript.setType(DbScriptType.getForInt(rs.getInt("TYPE")));
-//            dbScript.setStatus(DbScriptStatus.getForInt(rs.getInt("STATUS")));
+//            dbScript.setType(DbScriptType.getForId(rs.getInt("TYPE")));
+//            dbScript.setStatus(DbScriptStatus.getForId(rs.getInt("STATUS")));
 //            return dbScript;
 //        }
 //    };

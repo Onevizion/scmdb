@@ -81,11 +81,12 @@ public class CheckoutFacade {
         while (iter.hasNext()) {
             DbScriptVo vo = iter.next();
             if (!delDbScripts.contains(vo)) {
-                if (DbScriptType.ROLLBACK.equals(vo.getType())) {
+                if (DbScriptType.ROLLBACK.getTypeId().equals(vo.getType())) {
                     rollbackDbScripts.add(vo);
                     delIds.add(vo.getDbScriptId());
                 } else {
-                    String rollbackScript = vo.getName() + ROLLBACK_SUFX;
+                    String rollbackScript = FilenameUtils.getBaseName(vo.getName()) + ROLLBACK_SUFX
+                        + FilenameUtils.EXTENSION_SEPARATOR_STR + FilenameUtils.getExtension(vo.getName());
                     if (dbScripts.containsKey(rollbackScript)) {
                         delIds.add(vo.getDbScriptId());
                     }
@@ -117,7 +118,7 @@ public class CheckoutFacade {
             }
 
             for (DbScriptVo vo : newDbScripts) {
-                if (DbScriptType.ROLLBACK.equals(vo.getType())) {
+                if (DbScriptType.ROLLBACK.getTypeId().equals(vo.getType())) {
                     continue;
                 }
                 File srcFile = new File(scriptDir.getAbsolutePath() + File.separator + vo.getName());
@@ -177,11 +178,11 @@ public class CheckoutFacade {
                 } catch (IOException e) {
                     logger.warn("Can't read file [{}]", file.getName(), e);
                 }
-                dbScriptVo.setType(DbScriptType.ROLLBACK);
+                dbScriptVo.setType(DbScriptType.ROLLBACK.getTypeId());
             } else {
-                dbScriptVo.setType(DbScriptType.COMMIT);
+                dbScriptVo.setType(DbScriptType.COMMIT.getTypeId());
             }
-            dbScriptVo.setStatus(DbScriptStatus.EXECUTED);
+            dbScriptVo.setStatus(DbScriptStatus.EXECUTED.getStatusId());
             dbScripts.add(dbScriptVo);
         }
         return dbScripts;

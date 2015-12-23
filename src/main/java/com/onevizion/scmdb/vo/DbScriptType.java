@@ -1,26 +1,25 @@
 package com.onevizion.scmdb.vo;
 
 public enum DbScriptType {
-    COMMIT(0), ROLLBACK(1);
+    COMMIT(0L), ROLLBACK(1L);
 
-    int typeId;
+    Long typeId;
 
-    DbScriptType(int typeId) {
+    DbScriptType(Long typeId) {
         this.typeId = typeId;
     }
 
-    public int getTypeId() {
+    public Long getTypeId() {
         return typeId;
     }
 
-    public static DbScriptType getForInt(int typeId) {
-        switch (typeId) {
-            case 0:
-                return COMMIT;
-            case 1:
-                return ROLLBACK;
-            default:
-                throw new IllegalArgumentException("Not supported db script statusId: [" + typeId + "]");
+    public static DbScriptType getForId(Long typeId) {
+        if (Long.valueOf(0L).equals(typeId)) {
+            return COMMIT;
+        } else if (Long.valueOf(1L).equals(typeId)) {
+            return ROLLBACK;
+        } else {
+            throw new IllegalArgumentException("Not supported db script statusId: [" + typeId + "]");
         }
     }
 }

@@ -9,15 +9,15 @@ import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 
 @Repository
-public abstract class AbstractDaoOra {
+public class AbstractDaoOra {
     @Resource
     protected JdbcTemplate jdbcTemplate;
 
     @Resource
     protected NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
-    @PostConstruct
-    public void populateSqlStrings() {
-        TextFilePopulator.populate(this.getClass());
-    }
+//    @PostConstruct
+//    public void populateSqlStrings() {
+//        TextFilePopulator.populate(this.getClass());
+//    }
 }
