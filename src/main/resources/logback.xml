@@ -9,5 +9,5 @@
         <appender-ref ref="STDOUT" />
     </root>
 
-    <logger name="net.vqs" level="INFO" />
+    <logger name="com.onevizion" level="INFO" />
 </configuration>
