@@ -8,6 +8,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.filefilter.AgeFileFilter;
+import org.apache.commons.io.filefilter.RegexFileFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -46,9 +47,8 @@ public class CheckoutFacade {
 
     @Transactional
     public List<File> checkoutDbFromPath(File scriptDir, Map<String, DbScriptVo> dbScripts, boolean isGenDdl) {
-        DbScriptVo dbScriptVo = dbScriptDaoOra.readNewest();
         logger.debug("Searching new scripts in [{}]", scriptDir.getAbsolutePath());
-        Collection<File> files = FileUtils.listFiles(scriptDir, new AgeFileFilter(dbScriptVo.getTs(), false), null);
+        Collection<File> files = FileUtils.listFiles(scriptDir, new RegexFileFilter(".+\\.sql"), null);
         List<DbScriptVo> newDbScripts = createAll(files);
         List<DbScriptVo> delDbScripts = new ArrayList<DbScriptVo>();
         delDbScripts.addAll(newDbScripts);
@@ -67,14 +67,6 @@ public class CheckoutFacade {
         }
 
         logger.debug("Searching deleted scripts in [{}]", scriptDir.getAbsolutePath());
-        files = FileUtils.listFiles(scriptDir, new AgeFileFilter(dbScriptVo.getTs(), true), null);
-        delDbScripts.addAll(createAll(files));
-
-        File file = new File(scriptDir.getAbsolutePath() + File.separator + dbScriptVo.getName());
-        if (file.exists() && !delDbScripts.contains(dbScriptVo)) {
-            delDbScripts.add(dbScriptVo);
-        }
-
         List<DbScriptVo> rollbackDbScripts = new ArrayList<DbScriptVo>();
         List<Long> delIds = new ArrayList<Long>();
         iter = dbScripts.values().iterator();
@@ -132,6 +124,15 @@ public class CheckoutFacade {
                     throw new RuntimeException(e);
                 }
             }
+        } else {
+            logger.info("Extract DDL for new scripts");
+            List<DbScriptVo> newCommitScripts = new ArrayList<DbScriptVo>();
+            for (DbScriptVo vo : newDbScripts) {
+                if (DbScriptType.COMMIT.getTypeId().equals(vo.getType())) {
+                    newCommitScripts.add(vo);
+                }
+            }
+            ddlFacade.generateDdl(newCommitScripts, scriptDir);
         }
 
         if (!delIds.isEmpty()) {
@@ -143,11 +144,6 @@ public class CheckoutFacade {
             logger.debug("Saving new scripts in db");
             DbScriptVo[] newDbScriptArr = newDbScripts.toArray(new DbScriptVo[newDbScripts.size()]);
             dbScriptDaoOra.batchCreate(newDbScriptArr);
-
-            if (isGenDdl) {
-                logger.info("Extract DDL for new scripts");
-                ddlFacade.generateDdl(newDbScripts, scriptDir);
-            }
         }
 
         return result;
