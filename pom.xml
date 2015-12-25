@@ -1,12 +1,10 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
-    <groupId>net.vqs</groupId>
+    <groupId>com.onevizion</groupId>
     <artifactId>scm-db</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>scm-db</name>
+    <version>1.1.0</version>
 
     <dependencies>
         <dependency>
@@ -94,28 +92,6 @@
         </dependency>
     </dependencies>
 
-    <repositories>
-        <repository>
-            <id>internal</id>
-            <name>internal</name>
-            <url>${mvn.repo.addr}/archiva/repository/internal/</url>
-        </repository>
-        <repository>
-            <id>snapshots</id>
-            <name>snapshots</name>
-            <url>${mvn.repo.addr}/archiva/repository/snapshots/</url>
-            <snapshots>
-                <updatePolicy>never</updatePolicy>
-            </snapshots>
-        </repository>
-        <repository>
-            <id>releases</id>
-            <name>releases</name>
-            <url>${mvn.repo.addr}/archiva/repository/releases/</url>
-            <layout>default</layout>
-        </repository>
-    </repositories>
-
     <build>
         <plugins>
             <plugin>
@@ -157,4 +133,45 @@
             </plugin>
         </plugins>
     </build>
+
+    <repositories>
+        <repository>
+            <id>internal</id>
+            <name>internal</name>
+            <url>${mvn.repo.addr}/archiva/repository/internal/</url>
+        </repository>
+        <repository>
+            <id>snapshots</id>
+            <name>snapshots</name>
+            <url>${mvn.repo.addr}/archiva/repository/snapshots/</url>
+            <snapshots>
+                <updatePolicy>never</updatePolicy>
+            </snapshots>
+        </repository>
+        <repository>
+            <id>releases</id>
+            <name>releases</name>
+            <url>${mvn.repo.addr}/archiva/repository/releases/</url>
+            <layout>default</layout>
+        </repository>
+    </repositories>
+
+    <distributionManagement>
+        <repository>
+            <id>releases</id>
+            <name>releases</name>
+            <url>${mvn.repo.addr}/archiva/repository/releases/</url>
+            <layout>default</layout>
+        </repository>
+        <snapshotRepository>
+            <id>snapshots</id>
+            <name>snapshots</name>
+            <url>${mvn.repo.addr}/archiva/repository/snapshots/</url>
+            <layout>default</layout>
+        </snapshotRepository>
+    </distributionManagement>
+
+    <scm>
+        <developerConnection>scm:git:https://github.com/IKAMTeam/scmdb.git</developerConnection>
+    </scm>
 </project>
