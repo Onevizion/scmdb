@@ -91,6 +91,6 @@ public class DbScriptVo {
         }
 
         DbScriptVo vo = (DbScriptVo) obj;
-        return fileHash.equals(vo.getFileHash()) && name.equals(vo.getName());
+        return fileHash.equals(vo.getFileHash());
     }
 }
