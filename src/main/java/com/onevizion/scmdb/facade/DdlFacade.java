@@ -30,6 +30,7 @@ public class DdlFacade {
         if (newDbObjectArr == null) {
             return;
         }
+        logger.info("Extract DDL for new scripts");
         try {
             scriptsGenerator.setConCacheProperties("connectionCacheProperties.xml");
             scriptsGenerator.executeSettingTransformParams();

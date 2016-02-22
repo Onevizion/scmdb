@@ -125,7 +125,6 @@ public class CheckoutFacade {
                 }
             }
         } else {
-            logger.info("Extract DDL for new scripts");
             List<DbScriptVo> newCommitScripts = new ArrayList<DbScriptVo>();
             for (DbScriptVo vo : newDbScripts) {
                 if (DbScriptType.COMMIT.getTypeId().equals(vo.getType())) {
