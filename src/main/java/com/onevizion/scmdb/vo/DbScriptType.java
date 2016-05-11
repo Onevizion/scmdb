@@ -19,7 +19,7 @@ public enum DbScriptType {
         } else if (Long.valueOf(1L).equals(typeId)) {
             return ROLLBACK;
         } else {
-            throw new IllegalArgumentException("Not supported db script statusId: [" + typeId + "]");
+            throw new IllegalArgumentException("Not supported db script type: [" + typeId + "]");
         }
     }
 }

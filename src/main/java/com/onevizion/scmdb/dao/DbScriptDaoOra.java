@@ -25,6 +25,7 @@ public class DbScriptDaoOra extends AbstractDaoOra {
 
     private final String DELETE_BY_IDS = "delete from db_script where db_script_id in (:p_ids)";
     private final String READ_ALL = "select * from db_script";
+    private final String READ_COUNT = "select count(*) from db_script";
     private final String READ_NEWEST = "select * from (select * from db_script order by name desc, ts desc) where rownum = 1";
 
     private RowMapper<DbScriptVo> rowMapper = new BeanPropertyRowMapper<DbScriptVo>(DbScriptVo.class);
@@ -44,8 +45,17 @@ public class DbScriptDaoOra extends AbstractDaoOra {
         return jdbcTemplate.query(READ_ALL, dbScriptsExtractor);
     }
 
-    public void batchCreate(final DbScriptVo[] dbScripts) {
-        namedParameterJdbcTemplate.batchUpdate(CREATE, SqlParameterSourceUtils.createBatch(dbScripts));
+    public Long readCount() {
+        return jdbcTemplate.queryForObject(READ_COUNT, Long.class);
+    }
+
+    public void batchCreate(Collection<DbScriptVo> dbScripts) {
+        DbScriptVo[] dbScriptsArr = dbScripts.toArray(new DbScriptVo[dbScripts.size()]);
+        namedParameterJdbcTemplate.batchUpdate(CREATE, SqlParameterSourceUtils.createBatch(dbScriptsArr));
+    }
+
+    public void create(DbScriptVo dbScript) {
+        namedParameterJdbcTemplate.update(CREATE, new BeanPropertySqlParameterSource(dbScript));
     }
 
     public void deleteByIds(Collection<Long> delIds) {
