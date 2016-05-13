@@ -57,10 +57,12 @@ public class CheckoutFacade {
         List<DbScriptVo> rollbacksToExec = new ArrayList<DbScriptVo>();
         List<Long> deleteScriptIds = new ArrayList<Long>();
         for (DbScriptVo deletedScript : deletedScripts) {
-            deleteScriptIds.add(deletedScript.getDbScriptId());
-            if (DbScriptType.COMMIT.getTypeId().equals(deletedScript.getType())
+            if (DbScriptType.ROLLBACK.getTypeId().equals(deletedScript.getType())) {
+                deleteScriptIds.add(deletedScript.getDbScriptId());
+            }else if (DbScriptType.COMMIT.getTypeId().equals(deletedScript.getType())
                     && dbScripts.containsKey(deletedScript.getRollbackName())) {
                 rollbacksToExec.add(dbScripts.get(deletedScript.getRollbackName()));
+                deleteScriptIds.add(deletedScript.getDbScriptId());
             }
         }
         if (!deleteScriptIds.isEmpty()) {
