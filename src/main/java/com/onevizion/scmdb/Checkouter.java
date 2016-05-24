@@ -2,99 +2,91 @@ package com.onevizion.scmdb;
 
 import com.onevizion.scmdb.dao.DbScriptDaoOra;
 import com.onevizion.scmdb.facade.CheckoutFacade;
+import com.onevizion.scmdb.vo.DbCnnCredentials;
+import com.onevizion.scmdb.vo.DbScriptStatus;
 import com.onevizion.scmdb.vo.DbScriptVo;
 import oracle.jdbc.pool.OracleDataSource;
-import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 import java.io.File;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Collection;
 
 public class Checkouter {
-
-    private static final String DB_CNN_PROPS_ERROR_MESSAGE = "You should specify db connection properties using following format:"
-        + " <username>/<password>@<host>:<port>:<SID>";
-
-    private static final String JDBC_THIN_URL_PREFIX = "jdbc:oracle:thin:@";
-
-    private static final String DB_SCRIPT_DIR_ERROR_MESSAGE = "You should specify absolute path to db scripts";
-
     private static final Logger logger = LoggerFactory.getLogger(Checkouter.class);
+    public static final String SCRIPT_EXECUTION_ERROR_MESSAGE = "Fix and execute manually script [{}] and the run scmdb again to execute other scripts.";
+    private DbScriptDaoOra dbScriptDaoOra;
+    private CheckoutFacade checkoutFacade;
+    private DbCnnCredentials cnnCredentials;
+    private File scriptDir;
+    private boolean isGenDdl;
+    private boolean isExecScripts;
 
-    public static void main(String[] args) {
-        if (args.length == 0) {
-            throw new IllegalArgumentException(DB_CNN_PROPS_ERROR_MESSAGE + "\n" + DB_SCRIPT_DIR_ERROR_MESSAGE);
-        }
-        String[] cnnProps = parseDbCnnStr(args[0]);
-        File scriptDir = parseDbScriptDir(args[1]);
-        boolean isGenDdl = false;
-        if (args.length > 2) {
-            isGenDdl = parseDbGenDdl(args[2]);
-        }
+    public Checkouter(DbCnnCredentials cnnCredentials, File scriptDir, boolean isGenDdl, boolean isExecScripts) {
+        this.cnnCredentials = cnnCredentials;
+        this.scriptDir = scriptDir;
+        this.isGenDdl = isGenDdl;
+        this.isExecScripts = isExecScripts;
 
-        logger.debug("Initialize spring beans");
-        ApplicationContext ctx = new ClassPathXmlApplicationContext("classpath:beans.xml");
+        initSpring();
+    }
 
-        OracleDataSource ds = (OracleDataSource) ctx.getBean("dataSource");
-        ds.setUser(cnnProps[0]);
-        ds.setPassword(cnnProps[1]);
-        ds.setURL(cnnProps[2]);
-
-        DbScriptDaoOra dbScriptDaoOra = ctx.getBean(DbScriptDaoOra.class);
-        CheckoutFacade checkoutFacade = ctx.getBean(CheckoutFacade.class);
-
+    public void checkout() {
         logger.info("Checking out your database");
         logger.debug("Getting all scripts from db");
-        Map<String, DbScriptVo> dbScripts = dbScriptDaoOra.readAll();
-        if (dbScripts.isEmpty()) {
+        if (checkoutFacade.isFirstRun()) {
             logger.debug("Saving all scripts in db");
             checkoutFacade.createAllFromPath(scriptDir);
-        } else {
-            List<File> files = checkoutFacade.checkoutDbFromPath(scriptDir, dbScripts, isGenDdl);
-            if (!files.isEmpty()) {
-                logger.info("You should execute following script files to checkout your database:");
-                for (File f : files) {
-                    logger.info(f.getAbsolutePath());
+            return;
+        }
+
+        Collection<DbScriptVo> scriptsToExec = checkoutFacade.getScriptsToExec(scriptDir);
+        if (isGenDdl) {
+            checkoutFacade.genDdl(scriptDir, scriptsToExec);
+            return;
+        }
+
+        if (!scriptsToExec.isEmpty()) {
+            if (isExecScripts) {
+                SqlScriptExecutor scriptExecutor = new SqlScriptExecutor(cnnCredentials);
+                logger.info("Executing scripts in your database:");
+                for (DbScriptVo script : scriptsToExec) {
+                    logger.info("Executing: " + script.getName());
+                    int exitCode = scriptExecutor.execute(script.getFile());
+                    if (exitCode == 0) {
+                        script.setStatus(DbScriptStatus.EXECUTED);
+                    } else {
+                        script.setStatus(DbScriptStatus.EXECUTED_WITH_ERRORS);
+                    }
+                    dbScriptDaoOra.create(script);
+                    if (exitCode != 0) {
+                        logger.error(SCRIPT_EXECUTION_ERROR_MESSAGE, script.getFile().getAbsolutePath());
+                        return;
+                    }
                 }
+            } else {
+                logger.info("You should execute following script files to checkout your database:");
+                for (DbScriptVo script : scriptsToExec) {
+                    logger.info(script.getFile().getAbsolutePath());
+                }
+                dbScriptDaoOra.batchCreate(scriptsToExec);
             }
         }
         logger.info("Your database is up-to-date");
     }
 
-    private static boolean parseDbGenDdl(String arg) {
-        if (NumberUtils.isNumber(arg)) {
-            return NumberUtils.toInt(arg) == 1;
-        } else {
-            throw new IllegalArgumentException("Cannot parse generate ddl param using parameter: " + arg);
-        }
-    }
+    private void initSpring() {
+        logger.debug("Initialize spring beans");
+        ApplicationContext ctx = new ClassPathXmlApplicationContext("classpath:beans.xml");
 
-    private static File parseDbScriptDir(String path) {
-        File f = new File(path);
-        if (f.exists()) {
-            return f;
-        } else {
-            throw new IllegalArgumentException("File or directory doesn't exist: " + path);
-        }
-    }
+        OracleDataSource ds = (OracleDataSource) ctx.getBean("dataSource");
+        ds.setUser(cnnCredentials.getUser());
+        ds.setPassword(cnnCredentials.getPassword());
+        ds.setURL(cnnCredentials.getOracleUrl());
 
-    private static String[] parseDbCnnStr(String cnnStr) {
-        Pattern p = Pattern.compile("(.+?)/(.+?)@(.+)");
-        Matcher m = p.matcher(cnnStr);
-        String[] props = new String[3];
-        if (m.matches() && m.groupCount() == 3) {
-            props[0] = m.group(1);
-            props[1] = m.group(2);
-            props[2] = JDBC_THIN_URL_PREFIX + m.group(3);
-        } else {
-            throw new IllegalArgumentException(DB_CNN_PROPS_ERROR_MESSAGE);
-        }
-        return props;
+        dbScriptDaoOra = ctx.getBean(DbScriptDaoOra.class);
+        checkoutFacade = ctx.getBean(CheckoutFacade.class);
     }
 }

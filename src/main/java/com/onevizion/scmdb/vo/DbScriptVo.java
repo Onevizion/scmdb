@@ -1,5 +1,14 @@
 package com.onevizion.scmdb.vo;
 
+import com.onevizion.scmdb.Checkouter;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
 import java.util.Date;
 
 public class DbScriptVo {
@@ -11,6 +20,35 @@ public class DbScriptVo {
     private String output;
     private DbScriptType type;
     private DbScriptStatus status;
+    private File file;
+
+    private static final Logger logger = LoggerFactory.getLogger(Checkouter.class);
+    private static final String ROLLBACK_SUFX = "_rollback";
+
+    public static DbScriptVo create(File scriptFile) {
+        DbScriptVo scriptVo = new DbScriptVo();
+
+        scriptVo.setFile(scriptFile);
+        scriptVo.setName(scriptFile.getName());
+        String fileContent = null;
+        try {
+            fileContent = FileUtils.readFileToString(scriptFile);
+            scriptVo.setFileHash(DigestUtils.sha1Hex(fileContent.replaceAll("\\r\\n", "\n")));
+        } catch (IOException e) {
+            logger.warn("Can't read file content [{}]", scriptFile.getName(), e);
+        }
+        scriptVo.setTs(new Date(scriptFile.lastModified()));
+
+        if (FilenameUtils.getBaseName(scriptVo.getName()).endsWith(ROLLBACK_SUFX)) {
+            scriptVo.setText(fileContent);
+            scriptVo.setType(DbScriptType.ROLLBACK);
+        } else {
+            scriptVo.setType(DbScriptType.COMMIT);
+        }
+        scriptVo.setStatus(DbScriptStatus.EXECUTED);
+
+        return scriptVo;
+    }
 
     public Long getDbScriptId() {
         return dbScriptId;
@@ -80,17 +118,42 @@ public class DbScriptVo {
         this.status = DbScriptStatus.getForId(status);
     }
 
+    public void setStatus(DbScriptStatus status) {
+        this.status = status;
+    }
+
+    public File getFile() {
+        return file;
+    }
+
+    public void setFile(File file) {
+        this.file = file;
+    }
+
+    public String getRollbackName() {
+        if (type == DbScriptType.ROLLBACK) {
+            return name;
+        } else {
+            return FilenameUtils.getBaseName(name) + ROLLBACK_SUFX + FilenameUtils.EXTENSION_SEPARATOR_STR
+                    + FilenameUtils.getExtension(name);
+        }
+    }
+
     @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
+    public int hashCode() {
+        return name.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
             return true;
-        } else if (obj == null) {
-            return false;
-        } else if (getClass() != obj.getClass()) {
+        }
+        if (o == null || getClass() != o.getClass()) {
             return false;
         }
 
-        DbScriptVo vo = (DbScriptVo) obj;
-        return fileHash.equals(vo.getFileHash());
+        DbScriptVo that = (DbScriptVo) o;
+        return name != null ? name.equals(that.name) : that.name == null;
     }
 }
