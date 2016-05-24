@@ -7,6 +7,8 @@ public class DbCnnCredentials {
     private static final String JDBC_THIN_URL_PREFIX = "jdbc:oracle:thin:@";
     public static final String DB_CNN_STR_ERROR_MESSAGE = "You should specify db connection properties using following format:"
             + " <username>/<password>@<host>:<port>:<SID>";
+    public static final String USER_SCHEMA_ERROR_MESSAGE = "You should use owner schema in db connection string.";
+    public static final String USER_SCHEMA_SUFFIX = "_user";
 
     private String user;
     private String password;
@@ -30,13 +32,20 @@ public class DbCnnCredentials {
         } else {
             throw new IllegalArgumentException(DB_CNN_STR_ERROR_MESSAGE);
         }
+        if(isUserSchema(cnnCredentials.getUser())){
+            throw new IllegalArgumentException(USER_SCHEMA_ERROR_MESSAGE);
+        }
         return cnnCredentials;
     }
 
     private static String genUserCnnStr(String ownerCnnStr) {
         String owner = ownerCnnStr.substring(0, ownerCnnStr.indexOf("/"));
-        String user = owner + "_user";
+        String user = owner + USER_SCHEMA_SUFFIX;
         return user + ownerCnnStr.substring(ownerCnnStr.indexOf("/"));
+    }
+
+    private static boolean isUserSchema(String cnnUser) {
+        return cnnUser.endsWith(USER_SCHEMA_SUFFIX);
     }
 
     public String getUser() {
