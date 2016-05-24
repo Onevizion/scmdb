@@ -25,8 +25,7 @@ public class DbCnnCredentials {
         Matcher m = p.matcher(ownerCnnStr);
         if (m.matches() && m.groupCount() == 3) {
             cnnCredentials.setUser(m.group(1));
-            cnnCredentials.setPassword(m.group(1));
-            cnnCredentials.setUser(m.group(2));
+            cnnCredentials.setPassword(m.group(2));
             cnnCredentials.setOracleUrl(JDBC_THIN_URL_PREFIX + m.group(3));
         } else {
             throw new IllegalArgumentException(DB_CNN_STR_ERROR_MESSAGE);
