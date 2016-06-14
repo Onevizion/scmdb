@@ -43,10 +43,9 @@ public class SqlScriptExecutor {
         try {
             return executor.execute(commandLine);
         } catch (ExecuteException e) {
-            logger.error("Script executed with errors", e);
             return e.getExitValue();
         } catch (IOException e) {
-            logger.error("Error during command execution", e);
+            logger.error("Error during command execution.", e);
             return 1;
         } finally {
             wrapperScriptFile.delete();

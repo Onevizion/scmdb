@@ -16,7 +16,7 @@ import java.util.Collection;
 
 public class Checkouter {
     private static final Logger logger = LoggerFactory.getLogger(Checkouter.class);
-    public static final String SCRIPT_EXECUTION_ERROR_MESSAGE = "Fix and execute manually script [{}] and the run scmdb again to execute other scripts.";
+    public static final String SCRIPT_EXECUTION_ERROR_MESSAGE = "Fix and execute manually script [{}] and then run scmdb again to execute other scripts.";
     private DbScriptDaoOra dbScriptDaoOra;
     private CheckoutFacade checkoutFacade;
     private DbCnnCredentials cnnCredentials;
@@ -62,7 +62,7 @@ public class Checkouter {
                     }
                     dbScriptDaoOra.create(script);
                     if (exitCode != 0) {
-                        logger.error(SCRIPT_EXECUTION_ERROR_MESSAGE, script.getFile().getAbsolutePath());
+                        logger.error(SCRIPT_EXECUTION_ERROR_MESSAGE, script.getFile().getName());
                         return;
                     }
                 }
