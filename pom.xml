@@ -10,7 +10,7 @@
         <dependency>
             <groupId>com.onevizion</groupId>
             <artifactId>maven-plugin-dbschema</artifactId>
-            <version>7.37.0</version>
+            <version>1.0.0</version>
         </dependency>
 
         <dependency>
