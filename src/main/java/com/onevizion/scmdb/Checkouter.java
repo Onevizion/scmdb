@@ -6,6 +6,7 @@ import com.onevizion.scmdb.vo.DbCnnCredentials;
 import com.onevizion.scmdb.vo.DbScriptStatus;
 import com.onevizion.scmdb.vo.DbScriptVo;
 import oracle.jdbc.pool.OracleDataSource;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
@@ -13,6 +14,9 @@ import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 import java.io.File;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
 
 public class Checkouter {
     private static final Logger logger = LoggerFactory.getLogger(Checkouter.class);
@@ -48,12 +52,13 @@ public class Checkouter {
             return;
         }
 
+        skipDevScripts(scriptsToExec);
         if (!scriptsToExec.isEmpty()) {
             if (isExecScripts) {
                 SqlScriptExecutor scriptExecutor = new SqlScriptExecutor(cnnCredentials);
                 logger.info("Executing scripts in your database:");
                 for (DbScriptVo script : scriptsToExec) {
-                    logger.info("Executing: " + script.getName());
+                    logger.info("Executing script: [" + script.getName() + "]");
                     int exitCode = scriptExecutor.execute(script.getFile());
                     if (exitCode == 0) {
                         script.setStatus(DbScriptStatus.EXECUTED);
@@ -75,6 +80,29 @@ public class Checkouter {
             }
         }
         logger.info("Your database is up-to-date");
+    }
+
+    private void skipDevScripts(Collection<DbScriptVo> scripts) {
+        Set<DbScriptVo> ignoredScripts = new HashSet<DbScriptVo>();
+        Iterator<DbScriptVo> iterator = scripts.iterator();
+        while (iterator.hasNext()) {
+            DbScriptVo scriptVo = iterator.next();
+            if (isDevScript(scriptVo)) {
+                ignoredScripts.add(scriptVo);
+                iterator.remove();
+            }
+        }
+
+        if (!ignoredScripts.isEmpty()) {
+            for (DbScriptVo script : ignoredScripts) {
+                logger.info("Script was ignored [" + script.getName() + "]");
+            }
+        }
+    }
+
+    private boolean isDevScript(DbScriptVo scriptVo) {
+        String[] parts = scriptVo.getName().split("_");
+        return parts.length <= 1 || !NumberUtils.isDigits(parts[0]);
     }
 
     private void initSpring() {
