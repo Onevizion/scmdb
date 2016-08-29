@@ -20,7 +20,12 @@ public class SqlScriptExecutor {
     public SqlScriptExecutor(DbCnnCredentials dbCnnCredentials) {
         this.dbCnnCredentials = dbCnnCredentials;
         executor = new DefaultExecutor();
-        executor.setStreamHandler(new PumpStreamHandler(System.out));
+        executor.setStreamHandler(new PumpStreamHandler(new LogOutputStream() {
+            @Override
+            protected void processLine(String line, int logLevel) {
+                logger.info(line);
+            }
+        }));
     }
 
     public int execute(File sqlScript) {
