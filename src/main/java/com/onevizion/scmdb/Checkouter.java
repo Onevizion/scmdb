@@ -3,8 +3,8 @@ package com.onevizion.scmdb;
 import com.onevizion.scmdb.dao.DbScriptDaoOra;
 import com.onevizion.scmdb.facade.CheckoutFacade;
 import com.onevizion.scmdb.vo.DbCnnCredentials;
-import com.onevizion.scmdb.vo.DbScriptStatus;
-import com.onevizion.scmdb.vo.DbScriptVo;
+import com.onevizion.scmdb.vo.DbScript;
+import com.onevizion.scmdb.vo.ScriptStatus;
 import oracle.jdbc.pool.OracleDataSource;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
@@ -14,13 +14,13 @@ import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 import java.io.File;
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class Checkouter {
     private static final Logger logger = LoggerFactory.getLogger(Checkouter.class);
-    public static final String SCRIPT_EXECUTION_ERROR_MESSAGE = "Fix and execute manually script [{}] and then run scmdb again to execute other scripts.";
+    private static final String SCRIPT_EXECUTION_ERROR_MESSAGE = "Fix and execute manually script [{}] and then run scmdb again to execute other scripts.";
+
     private DbScriptDaoOra dbScriptDaoOra;
     private CheckoutFacade checkoutFacade;
     private DbCnnCredentials cnnCredentials;
@@ -40,30 +40,36 @@ public class Checkouter {
     public void checkout() {
         logger.info("Checking out your database");
         logger.debug("Getting all scripts from db");
+
+        ///region First run
         if (checkoutFacade.isFirstRun()) {
             logger.debug("Saving all scripts in db");
             checkoutFacade.createAllFromPath(scriptDir);
             return;
         }
+        ///endregion
 
-        Collection<DbScriptVo> scriptsToExec = checkoutFacade.getScriptsToExec(scriptDir);
+        List<DbScript> scriptsToExec = checkoutFacade.getScriptsToExec(scriptDir);
+
+        //region Gen DDL
         if (isGenDdl) {
             checkoutFacade.genDdl(scriptDir, scriptsToExec);
             return;
         }
+        //endregion
 
-        skipDevScripts(scriptsToExec);
+        removeDevScripts(scriptsToExec);
         if (!scriptsToExec.isEmpty()) {
             if (isExecScripts) {
                 SqlScriptExecutor scriptExecutor = new SqlScriptExecutor(cnnCredentials);
                 logger.info("Executing scripts in your database:");
-                for (DbScriptVo script : scriptsToExec) {
+                for (DbScript script : scriptsToExec) {
                     logger.info("Executing script: [" + script.getName() + "]");
                     int exitCode = scriptExecutor.execute(script.getFile());
                     if (exitCode == 0) {
-                        script.setStatus(DbScriptStatus.EXECUTED);
+                        script.setStatus(ScriptStatus.EXECUTED);
                     } else {
-                        script.setStatus(DbScriptStatus.EXECUTED_WITH_ERRORS);
+                        script.setStatus(ScriptStatus.EXECUTED_WITH_ERRORS);
                     }
                     dbScriptDaoOra.create(script);
                     if (exitCode != 0) {
@@ -73,7 +79,7 @@ public class Checkouter {
                 }
             } else {
                 logger.info("You should execute following script files to checkout your database:");
-                for (DbScriptVo script : scriptsToExec) {
+                for (DbScript script : scriptsToExec) {
                     logger.info(script.getFile().getAbsolutePath());
                 }
                 dbScriptDaoOra.batchCreate(scriptsToExec);
@@ -82,25 +88,17 @@ public class Checkouter {
         logger.info("Your database is up-to-date");
     }
 
-    private void skipDevScripts(Collection<DbScriptVo> scripts) {
-        Set<DbScriptVo> ignoredScripts = new HashSet<DbScriptVo>();
-        Iterator<DbScriptVo> iterator = scripts.iterator();
-        while (iterator.hasNext()) {
-            DbScriptVo scriptVo = iterator.next();
-            if (isDevScript(scriptVo)) {
-                ignoredScripts.add(scriptVo);
-                iterator.remove();
-            }
-        }
+    private List<DbScript> removeDevScripts(Collection<DbScript> scripts) {
+        scripts.stream()
+               .filter(this::isDevScript)
+               .forEach(script -> logger.info("Script was ignored [" + script.getName() + "]"));
 
-        if (!ignoredScripts.isEmpty()) {
-            for (DbScriptVo script : ignoredScripts) {
-                logger.info("Script was ignored [" + script.getName() + "]");
-            }
-        }
+        return scripts.stream()
+                      .filter(script -> !isDevScript(script))
+                      .collect(Collectors.toList());
     }
 
-    private boolean isDevScript(DbScriptVo scriptVo) {
+    private boolean isDevScript(DbScript scriptVo) {
         String[] parts = scriptVo.getName().split("_");
         return parts.length <= 1 || !NumberUtils.isDigits(parts[0]);
     }

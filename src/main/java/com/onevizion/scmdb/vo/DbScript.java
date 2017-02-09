@@ -1,6 +1,5 @@
 package com.onevizion.scmdb.vo;
 
-import com.onevizion.scmdb.Checkouter;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
@@ -11,43 +10,43 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Date;
 
-public class DbScriptVo {
+public class DbScript {
     private Long dbScriptId;
     private String name;
     private String fileHash;
     private String text;
     private Date ts;
     private String output;
-    private DbScriptType type;
-    private DbScriptStatus status;
+    private ScriptType type;
+    private ScriptStatus status;
     private File file;
 
-    private static final Logger logger = LoggerFactory.getLogger(Checkouter.class);
-    private static final String ROLLBACK_SUFX = "_rollback";
+    private static final Logger logger = LoggerFactory.getLogger(DbScript.class);
+    private static final String ROLLBACK_SUFFIX = "_rollback";
 
-    public static DbScriptVo create(File scriptFile) {
-        DbScriptVo scriptVo = new DbScriptVo();
+    public static DbScript create(File scriptFile) {
+        DbScript script = new DbScript();
 
-        scriptVo.setFile(scriptFile);
-        scriptVo.setName(scriptFile.getName());
+        script.setFile(scriptFile);
+        script.setName(scriptFile.getName());
         String fileContent = null;
         try {
             fileContent = FileUtils.readFileToString(scriptFile);
-            scriptVo.setFileHash(DigestUtils.sha1Hex(fileContent.replaceAll("\\r\\n", "\n")));
+            script.setFileHash(DigestUtils.sha1Hex(fileContent.replaceAll("\\r\\n", "\n")));
         } catch (IOException e) {
             logger.warn("Can't read file content [{}]", scriptFile.getName(), e);
         }
-        scriptVo.setTs(new Date(scriptFile.lastModified()));
+        script.setTs(new Date(scriptFile.lastModified()));
 
-        if (FilenameUtils.getBaseName(scriptVo.getName()).endsWith(ROLLBACK_SUFX)) {
-            scriptVo.setText(fileContent);
-            scriptVo.setType(DbScriptType.ROLLBACK);
+        if (FilenameUtils.getBaseName(script.getName()).endsWith(ROLLBACK_SUFFIX)) {
+            script.setText(fileContent);
+            script.setType(ScriptType.ROLLBACK);
         } else {
-            scriptVo.setType(DbScriptType.COMMIT);
+            script.setType(ScriptType.COMMIT);
         }
-        scriptVo.setStatus(DbScriptStatus.EXECUTED);
+        script.setStatus(ScriptStatus.EXECUTED);
 
-        return scriptVo;
+        return script;
     }
 
     public Long getDbScriptId() {
@@ -98,15 +97,11 @@ public class DbScriptVo {
         this.output = output;
     }
 
-    public Long getType() {
-        return type.getTypeId();
+    public ScriptType getType() {
+        return type;
     }
 
-    public void setType(Long type) {
-        this.type = DbScriptType.getForId(type);
-    }
-
-    public void setType(DbScriptType type) {
+    public void setType(ScriptType type) {
         this.type = type;
     }
 
@@ -115,10 +110,10 @@ public class DbScriptVo {
     }
 
     public void setStatus(Long status) {
-        this.status = DbScriptStatus.getForId(status);
+        this.status = ScriptStatus.getById(status);
     }
 
-    public void setStatus(DbScriptStatus status) {
+    public void setStatus(ScriptStatus status) {
         this.status = status;
     }
 
@@ -131,10 +126,10 @@ public class DbScriptVo {
     }
 
     public String getRollbackName() {
-        if (type == DbScriptType.ROLLBACK) {
+        if (type == ScriptType.ROLLBACK) {
             return name;
         } else {
-            return FilenameUtils.getBaseName(name) + ROLLBACK_SUFX + FilenameUtils.EXTENSION_SEPARATOR_STR
+            return FilenameUtils.getBaseName(name) + ROLLBACK_SUFFIX + FilenameUtils.EXTENSION_SEPARATOR_STR
                     + FilenameUtils.getExtension(name);
         }
     }
@@ -153,7 +148,7 @@ public class DbScriptVo {
             return false;
         }
 
-        DbScriptVo that = (DbScriptVo) o;
+        DbScript that = (DbScript) o;
         return name != null ? name.equals(that.name) : that.name == null;
     }
 }

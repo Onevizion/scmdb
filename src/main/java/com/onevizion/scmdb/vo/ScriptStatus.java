@@ -1,11 +1,13 @@
 package com.onevizion.scmdb.vo;
 
-public enum DbScriptStatus {
-    EXECUTED(0L), NOT_EXECUTED(1L), EXECUTED_WITH_ERRORS(2L);
+public enum ScriptStatus {
+    EXECUTED(0L),
+    NOT_EXECUTED(1L),
+    EXECUTED_WITH_ERRORS(2L);
 
-    Long statusId;
+    private Long statusId;
 
-    DbScriptStatus(Long statusId) {
+    ScriptStatus(Long statusId) {
         this.statusId = statusId;
     }
 
@@ -13,7 +15,7 @@ public enum DbScriptStatus {
         return statusId;
     }
 
-    public static DbScriptStatus getForId(Long statusId) {
+    public static ScriptStatus getById(Long statusId) {
         if (Long.valueOf(0L).equals(statusId)) {
             return EXECUTED;
         } else if (Long.valueOf(1L).equals(statusId)) {

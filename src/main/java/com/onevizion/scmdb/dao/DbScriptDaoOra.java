@@ -1,7 +1,6 @@
 package com.onevizion.scmdb.dao;
 
-import com.onevizion.scmdb.vo.DbScriptVo;
-import org.springframework.dao.DataAccessException;
+import com.onevizion.scmdb.vo.DbScript;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.RowMapper;
@@ -10,8 +9,6 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.SqlParameterSourceUtils;
 import org.springframework.stereotype.Repository;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -28,20 +25,18 @@ public class DbScriptDaoOra extends AbstractDaoOra {
     private final String READ_COUNT = "select count(*) from db_script";
     private final String READ_NEWEST = "select * from (select * from db_script order by name desc, ts desc) where rownum = 1";
 
-    private RowMapper<DbScriptVo> rowMapper = new BeanPropertyRowMapper<DbScriptVo>(DbScriptVo.class);
+    private RowMapper<DbScript> rowMapper = new BeanPropertyRowMapper<>(DbScript.class);
 
-    private ResultSetExtractor<Map<String, DbScriptVo>> dbScriptsExtractor = new ResultSetExtractor<Map<String, DbScriptVo>>() {
-        public Map<String, DbScriptVo> extractData(ResultSet rs) throws SQLException, DataAccessException {
-            Map<String, DbScriptVo> dbScripts = new HashMap<String, DbScriptVo>();
-            while (rs.next()) {
-                DbScriptVo dbScript = rowMapper.mapRow(rs, rs.getRow());
-                dbScripts.put(dbScript.getName(), dbScript);
-            }
-            return dbScripts;
+    private ResultSetExtractor<Map<String, DbScript>> dbScriptsExtractor = rs -> {
+        Map<String, DbScript> dbScripts = new HashMap<>();
+        while (rs.next()) {
+            DbScript dbScript = rowMapper.mapRow(rs, rs.getRow());
+            dbScripts.put(dbScript.getName(), dbScript);
         }
+        return dbScripts;
     };
 
-    public Map<String, DbScriptVo> readAll() {
+    public Map<String, DbScript> readAll() {
         return jdbcTemplate.query(READ_ALL, dbScriptsExtractor);
     }
 
@@ -49,12 +44,12 @@ public class DbScriptDaoOra extends AbstractDaoOra {
         return jdbcTemplate.queryForObject(READ_COUNT, Long.class);
     }
 
-    public void batchCreate(Collection<DbScriptVo> dbScripts) {
-        DbScriptVo[] dbScriptsArr = dbScripts.toArray(new DbScriptVo[dbScripts.size()]);
+    public void batchCreate(Collection<DbScript> dbScripts) {
+        DbScript[] dbScriptsArr = dbScripts.toArray(new DbScript[dbScripts.size()]);
         namedParameterJdbcTemplate.batchUpdate(CREATE, SqlParameterSourceUtils.createBatch(dbScriptsArr));
     }
 
-    public void create(DbScriptVo dbScript) {
+    public void create(DbScript dbScript) {
         namedParameterJdbcTemplate.update(CREATE, new BeanPropertySqlParameterSource(dbScript));
     }
 
@@ -64,7 +59,7 @@ public class DbScriptDaoOra extends AbstractDaoOra {
         namedParameterJdbcTemplate.update(DELETE_BY_IDS, params);
     }
 
-    public void update(DbScriptVo dbScriptVo) {
-        namedParameterJdbcTemplate.update(UPDATE, new BeanPropertySqlParameterSource(dbScriptVo));
+    public void update(DbScript dbScript) {
+        namedParameterJdbcTemplate.update(UPDATE, new BeanPropertySqlParameterSource(dbScript));
     }
 }

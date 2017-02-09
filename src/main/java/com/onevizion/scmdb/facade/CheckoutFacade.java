@@ -1,11 +1,9 @@
 package com.onevizion.scmdb.facade;
 
 import com.onevizion.scmdb.dao.DbScriptDaoOra;
-import com.onevizion.scmdb.vo.DbScriptType;
-import com.onevizion.scmdb.vo.DbScriptVo;
+import com.onevizion.scmdb.vo.DbScript;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.filefilter.RegexFileFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -14,7 +12,14 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
+import static com.onevizion.scmdb.vo.ScriptType.ROLLBACK;
 
 @Component
 public class CheckoutFacade {
@@ -24,7 +29,7 @@ public class CheckoutFacade {
     @Resource
     private DdlFacade ddlFacade;
 
-    private final String EXEC_FOLDER_NAME = "EXECUTE_ME";
+    private final static String EXEC_FOLDER_NAME = "EXECUTE_ME";
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
@@ -34,16 +39,16 @@ public class CheckoutFacade {
     }
 
     @Transactional
-    public Collection<DbScriptVo> getScriptsToExec(File scriptDir) {
+    public List<DbScript> getScriptsToExec(File scriptDir) {
         logger.debug("Searching new scripts in [{}]", scriptDir.getAbsolutePath());
 
-        Map<String, DbScriptVo> dbScripts = dbScriptDaoOra.readAll();
-        Collection<File> scriptFiles = FileUtils.listFiles(scriptDir, new RegexFileFilter(".+\\.sql"), null);
-        List<DbScriptVo> scriptsInDir = createVosFromScriptFiles(scriptFiles);
+        Map<String, DbScript> dbScripts = dbScriptDaoOra.readAll();
+        List<File> scriptFiles = (List<File>) FileUtils.listFiles(scriptDir, new String[]{"sql"}, false);
+        List<DbScript> scriptsInDir = createVosFromScriptFiles(scriptFiles);
 
-        for (DbScriptVo script : scriptsInDir) {
+        for (DbScript script : scriptsInDir) {
             if (dbScripts.containsKey(script.getName())) {
-                DbScriptVo savedScript = dbScripts.get(script.getName());
+                DbScript savedScript = dbScripts.get(script.getName());
                 if (!script.getFileHash().equals(savedScript.getFileHash())) {
                     logger.warn("Script file was changed [{}]", script.getName());
                     savedScript.setFileHash(script.getFileHash());
@@ -53,14 +58,13 @@ public class CheckoutFacade {
         }
 
         logger.debug("Searching deleted scripts in [{}]", scriptDir.getAbsolutePath());
-        Collection<DbScriptVo> deletedScripts = CollectionUtils.subtract(dbScripts.values(), scriptsInDir);
-        List<DbScriptVo> rollbacksToExec = new ArrayList<DbScriptVo>();
-        List<Long> deleteScriptIds = new ArrayList<Long>();
-        for (DbScriptVo deletedScript : deletedScripts) {
-            if (DbScriptType.ROLLBACK.getTypeId().equals(deletedScript.getType())) {
+        Collection<DbScript> deletedScripts = CollectionUtils.subtract(dbScripts.values(), scriptsInDir);
+        List<DbScript> rollbacksToExec = new ArrayList<>();
+        List<Long> deleteScriptIds = new ArrayList<>();
+        for (DbScript deletedScript : deletedScripts) {
+            if (deletedScript.getType() == ROLLBACK) {
                 deleteScriptIds.add(deletedScript.getDbScriptId());
-            }else if (DbScriptType.COMMIT.getTypeId().equals(deletedScript.getType())
-                    && dbScripts.containsKey(deletedScript.getRollbackName())) {
+            } else if (deletedScript.getType() == COMMIT && dbScripts.containsKey(deletedScript.getRollbackName())) {
                 rollbacksToExec.add(dbScripts.get(deletedScript.getRollbackName()));
                 deleteScriptIds.add(deletedScript.getDbScriptId());
             }
@@ -70,25 +74,18 @@ public class CheckoutFacade {
             dbScriptDaoOra.deleteByIds(deleteScriptIds);
         }
 
-        Collection<DbScriptVo> newScripts = removeRollbacks(CollectionUtils.subtract(scriptsInDir, dbScripts.values()));
+        List<DbScript> newScripts = scriptsInDir.stream()
+                                                .filter(script -> script.getType() == ROLLBACK)
+                                                .filter(script -> dbScripts.containsKey(script.getName()))
+                                                .collect(Collectors.toList());
+
         return copyScriptsToExecDir(scriptDir, newScripts, rollbacksToExec);
     }
 
-    private Collection<DbScriptVo> removeRollbacks(Collection<DbScriptVo> scripts) {
-        Iterator<DbScriptVo> iterator = scripts.iterator();
-        while (iterator.hasNext()) {
-            DbScriptVo script = iterator.next();
-            if (DbScriptType.ROLLBACK.getTypeId().equals(script.getType())) {
-                iterator.remove();
-            }
-        }
-        return scripts;
-    }
-
-    public Collection<DbScriptVo> copyScriptsToExecDir(File scriptDir, Collection<DbScriptVo> newScripts, Collection<DbScriptVo> rollbacks) {
+    public List<DbScript> copyScriptsToExecDir(File scriptDir, List<DbScript> newScripts, List<DbScript> rollbacks) {
         File execDir = createExecDir(scriptDir);
 
-        for (DbScriptVo vo : rollbacks) {
+        for (DbScript vo : rollbacks) {
             File f = new File(execDir.getAbsolutePath() + File.separator + vo.getName());
             try {
                 logger.debug("Creating rollback script [{}]", f.getAbsolutePath());
@@ -100,8 +97,8 @@ public class CheckoutFacade {
             }
         }
 
-        for (DbScriptVo script : newScripts) {
-            if (DbScriptType.ROLLBACK.getTypeId().equals(script.getType())) {
+        for (DbScript script : newScripts) {
+            if (script.getType() == ROLLBACK) {
                 continue;
             }
             File srcFile = new File(scriptDir.getAbsolutePath() + File.separator + script.getName());
@@ -119,10 +116,10 @@ public class CheckoutFacade {
         return newScripts;
     }
 
-    public void genDdl(File scriptDir, Collection<DbScriptVo> newScripts) {
-        List<DbScriptVo> newCommitScripts = new ArrayList<DbScriptVo>();
-        for (DbScriptVo vo : newScripts) {
-            if (DbScriptType.COMMIT.getTypeId().equals(vo.getType())) {
+    public void genDdl(File scriptDir, Collection<DbScript> newScripts) {
+        List<DbScript> newCommitScripts = new ArrayList<>();
+        for (DbScript vo : newScripts) {
+            if (vo.getType() == COMMIT) {
                 newCommitScripts.add(vo);
             }
         }
@@ -145,10 +142,10 @@ public class CheckoutFacade {
         return execDir;
     }
 
-    private List<DbScriptVo> createVosFromScriptFiles(Collection<File> files) {
-        List<DbScriptVo> dbScripts = new ArrayList<DbScriptVo>();
+    private List<DbScript> createVosFromScriptFiles(Collection<File> files) {
+        List<DbScript> dbScripts = new ArrayList<>();
         for (File scriptFile : files) {
-            dbScripts.add(DbScriptVo.create(scriptFile));
+            dbScripts.add(DbScript.create(scriptFile));
         }
         return dbScripts;
     }

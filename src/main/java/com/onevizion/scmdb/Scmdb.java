@@ -16,8 +16,10 @@ public class Scmdb {
         }
         DbCnnCredentials cnnCredentials = DbCnnCredentials.create(args[0]);
         File scriptDir = parseDbScriptDir(args[1]);
+
         boolean isGenDdl = false;
         boolean isExecScripts = false;
+
         if (args.length > 2) {
             for (int i = 2; i < args.length; i++) {
                 String arg = args[i];

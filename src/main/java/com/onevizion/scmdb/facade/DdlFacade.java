@@ -1,30 +1,30 @@
 package com.onevizion.scmdb.facade;
 
 import com.onevizion.maven.plugin.dbschema.ScriptsGenerator;
-import com.onevizion.scmdb.vo.DbScriptVo;
+import com.onevizion.scmdb.vo.DbScript;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.annotation.Resource;
 
 @Component
 public class DdlFacade {
     @Resource
     private ScriptsGenerator scriptsGenerator;
 
-    private final String DDL_FOLDER_NAME = "ddl";
+    private final static String DDL_FOLDER_NAME = "ddl";
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
-    public void generateDdl(List<DbScriptVo> newDbScripts, File scriptDir) {
+    public void generateDdl(List<DbScript> newDbScripts, File scriptDir) {
         String ddlDir = scriptDir.getParentFile().getAbsolutePath() + File.separator + DDL_FOLDER_NAME;
         String[] newDbObjectArr = findChangedDbObjects(newDbScripts, scriptDir);
         if (newDbObjectArr == null) {
@@ -36,13 +36,13 @@ public class DdlFacade {
             scriptsGenerator.executeSettingTransformParams();
             scriptsGenerator.generateDbObjectScripts(ddlDir, newDbObjectArr);
         } catch (IOException e) {
-            this.logger.error(e.toString());
+            logger.error(e.toString());
         }
     }
 
-    private String[] findChangedDbObjects(List<DbScriptVo> newDbScripts, File scriptDir) {
-        List<String> cats = new ArrayList<String>();
-        for (DbScriptVo newDbScript : newDbScripts) {
+    private String[] findChangedDbObjects(List<DbScript> newDbScripts, File scriptDir) {
+        List<String> cats = new ArrayList<>();
+        for (DbScript newDbScript : newDbScripts) {
             File f = new File(scriptDir.getAbsolutePath() + File.separator + newDbScript.getName());
             try {
                 String content = FileUtils.readFileToString(f);
@@ -62,10 +62,10 @@ public class DdlFacade {
                 "create table", "alter table", "drop table", "create index", "create unique index", "drop index",
                 "create trigger", "replace trigger", "drop trigger", "alter trigger", "create sequence", "drop sequence", "comment on table",
                 "comment on column"};
-        List<String> dbObjectsNames = new ArrayList<String>();
-        List<String> dbObjectsTypes = new ArrayList<String>();
-        List<String> delDbObjectsNames = new ArrayList<String>();
-        List<String> delDbObjectsTypes = new ArrayList<String>();
+        List<String> dbObjectsNames = new ArrayList<>();
+        List<String> dbObjectsTypes = new ArrayList<>();
+        List<String> delDbObjectsNames = new ArrayList<>();
+        List<String> delDbObjectsTypes = new ArrayList<>();
 
         for (String cat : cats) {
             cat = cat.replaceAll("--.*\r*\n", "");
@@ -145,8 +145,8 @@ public class DdlFacade {
             }
         }
 
-        List<String> uniqueObjNames = new ArrayList<String>();
-        List<String> dbTypes = new ArrayList<String>();
+        List<String> uniqueObjNames = new ArrayList<>();
+        List<String> dbTypes = new ArrayList<>();
         boolean isUniqueObj;
         for (int i = 0; i < dbObjectsNames.size(); i++) {
             isUniqueObj = true;
@@ -164,7 +164,7 @@ public class DdlFacade {
             }
         }
 
-        List<String> extractDdlArr = new ArrayList<String>();
+        List<String> extractDdlArr = new ArrayList<>();
         for (int i = 0; i < uniqueObjNames.size(); i++) {
             extractDdlArr.add(uniqueObjNames.get(i) + "|" + dbTypes.get(i));
         }
