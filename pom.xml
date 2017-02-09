@@ -11,7 +11,7 @@
         <dependency>
             <groupId>com.onevizion</groupId>
             <artifactId>maven-plugin-dbschema</artifactId>
-            <version>1.0.0</version>
+            <version>1.0.2</version>
         </dependency>
 
         <dependency>
@@ -73,6 +73,15 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.6.1</version>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <executions>
                     <execution>
@@ -96,7 +105,8 @@
                     </filters>
                     <shadedArtifactAttached>true</shadedArtifactAttached>
                     <transformers>
-                        <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                        <transformer
+                                implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                             <mainClass>com.onevizion.scmdb.Scmdb</mainClass>
                         </transformer>
                         <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
@@ -116,14 +126,6 @@
             <id>internal</id>
             <name>internal</name>
             <url>${mvn.repo.addr}/archiva/repository/internal/</url>
-        </repository>
-        <repository>
-            <id>snapshots</id>
-            <name>snapshots</name>
-            <url>${mvn.repo.addr}/archiva/repository/snapshots/</url>
-            <snapshots>
-                <updatePolicy>never</updatePolicy>
-            </snapshots>
         </repository>
         <repository>
             <id>releases</id>
@@ -148,12 +150,6 @@
             <url>${mvn.repo.addr}/archiva/repository/releases/</url>
             <layout>default</layout>
         </repository>
-        <snapshotRepository>
-            <id>snapshots</id>
-            <name>snapshots</name>
-            <url>${mvn.repo.addr}/archiva/repository/snapshots/</url>
-            <layout>default</layout>
-        </snapshotRepository>
     </distributionManagement>
 
     <scm>
