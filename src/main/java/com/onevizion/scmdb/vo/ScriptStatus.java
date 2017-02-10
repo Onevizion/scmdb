@@ -5,25 +5,25 @@ public enum ScriptStatus {
     NOT_EXECUTED(1L),
     EXECUTED_WITH_ERRORS(2L);
 
-    private Long statusId;
+    private Long id;
 
-    ScriptStatus(Long statusId) {
-        this.statusId = statusId;
+    ScriptStatus(Long id) {
+        this.id = id;
     }
 
-    public Long getStatusId() {
-        return statusId;
+    public Long getId() {
+        return id;
     }
 
-    public static ScriptStatus getById(Long statusId) {
-        if (Long.valueOf(0L).equals(statusId)) {
+    public static ScriptStatus getById(Long id) {
+        if (Long.valueOf(0L).equals(id)) {
             return EXECUTED;
-        } else if (Long.valueOf(1L).equals(statusId)) {
+        } else if (Long.valueOf(1L).equals(id)) {
             return NOT_EXECUTED;
-        } else if (Long.valueOf(2L).equals(statusId)) {
+        } else if (Long.valueOf(2L).equals(id)) {
             return EXECUTED_WITH_ERRORS;
         } else {
-            throw new IllegalArgumentException("Not supported db script statusId: [" + statusId + "]");
+            throw new IllegalArgumentException("Not supported db script id: [" + id + "]");
         }
     }
 }

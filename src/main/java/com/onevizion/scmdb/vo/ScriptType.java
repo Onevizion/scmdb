@@ -4,23 +4,23 @@ public enum ScriptType {
     COMMIT(0L),
     ROLLBACK(1L);
 
-    private Long typeId;
+    private Long id;
 
-    ScriptType(Long typeId) {
-        this.typeId = typeId;
+    ScriptType(Long id) {
+        this.id = id;
     }
 
-    public Long getTypeId() {
-        return typeId;
+    public Long getId() {
+        return id;
     }
 
-    public static ScriptType getById(Long typeId) {
-        if (Long.valueOf(0L).equals(typeId)) {
+    public static ScriptType getById(Long id) {
+        if (Long.valueOf(0L).equals(id)) {
             return COMMIT;
-        } else if (Long.valueOf(1L).equals(typeId)) {
+        } else if (Long.valueOf(1L).equals(id)) {
             return ROLLBACK;
         } else {
-            throw new IllegalArgumentException("Not supported db script type: [" + typeId + "]");
+            throw new IllegalArgumentException("Not supported db script type: [" + id + "]");
         }
     }
 }

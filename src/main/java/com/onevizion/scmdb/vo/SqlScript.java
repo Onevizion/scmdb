@@ -10,8 +10,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Date;
 
-public class DbScript {
-    private Long dbScriptId;
+public class SqlScript implements Comparable<SqlScript> {
+    private Long id;
     private String name;
     private String fileHash;
     private String text;
@@ -21,11 +21,11 @@ public class DbScript {
     private ScriptStatus status;
     private File file;
 
-    private static final Logger logger = LoggerFactory.getLogger(DbScript.class);
+    private static final Logger logger = LoggerFactory.getLogger(SqlScript.class);
     private static final String ROLLBACK_SUFFIX = "_rollback";
 
-    public static DbScript create(File scriptFile) {
-        DbScript script = new DbScript();
+    public static SqlScript create(File scriptFile) {
+        SqlScript script = new SqlScript();
 
         script.setFile(scriptFile);
         script.setName(scriptFile.getName());
@@ -49,12 +49,12 @@ public class DbScript {
         return script;
     }
 
-    public Long getDbScriptId() {
-        return dbScriptId;
+    public Long getId() {
+        return id;
     }
 
-    public void setDbScriptId(Long dbScriptId) {
-        this.dbScriptId = dbScriptId;
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public String getName() {
@@ -105,12 +105,8 @@ public class DbScript {
         this.type = type;
     }
 
-    public Long getStatus() {
-        return status.getStatusId();
-    }
-
-    public void setStatus(Long status) {
-        this.status = ScriptStatus.getById(status);
+    public ScriptStatus getStatus() {
+        return status;
     }
 
     public void setStatus(ScriptStatus status) {
@@ -148,7 +144,12 @@ public class DbScript {
             return false;
         }
 
-        DbScript that = (DbScript) o;
+        SqlScript that = (SqlScript) o;
         return name != null ? name.equals(that.name) : that.name == null;
+    }
+
+    @Override
+    public int compareTo(SqlScript anotherScript) {
+        return name.compareTo(anotherScript.getName());
     }
 }

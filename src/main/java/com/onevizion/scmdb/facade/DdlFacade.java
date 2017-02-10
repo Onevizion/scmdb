@@ -1,8 +1,9 @@
 package com.onevizion.scmdb.facade;
 
 import com.onevizion.maven.plugin.dbschema.ScriptsGenerator;
-import com.onevizion.scmdb.vo.DbScript;
+import com.onevizion.scmdb.vo.SqlScript;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -24,7 +25,7 @@ public class DdlFacade {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
-    public void generateDdl(List<DbScript> newDbScripts, File scriptDir) {
+    public void generateDdl(List<SqlScript> newDbScripts, File scriptDir) {
         String ddlDir = scriptDir.getParentFile().getAbsolutePath() + File.separator + DDL_FOLDER_NAME;
         String[] newDbObjectArr = findChangedDbObjects(newDbScripts, scriptDir);
         if (newDbObjectArr == null) {
@@ -40,9 +41,9 @@ public class DdlFacade {
         }
     }
 
-    private String[] findChangedDbObjects(List<DbScript> newDbScripts, File scriptDir) {
+    private String[] findChangedDbObjects(List<SqlScript> newDbScripts, File scriptDir) {
         List<String> cats = new ArrayList<>();
-        for (DbScript newDbScript : newDbScripts) {
+        for (SqlScript newDbScript : newDbScripts) {
             File f = new File(scriptDir.getAbsolutePath() + File.separator + newDbScript.getName());
             try {
                 String content = FileUtils.readFileToString(f);
