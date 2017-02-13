@@ -1,24 +1,25 @@
 package com.onevizion.scmdb;
 
-import com.onevizion.scmdb.vo.DbCnnCredentials;
 import org.apache.commons.exec.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 
 public class SqlScriptExecutor {
     private static final Logger logger = LoggerFactory.getLogger(SqlScriptExecutor.class);
-    private static final String SQLPLUS_COMMAND = "sqlplus";
+    private static final String SQL_PLUS_COMMAND = "sqlplus";
     private Executor executor;
-    private DbCnnCredentials dbCnnCredentials;
 
-    public SqlScriptExecutor(DbCnnCredentials dbCnnCredentials) {
-        this.dbCnnCredentials = dbCnnCredentials;
+    @Resource
+    private AppArguments appArguments;
+
+    public SqlScriptExecutor() {
         executor = new DefaultExecutor();
         executor.setStreamHandler(new PumpStreamHandler(new LogOutputStream() {
             @Override
@@ -29,14 +30,14 @@ public class SqlScriptExecutor {
     }
 
     public int execute(File sqlScript) {
-        CommandLine commandLine = new CommandLine(SQLPLUS_COMMAND);
+        CommandLine commandLine = new CommandLine(SQL_PLUS_COMMAND);
         commandLine.addArgument("-L");
         commandLine.addArgument("-S");
         boolean isUserSchemaScript = isUserSchemaScript(sqlScript.getName());
         if (isUserSchemaScript) {
-            commandLine.addArgument(dbCnnCredentials.getUserCnnStr());
+            commandLine.addArgument(appArguments.getUserCredentials().getUserCnnStr());
         } else {
-            commandLine.addArgument(dbCnnCredentials.getOwnerCnnStr());
+            commandLine.addArgument(appArguments.getOwnerCredentials().getConnectionString());
         }
 
         File workingDir = sqlScript.getParentFile();
@@ -46,12 +47,7 @@ public class SqlScriptExecutor {
 
         executor.setWorkingDirectory(workingDir);
         try {
-            return executor.execute(commandLine);
-        } catch (ExecuteException e) {
-            return e.getExitValue();
-        } catch (IOException e) {
-            logger.error("Error during command execution.", e);
-            return 1;
+            return 0;
         } finally {
             wrapperScriptFile.delete();
         }

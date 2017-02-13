@@ -78,7 +78,7 @@ public class DbCnnCredentials {
         this.password = password;
     }
 
-    public String getOwnerCnnStr() {
+    public String getConnectionString() {
         return ownerCnnStr;
     }
 
