@@ -70,7 +70,7 @@ public class SqlScriptDaoOra extends AbstractDaoOra {
     }
 
     public void update(SqlScript dbScript) {
-        //jdbcTemplate.update(UPDATE,);
+        //jdbcTemplate.update(UPDATE, dbScript);
     }
 
     public void batchUpdate(List<SqlScript> updatedScripts) {

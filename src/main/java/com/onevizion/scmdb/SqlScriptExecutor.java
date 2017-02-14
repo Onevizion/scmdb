@@ -47,7 +47,12 @@ public class SqlScriptExecutor {
 
         executor.setWorkingDirectory(workingDir);
         try {
-            return 0;
+            return executor.execute(commandLine);
+        } catch (ExecuteException e) {
+            return e.getExitValue();
+        } catch (IOException e) {
+            logger.error("Error during command execution.", e);
+            return 1;
         } finally {
             wrapperScriptFile.delete();
         }

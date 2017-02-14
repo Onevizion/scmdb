@@ -130,6 +130,14 @@ public class SqlScript implements Comparable<SqlScript> {
         }
     }
 
+    public String getCommitName() {
+        if (type == ScriptType.COMMIT) {
+            return name;
+        } else {
+            return name.replaceAll(ROLLBACK_SUFFIX, "");
+        }
+    }
+
     @Override
     public int hashCode() {
         return name.hashCode();

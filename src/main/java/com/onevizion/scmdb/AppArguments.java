@@ -30,7 +30,6 @@ public class AppArguments {
         userCredentials = DbCnnCredentials.create(args[0]);
         scriptDirectory = parseDbScriptDir(args[1]);
 
-
         boolean isGenDdl = false;
         boolean isExecScripts = false;
 

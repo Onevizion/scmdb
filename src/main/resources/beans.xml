@@ -32,6 +32,7 @@
 
     <bean class="com.onevizion.scmdb.Checkouter"/>
     <bean class="com.onevizion.scmdb.AppArguments"/>
+    <bean class="com.onevizion.scmdb.SqlScriptExecutor"/>
 
     <context:component-scan base-package="com.onevizion.scmdb"/>
 
