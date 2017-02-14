@@ -27,24 +27,20 @@ import static com.onevizion.scmdb.vo.ScriptType.ROLLBACK;
 @Component
 public class SqlScriptsFacade {
     @Resource
-    private SqlScriptDaoOra dbScriptDaoOra;
+    private SqlScriptDaoOra sqlScriptDaoOra;
 
     @Resource
     private AppArguments appArguments;
 
     private final static String EXEC_FOLDER_NAME = "EXECUTE_ME";
-    private final static String ERROR_MSG_COMMIT_DELETED_WITHOUT_ROLLBACK = "Following scripts were deleted but it's rollbacks are still here. Please, remove rollbacks scripts or restore deleted scripts and then run scmdb again.";
-
+    private final static String ERROR_MSG_COMMIT_DELETED_WITHOUT_ROLLBACK = "Following scripts were deleted but it's rollbacks are still here. Remove rollbacks scripts or restore deleted scripts and then run scmdb again.";
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
-
-    public void createAll() {
-    }
 
     public List<SqlScript> getNewScripts() {
         logger.debug("Searching new scripts in [{}]", appArguments.getScriptDirectory().getAbsolutePath());
 
-        Map<String, SqlScript> savedScripts = dbScriptDaoOra.readMap();
+        Map<String, SqlScript> savedScripts = sqlScriptDaoOra.readMap();
         List<SqlScript> scriptsInDir = createScriptsFromFiles();
 
         scriptsInDir.stream()
@@ -69,7 +65,7 @@ public class SqlScriptsFacade {
     public List<SqlScript> getScriptsToExec() {
         logger.debug("Searching new scripts in [{}]", appArguments.getScriptDirectory().getAbsolutePath());
 
-        Map<String, SqlScript> dbScripts = dbScriptDaoOra.readMap();
+        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMap();
         List<File> scriptFiles = (List<File>) FileUtils.listFiles(appArguments.getScriptDirectory(), new String[]{"sql"}, false);
         List<SqlScript> scriptsInDir = createScriptsFromFiles();
 
@@ -79,7 +75,7 @@ public class SqlScriptsFacade {
                 if (!script.getFileHash().equals(savedScript.getFileHash())) {
                     logger.warn("Script file was changed [{}]", script.getName());
                     savedScript.setFileHash(script.getFileHash());
-                    dbScriptDaoOra.update(savedScript);
+                    sqlScriptDaoOra.update(savedScript);
                 }
             }
         }
@@ -98,7 +94,7 @@ public class SqlScriptsFacade {
         }
         if (!deleteScriptIds.isEmpty()) {
             logger.debug("Deleting missed scripts form db");
-            dbScriptDaoOra.deleteByIds(deleteScriptIds);
+            sqlScriptDaoOra.deleteByIds(deleteScriptIds);
         }
 
         List<SqlScript> newScripts = scriptsInDir.stream()
@@ -145,7 +141,7 @@ public class SqlScriptsFacade {
     }
 
     public boolean isFirstRun() {
-        return dbScriptDaoOra.readCount().equals(0L);
+        return sqlScriptDaoOra.readCount().equals(0L);
     }
 
     private File createExecDir() {
@@ -178,7 +174,7 @@ public class SqlScriptsFacade {
     public List<SqlScript> getUpdatedScripts() {
         List<SqlScript> updatedScripts = new ArrayList<>();
 
-        Map<String, SqlScript> dbScripts = dbScriptDaoOra.readMap();
+        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMap();
         List<SqlScript> scriptsInDir = createScriptsFromFiles();
 
         for (SqlScript scriptInDir : scriptsInDir) {
@@ -196,15 +192,15 @@ public class SqlScriptsFacade {
     }
 
     public void batchUpdate(List<SqlScript> updatedScripts) {
-        dbScriptDaoOra.batchUpdate(updatedScripts);
+        sqlScriptDaoOra.batchUpdate(updatedScripts);
     }
 
     public void batchCreate(List<SqlScript> scripts) {
-        dbScriptDaoOra.batchCreate(scripts);
+        sqlScriptDaoOra.batchCreate(scripts);
     }
 
     public Map<String, SqlScript> getDeletedScriptsMap() {
-        Map<String, SqlScript> dbScripts = dbScriptDaoOra.readMap();
+        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMap();
         Map<String, SqlScript> scriptsInDir = createScriptsMapFromFiles();
 
         logger.debug("Searching deleted scripts in [{}]", appArguments.getScriptDirectory().getAbsolutePath());
@@ -215,8 +211,7 @@ public class SqlScriptsFacade {
         List<SqlScript> commitsDeletedWithoutRollbacks =
                 deletedScripts.values().stream()
                               .filter(script -> script.getType() == COMMIT)
-                              .filter(script -> scriptsInDir.containsKey(script.getRollbackName()))
-                              .filter(script -> !dbScripts.containsKey(script.getRollbackName()))
+                              .filter(script -> !deletedScripts.containsKey(script.getRollbackName()))
                               .collect(Collectors.toList());
         if (!commitsDeletedWithoutRollbacks.isEmpty()) {
             logger.error(ERROR_MSG_COMMIT_DELETED_WITHOUT_ROLLBACK);
@@ -229,12 +224,16 @@ public class SqlScriptsFacade {
     }
 
     public void deleteAll(Collection<SqlScript> scripts) {
-        dbScriptDaoOra.deleteByIds(scripts.stream()
+        sqlScriptDaoOra.deleteByIds(scripts.stream()
                                           .map(SqlScript::getId)
                                           .collect(Collectors.toSet()));
     }
 
     public void create(SqlScript script) {
-        dbScriptDaoOra.create(script);
+        sqlScriptDaoOra.create(script);
+    }
+
+    public void createAllFromDirectory() {
+        sqlScriptDaoOra.batchCreate(createScriptsFromFiles());
     }
 }

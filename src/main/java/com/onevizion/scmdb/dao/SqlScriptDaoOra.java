@@ -18,7 +18,7 @@ import java.util.Map;
 @Repository
 public class SqlScriptDaoOra extends AbstractDaoOra {
 
-    private String UPDATE = "update db_script set name = :name,file_hash = :fileHash,text = :text,ts = :ts,output = :output,type = :type,status = :status.id where db_script_id = :id";
+    private String UPDATE = "update db_script set file_hash = :fileHash,text = :text,ts = :ts where db_script_id = :id";
 
     private String CREATE = "insert into db_script (name,file_hash,text,ts,output,type,status) values (:name,:fileHash,:text,:ts,:output,:type.id,:status.id)";
 
@@ -54,8 +54,8 @@ public class SqlScriptDaoOra extends AbstractDaoOra {
         return jdbcTemplate.queryForObject(READ_COUNT, Long.class);
     }
 
-    public void batchCreate(Collection<SqlScript> dbScripts) {
-        SqlScript[] dbScriptsArr = dbScripts.toArray(new SqlScript[dbScripts.size()]);
+    public void batchCreate(Collection<SqlScript> scripts) {
+        SqlScript[] dbScriptsArr = scripts.toArray(new SqlScript[scripts.size()]);
         namedParameterJdbcTemplate.batchUpdate(CREATE, SqlParameterSourceUtils.createBatch(dbScriptsArr));
     }
 
@@ -63,17 +63,21 @@ public class SqlScriptDaoOra extends AbstractDaoOra {
         namedParameterJdbcTemplate.update(CREATE, new BeanPropertySqlParameterSource(script));
     }
 
-    public void deleteByIds(Collection<Long> delIds) {
+    public void deleteByIds(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
         MapSqlParameterSource params = new MapSqlParameterSource();
-        params.addValue("p_ids", delIds);
+        params.addValue("p_ids", ids);
         namedParameterJdbcTemplate.update(DELETE_BY_IDS, params);
     }
 
-    public void update(SqlScript dbScript) {
+    public void update(SqlScript script) {
         //jdbcTemplate.update(UPDATE, dbScript);
     }
 
-    public void batchUpdate(List<SqlScript> updatedScripts) {
-
+    public void batchUpdate(List<SqlScript> scripts) {
+        SqlScript[] scriptsArr = scripts.toArray(new SqlScript[scripts.size()]);
+        namedParameterJdbcTemplate.batchUpdate(UPDATE, SqlParameterSourceUtils.createBatch(scriptsArr));
     }
 }

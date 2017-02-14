@@ -40,8 +40,8 @@ public class Checkouter {
         logger.info("Checking out your database");
 
         if (scriptsFacade.isFirstRun()) {
-            logger.debug("Saving all scripts in db");
-            scriptsFacade.createAll();
+            scriptsFacade.createAllFromDirectory();
+            logger.info("It's your first run of scmdb. Scmdb was initialized.");
             return;
         }
 
@@ -109,13 +109,12 @@ public class Checkouter {
             rollbacksToExec.forEach(script -> logger.info(script.getFile().getAbsolutePath()));
             scriptsFacade.batchCreate(rollbacksToExec);
         }
-
     }
 
     private void checkUpdatedScripts() {
         List<SqlScript> updatedScripts = scriptsFacade.getUpdatedScripts();
         scriptsFacade.batchUpdate(updatedScripts);
-        updatedScripts.forEach(script -> logger.warn("Script file was changed [{}]", script.getName()));
+        updatedScripts.forEach(script -> logger.warn("Script file [{}] was changed", script.getName()));
     }
 
     private boolean askUserPermission() {
