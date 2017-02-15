@@ -18,13 +18,13 @@ import java.util.Map;
 @Repository
 public class SqlScriptDaoOra extends AbstractDaoOra {
 
-    private String UPDATE = "update db_script set file_hash = :fileHash,text = :text,ts = :ts where db_script_id = :id";
+    private static final String UPDATE = "update db_script set file_hash = :fileHash,text = :text,ts = :ts where db_script_id = :id";
+    private static final String CREATE = "insert into db_script (name,file_hash,text,ts,output,type,status) values (:name,:fileHash,:text,:ts,:output,:type.id,:status.id)";
+    private static final String DELETE_BY_IDS = "delete from db_script where db_script_id in (:p_ids)";
+    private static final String DELETE = "delete from db_script where db_script_id = ?";
+    private static final String READ_ALL = "select * from db_script";
+    private static final String READ_COUNT = "select count(*) from db_script";
 
-    private String CREATE = "insert into db_script (name,file_hash,text,ts,output,type,status) values (:name,:fileHash,:text,:ts,:output,:type.id,:status.id)";
-
-    private final String DELETE_BY_IDS = "delete from db_script where db_script_id in (:p_ids)";
-    private final String READ_ALL = "select * from db_script";
-    private final String READ_COUNT = "select count(*) from db_script";
     private RowMapper<SqlScript> rowMapper = (rs, rowNum) -> {
         SqlScript script = new SqlScript();
         script.setId(rs.getLong("db_script_id"));
@@ -72,12 +72,12 @@ public class SqlScriptDaoOra extends AbstractDaoOra {
         namedParameterJdbcTemplate.update(DELETE_BY_IDS, params);
     }
 
-    public void update(SqlScript script) {
-        //jdbcTemplate.update(UPDATE, dbScript);
-    }
-
     public void batchUpdate(List<SqlScript> scripts) {
         SqlScript[] scriptsArr = scripts.toArray(new SqlScript[scripts.size()]);
         namedParameterJdbcTemplate.batchUpdate(UPDATE, SqlParameterSourceUtils.createBatch(scriptsArr));
+    }
+
+    public void delete(Long id) {
+        jdbcTemplate.update(DELETE, id);
     }
 }

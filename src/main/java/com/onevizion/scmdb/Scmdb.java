@@ -1,5 +1,6 @@
 package com.onevizion.scmdb;
 
+import com.onevizion.scmdb.facade.SqlScriptsFacade;
 import oracle.jdbc.pool.OracleDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +16,9 @@ public class Scmdb {
 
         AppArguments appArguments = ctx.getBean(AppArguments.class);
         appArguments.parse(args);
+
+        SqlScriptsFacade sqlScriptsFacade = ctx.getBean(SqlScriptsFacade.class);
+        sqlScriptsFacade.init();
 
         OracleDataSource ds = (OracleDataSource) ctx.getBean("dataSource");
         ds.setUser(appArguments.getOwnerCredentials().getUser());

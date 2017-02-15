@@ -9,8 +9,8 @@ public class DbCnnCredentials {
     private static final String JDBC_THIN_URL_PREFIX = "jdbc:oracle:thin:@";
     public static final String DB_CNN_STR_ERROR_MESSAGE = "You should specify db connection properties using one of following formats:"
             + " <username>/<password>@<host>:<port>:<SID> or <username>/<password>@<host>:<port>/<service>";
-    public static final String USER_SCHEMA_ERROR_MESSAGE = "You should use owner schema in db connection string.";
-    public static final String USER_SCHEMA_SUFFIX = "_user";
+    private static final String USER_SCHEMA_ERROR_MESSAGE = "You should use owner schema in db connection string.";
+    private static final String USER_SCHEMA_SUFFIX = "_user";
 
     private String user;
     private String password;

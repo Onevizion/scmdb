@@ -6,8 +6,8 @@ import java.io.File;
 
 public class AppArguments {
     private static final String DB_SCRIPT_DIR_ERROR_MESSAGE = "You should specify absolute path to db scripts";
-    private static final String ARGUMENTS_ERROR_MESSAGE = "You can't specify both -generateDdl and -exec. Choose one.";
-    private static final String ARG_GEN_DDL = "-generateDdl";
+    private static final String ARGUMENTS_ERROR_MESSAGE = "You can't specify both -genDdl and -exec. Choose one.";
+    private static final String ARG_GEN_DDL = "-genDdl";
     private static final String ARG_EXECUTE_SCRIPTS = "-exec";
 
     private File scriptDirectory;
@@ -30,14 +30,11 @@ public class AppArguments {
         userCredentials = DbCnnCredentials.create(args[0]);
         scriptDirectory = parseDbScriptDir(args[1]);
 
-        boolean isGenDdl = false;
-        boolean isExecScripts = false;
-
         if (args.length > 2) {
             for (int i = 2; i < args.length; i++) {
                 String arg = args[i];
                 if (ARG_GEN_DDL.equals(arg)) {
-                    if (isExecScripts) {
+                    if (isExecuteScripts) {
                         throw new IllegalArgumentException(ARGUMENTS_ERROR_MESSAGE);
                     }
                     isGenDdl = true;
@@ -45,7 +42,7 @@ public class AppArguments {
                     if (isGenDdl) {
                         throw new IllegalArgumentException(ARGUMENTS_ERROR_MESSAGE);
                     }
-                    isExecScripts = true;
+                    isExecuteScripts = true;
                 }
             }
         }

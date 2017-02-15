@@ -3,13 +3,11 @@ package com.onevizion.scmdb.facade;
 import com.onevizion.scmdb.AppArguments;
 import com.onevizion.scmdb.dao.SqlScriptDaoOra;
 import com.onevizion.scmdb.vo.SqlScript;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.io.File;
@@ -22,7 +20,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
-import static com.onevizion.scmdb.vo.ScriptType.ROLLBACK;
 
 @Component
 public class SqlScriptsFacade {
@@ -37,11 +34,19 @@ public class SqlScriptsFacade {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
+    private File execDir;
+    private List<SqlScript> scriptsInDir;
+
+
+    public void init() {
+        execDir = new File(appArguments.getScriptDirectory().getAbsolutePath() + File.separator + EXEC_FOLDER_NAME);
+        scriptsInDir = createScriptsFromFiles();
+    }
+
     public List<SqlScript> getNewScripts() {
         logger.debug("Searching new scripts in [{}]", appArguments.getScriptDirectory().getAbsolutePath());
 
         Map<String, SqlScript> savedScripts = sqlScriptDaoOra.readMap();
-        List<SqlScript> scriptsInDir = createScriptsFromFiles();
 
         scriptsInDir.stream()
                     .parallel()
@@ -60,93 +65,31 @@ public class SqlScriptsFacade {
         return parts.length <= 1 || !NumberUtils.isDigits(parts[0]);
     }
 
+    public void copyRollbacksToExecDir(List<SqlScript> rollbacks) {
+        cleanExecDir();
 
-    @Transactional
-    public List<SqlScript> getScriptsToExec() {
-        logger.debug("Searching new scripts in [{}]", appArguments.getScriptDirectory().getAbsolutePath());
-
-        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMap();
-        List<File> scriptFiles = (List<File>) FileUtils.listFiles(appArguments.getScriptDirectory(), new String[]{"sql"}, false);
-        List<SqlScript> scriptsInDir = createScriptsFromFiles();
-
-        for (SqlScript script : scriptsInDir) {
-            if (dbScripts.containsKey(script.getName())) {
-                SqlScript savedScript = dbScripts.get(script.getName());
-                if (!script.getFileHash().equals(savedScript.getFileHash())) {
-                    logger.warn("Script file was changed [{}]", script.getName());
-                    savedScript.setFileHash(script.getFileHash());
-                    sqlScriptDaoOra.update(savedScript);
-                }
-            }
+        for (SqlScript rollback : rollbacks) {
+            copyRollbackToExecDir(rollback);
         }
-
-        logger.debug("Searching deleted scripts in [{}]", appArguments.getScriptDirectory().getAbsolutePath());
-        Collection<SqlScript> deletedScripts = CollectionUtils.subtract(dbScripts.values(), scriptsInDir);
-        List<SqlScript> rollbacksToExec = new ArrayList<>();
-        List<Long> deleteScriptIds = new ArrayList<>();
-        for (SqlScript deletedScript : deletedScripts) {
-            if (deletedScript.getType() == ROLLBACK) {
-                deleteScriptIds.add(deletedScript.getId());
-            } else if (deletedScript.getType() == COMMIT && dbScripts.containsKey(deletedScript.getRollbackName())) {
-                rollbacksToExec.add(dbScripts.get(deletedScript.getRollbackName()));
-                deleteScriptIds.add(deletedScript.getId());
-            }
-        }
-        if (!deleteScriptIds.isEmpty()) {
-            logger.debug("Deleting missed scripts form db");
-            sqlScriptDaoOra.deleteByIds(deleteScriptIds);
-        }
-
-        List<SqlScript> newScripts = scriptsInDir.stream()
-                                                 .filter(script -> script.getType() == ROLLBACK)
-                                                 .filter(script -> dbScripts.containsKey(script.getName()))
-                                                 .collect(Collectors.toList());
-
-        return copyRollbacksToExecDir(newScripts, rollbacksToExec);
     }
 
-    public List<SqlScript> copyRollbacksToExecDir(List<SqlScript> newScripts, List<SqlScript> rollbacks) {
-        File execDir = createExecDir();
-
-        for (SqlScript vo : rollbacks) {
-            File f = new File(execDir.getAbsolutePath() + File.separator + vo.getName());
-            try {
-                logger.debug("Creating rollback script [{}]", f.getAbsolutePath());
-                FileUtils.writeStringToFile(f, vo.getText());
-                logger.info("Execute manually rollback script: [{}]", f.getAbsolutePath());
-            } catch (IOException e) {
-                logger.error("Can't create file [{}]", f.getAbsolutePath(), e);
-                throw new RuntimeException(e);
-            }
+    public void copyRollbackToExecDir(SqlScript rollback) {
+        File rollBackFile = new File(execDir.getAbsolutePath() + File.separator + rollback.getName());
+        rollback.setFile(rollBackFile);
+        try {
+            logger.debug("Creating rollback script [{}]", rollBackFile.getAbsolutePath());
+            FileUtils.writeStringToFile(rollBackFile, rollback.getText());
+        } catch (IOException e) {
+            logger.error("Can't create file [{}]", rollBackFile.getAbsolutePath(), e);
+            throw new RuntimeException(e);
         }
-
-        for (SqlScript script : newScripts) {
-            if (script.getType() == ROLLBACK) {
-                continue;
-            }
-            File srcFile = new File(appArguments.getScriptDirectory()
-                                                .getAbsolutePath() + File.separator + script.getName());
-            File destFile = new File(execDir.getAbsolutePath() + File.separator + script.getName());
-            try {
-                logger.debug("Copying new script [{}]", destFile.getAbsolutePath());
-                FileUtils.copyFile(srcFile, destFile);
-                script.setFile(destFile);
-            } catch (IOException e) {
-                logger.error("Can't copy file [{}]", srcFile.getAbsolutePath(), e);
-                throw new RuntimeException(e);
-            }
-        }
-
-        return newScripts;
     }
 
     public boolean isFirstRun() {
         return sqlScriptDaoOra.readCount().equals(0L);
     }
 
-    private File createExecDir() {
-        File execDir = new File(appArguments.getScriptDirectory()
-                                            .getAbsolutePath() + File.separator + EXEC_FOLDER_NAME);
+    private void cleanExecDir() {
         if (execDir.exists()) {
             try {
                 FileUtils.deleteDirectory(execDir);
@@ -154,7 +97,6 @@ public class SqlScriptsFacade {
                 logger.error("Can't delete directory by path {" + execDir.getAbsolutePath() + "}", e);
             }
         }
-        return execDir;
     }
 
     private List<SqlScript> createScriptsFromFiles() {
@@ -164,18 +106,9 @@ public class SqlScriptsFacade {
                           .collect(Collectors.toList());
     }
 
-    private Map<String, SqlScript> createScriptsMapFromFiles() {
-        List<File> scriptFiles = (List<File>) FileUtils.listFiles(appArguments.getScriptDirectory(), new String[]{"sql"}, false);
-        return scriptFiles.stream()
-                          .collect(Collectors.toMap(File::getName, SqlScript::create));
-    }
-
-
     public List<SqlScript> getUpdatedScripts() {
         List<SqlScript> updatedScripts = new ArrayList<>();
-
         Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMap();
-        List<SqlScript> scriptsInDir = createScriptsFromFiles();
 
         for (SqlScript scriptInDir : scriptsInDir) {
             if (!dbScripts.containsKey(scriptInDir.getName())) {
@@ -201,23 +134,26 @@ public class SqlScriptsFacade {
 
     public Map<String, SqlScript> getDeletedScriptsMap() {
         Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMap();
-        Map<String, SqlScript> scriptsInDir = createScriptsMapFromFiles();
+        Map<String, SqlScript> scriptsInDirMap = scriptsInDir.stream()
+                                                             .collect(Collectors.toMap(SqlScript::getName, Function.identity()));
+
 
         logger.debug("Searching deleted scripts in [{}]", appArguments.getScriptDirectory().getAbsolutePath());
         Map<String, SqlScript> deletedScripts = dbScripts.values().stream()
-                                                         .filter(dbScript -> !scriptsInDir.containsKey(dbScript.getName()))
+                                                         .filter(dbScript -> !scriptsInDirMap.containsKey(dbScript.getName()))
                                                          .collect(Collectors.toMap(SqlScript::getName, Function.identity()));
 
         List<SqlScript> commitsDeletedWithoutRollbacks =
                 deletedScripts.values().stream()
                               .filter(script -> script.getType() == COMMIT)
+                              .filter(script -> scriptsInDirMap.containsKey(script.getRollbackName()))
                               .filter(script -> !deletedScripts.containsKey(script.getRollbackName()))
                               .collect(Collectors.toList());
         if (!commitsDeletedWithoutRollbacks.isEmpty()) {
             logger.error(ERROR_MSG_COMMIT_DELETED_WITHOUT_ROLLBACK);
             commitsDeletedWithoutRollbacks.forEach(script -> logger.error("Deleted script: [{}], rollback: [{}]",
                     script.getName(), script.getRollbackName()));
-            throw new RuntimeException("");
+            System.exit(0);
         }
 
         return deletedScripts;
@@ -225,8 +161,8 @@ public class SqlScriptsFacade {
 
     public void deleteAll(Collection<SqlScript> scripts) {
         sqlScriptDaoOra.deleteByIds(scripts.stream()
-                                          .map(SqlScript::getId)
-                                          .collect(Collectors.toSet()));
+                                           .map(SqlScript::getId)
+                                           .collect(Collectors.toSet()));
     }
 
     public void create(SqlScript script) {
@@ -235,5 +171,25 @@ public class SqlScriptsFacade {
 
     public void createAllFromDirectory() {
         sqlScriptDaoOra.batchCreate(createScriptsFromFiles());
+    }
+
+    public void delete(Long id) {
+        sqlScriptDaoOra.delete(id);
+    }
+
+    public void copyScriptsToExecDir(List<SqlScript> scripts) {
+        cleanExecDir();
+        for (SqlScript script : scripts) {
+            File srcFile = new File(appArguments.getScriptDirectory()
+                                                .getAbsolutePath() + File.separator + script.getName());
+            File destFile = new File(execDir.getAbsolutePath() + File.separator + script.getName());
+            try {
+                logger.debug("Copying new script [{}]", destFile.getAbsolutePath());
+                FileUtils.copyFile(srcFile, destFile);
+            } catch (IOException e) {
+                logger.error("Can't copy file [{}]", srcFile.getAbsolutePath(), e);
+                throw new RuntimeException(e);
+            }
+        }
     }
 }

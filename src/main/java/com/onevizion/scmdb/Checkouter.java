@@ -12,7 +12,6 @@ import javax.annotation.Resource;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -69,15 +68,15 @@ public class Checkouter {
         if (appArguments.isExecuteScripts()) {
             logger.info("Executing scripts in your database:");
             for (SqlScript script : newCommitScripts) {
-                executeScripts(script);
+                executeScript(script);
                 scriptsFacade.create(script);
                 if (script.getStatus() == ScriptStatus.EXECUTED_WITH_ERRORS) {
-                    return;
+                    System.exit(0);
                 }
             }
         } else {
-            logger.info("You should execute following script files to updateDb your database:");
-            scriptsFacade.copyRollbacksToExecDir(newCommitScripts, Collections.emptyList());
+            logger.info("You should execute following script files to update your database:");
+            scriptsFacade.copyScriptsToExecDir(newCommitScripts);
             newCommitScripts.forEach(script -> logger.info(script.getFile().getAbsolutePath()));
             scriptsFacade.batchCreate(newCommitScripts);
         }
@@ -90,24 +89,49 @@ public class Checkouter {
                                                         .filter(script -> deletedScripts.containsKey(script.getCommitName()))
                                                         .sorted(Comparator.reverseOrder())
                                                         .collect(Collectors.toList());
-        deletedScripts.values().removeAll(rollbacksToExec);
-        scriptsFacade.deleteAll(deletedScripts.values());
+        if (rollbacksToExec.isEmpty()) {
+            scriptsFacade.deleteAll(deletedScripts.values());
+            return;
+        }
+
+        boolean executeRollbacks = false;
 
         if (appArguments.isExecuteScripts()) {
             logger.info("Do you really wan't to execute {} rollbacks? ", rollbacksToExec.size());
             logger.info("Type NO and rollbacks will be copied to EXECUTE_ME directory and marked as executed. Execute them manually and run scmdb again to execute new scripts.");
             logger.info("Type YES to continue and execute all rollbacks");
+            executeRollbacks = userGrantsPermission();
+        }
 
-            if (askUserPermission()) {
-                //executeScripts(rollbacksToExec);
-            } else {
-                scriptsFacade.copyRollbacksToExecDir(rollbacksToExec, Collections.emptyList());
-            }
+        if (executeRollbacks) {
+            executeRollbacks(deletedScripts, rollbacksToExec);
+            scriptsFacade.deleteAll(deletedScripts.values());
         } else {
-            logger.info("You should execute following script files to updateDb your database:");
-            scriptsFacade.copyRollbacksToExecDir(rollbacksToExec, Collections.emptyList());
+            logger.info("You should execute following rollbacks to revert changes of deleted scripts. Execute them manually and run scmdb again to execute new scripts.");
+            scriptsFacade.copyRollbacksToExecDir(rollbacksToExec);
             rollbacksToExec.forEach(script -> logger.info(script.getFile().getAbsolutePath()));
-            scriptsFacade.batchCreate(rollbacksToExec);
+            scriptsFacade.deleteAll(deletedScripts.values());
+            System.exit(0);
+        }
+    }
+
+    private void executeRollbacks(Map<String, SqlScript> deletedScripts, List<SqlScript> rollbacksToExec) {
+        for (SqlScript rollback : rollbacksToExec) {
+            if (deletedScripts.containsKey(rollback.getCommitName())) {
+                scriptsFacade.copyRollbackToExecDir(rollback);
+
+                executeScript(rollback);
+
+                SqlScript commit = deletedScripts.get(rollback.getCommitName());
+                scriptsFacade.delete(rollback.getId());
+                scriptsFacade.delete(commit.getId());
+                deletedScripts.keySet().remove(rollback.getName());
+                deletedScripts.keySet().remove(rollback.getCommitName());
+
+                if (rollback.getStatus() == ScriptStatus.EXECUTED_WITH_ERRORS) {
+                    return;
+                }
+            }
         }
     }
 
@@ -117,7 +141,7 @@ public class Checkouter {
         updatedScripts.forEach(script -> logger.warn("Script file [{}] was changed", script.getName()));
     }
 
-    private boolean askUserPermission() {
+    private boolean userGrantsPermission() {
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
         try {
             String str = br.readLine();
@@ -127,7 +151,7 @@ public class Checkouter {
                 return false;
             } else {
                 logger.info("Type yes or no");
-                return askUserPermission();
+                return userGrantsPermission();
             }
 
         } catch (IOException e) {
@@ -135,7 +159,7 @@ public class Checkouter {
         }
     }
 
-    private void executeScripts(SqlScript script) {
+    private void executeScript(SqlScript script) {
         logger.info("Executing script: [" + script.getName() + "]");
         int exitCode = scriptExecutor.execute(script.getFile());
         if (exitCode == 0) {
