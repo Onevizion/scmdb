@@ -97,7 +97,7 @@ public class Checkouter {
         boolean executeRollbacks = false;
 
         if (appArguments.isExecuteScripts()) {
-            logger.info("Do you really wan't to execute {} rollbacks? ", rollbacksToExec.size());
+            logger.info("Do you really want to execute {} rollbacks? ", rollbacksToExec.size());
             logger.info("Type NO and rollbacks will be copied to EXECUTE_ME directory and marked as executed. Execute them manually and run scmdb again to execute new scripts.");
             logger.info("Type YES to continue and execute all rollbacks");
             executeRollbacks = userGrantsPermission();
@@ -121,6 +121,7 @@ public class Checkouter {
                 scriptsFacade.copyRollbackToExecDir(rollback);
 
                 executeScript(rollback);
+                //TODO: delete script after exec
 
                 SqlScript commit = deletedScripts.get(rollback.getCommitName());
                 scriptsFacade.delete(rollback.getId());
@@ -129,7 +130,7 @@ public class Checkouter {
                 deletedScripts.keySet().remove(rollback.getCommitName());
 
                 if (rollback.getStatus() == ScriptStatus.EXECUTED_WITH_ERRORS) {
-                    return;
+                    System.exit(0);
                 }
             }
         }
@@ -161,7 +162,7 @@ public class Checkouter {
 
     private void executeScript(SqlScript script) {
         logger.info("Executing script: [" + script.getName() + "]");
-        int exitCode = scriptExecutor.execute(script.getFile());
+        int exitCode = scriptExecutor.execute(script);
         if (exitCode == 0) {
             script.setStatus(ScriptStatus.EXECUTED);
         } else {
@@ -177,6 +178,7 @@ public class Checkouter {
         List<SqlScript> newCommitScripts = newScripts.stream()
                                                      .sorted()
                                                      .filter(script -> script.getType() == ScriptType.COMMIT)
+                                                     .filter(script -> !script.isUserSchemaScript())
                                                      .collect(Collectors.toList());
         ddlFacade.generateDdl(newCommitScripts);
     }

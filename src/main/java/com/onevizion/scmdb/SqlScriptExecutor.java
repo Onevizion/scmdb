@@ -1,8 +1,8 @@
 package com.onevizion.scmdb;
 
+import com.onevizion.scmdb.vo.SqlScript;
 import org.apache.commons.exec.*;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.FilenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,21 +29,20 @@ public class SqlScriptExecutor {
         }));
     }
 
-    public int execute(File sqlScript) {
+    public int execute(SqlScript script) {
         CommandLine commandLine = new CommandLine(SQL_PLUS_COMMAND);
         commandLine.addArgument("-L");
         commandLine.addArgument("-S");
-        boolean isUserSchemaScript = isUserSchemaScript(sqlScript.getName());
-        if (isUserSchemaScript) {
+        if (script.isUserSchemaScript()) {
             commandLine.addArgument(appArguments.getUserCredentials().getUserCnnStr());
         } else {
             commandLine.addArgument(appArguments.getOwnerCredentials().getConnectionString());
         }
 
-        File workingDir = sqlScript.getParentFile();
-        File wrapperScriptFile = getTmpWrapperScript(isUserSchemaScript, workingDir);
+        File workingDir = script.getFile().getParentFile();
+        File wrapperScriptFile = getTmpWrapperScript(script.isUserSchemaScript(), workingDir);
         commandLine.addArgument("@" + wrapperScriptFile.getAbsolutePath());
-        commandLine.addArgument(sqlScript.getAbsolutePath());
+        commandLine.addArgument(script.getFile().getAbsolutePath());
 
         executor.setWorkingDirectory(workingDir);
         try {
@@ -75,10 +74,5 @@ public class SqlScriptExecutor {
         }
 
         return tmpFile;
-    }
-
-    private boolean isUserSchemaScript(String scriptFileName) {
-        String scriptName = FilenameUtils.getBaseName(scriptFileName);
-        return scriptName.endsWith("_user") && !scriptName.endsWith("pkg_user");
     }
 }

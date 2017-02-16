@@ -121,6 +121,11 @@ public class SqlScript implements Comparable<SqlScript> {
         this.file = file;
     }
 
+    public boolean isUserSchemaScript() {
+        String baseName = FilenameUtils.getBaseName(name);
+        return baseName.endsWith("_user") && !baseName.endsWith("pkg_user");
+    }
+
     public String getRollbackName() {
         if (type == ScriptType.ROLLBACK) {
             return name;

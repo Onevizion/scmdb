@@ -30,7 +30,7 @@ public class DdlFacade {
 
     public void generateDdl(List<SqlScript> scripts) {
         String ddlDir = appArguments.getScriptDirectory().getParentFile().getAbsolutePath() + File.separator + DDL_FOLDER_NAME;
-        String[] newDbObjectArr = findChangedDbObjects(scripts, appArguments.getScriptDirectory());
+        String[] newDbObjectArr = findChangedDbObjects(scripts);
         if (newDbObjectArr == null) {
             return;
         }
@@ -44,10 +44,10 @@ public class DdlFacade {
         }
     }
 
-    private String[] findChangedDbObjects(List<SqlScript> newDbScripts, File scriptDir) {
+    private String[] findChangedDbObjects(List<SqlScript> scripts) {
         List<String> cats = new ArrayList<>();
-        for (SqlScript newDbScript : newDbScripts) {
-            File f = new File(scriptDir.getAbsolutePath() + File.separator + newDbScript.getName());
+        for (SqlScript script : scripts) {
+            File f = new File(appArguments.getScriptDirectory().getAbsolutePath() + File.separator + script.getName());
             try {
                 String content = FileUtils.readFileToString(f);
                 cats.add(content);
