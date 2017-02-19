@@ -122,7 +122,10 @@ public class SqlScript implements Comparable<SqlScript> {
     }
 
     public boolean isUserSchemaScript() {
-        String baseName = FilenameUtils.getBaseName(name);
+        return hasUserSchemaSuffix(FilenameUtils.getBaseName(getCommitName()));
+    }
+
+    private boolean hasUserSchemaSuffix(String baseName) {
         return baseName.endsWith("_user") && !baseName.endsWith("pkg_user");
     }
 

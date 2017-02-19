@@ -66,8 +66,6 @@ public class SqlScriptsFacade {
     }
 
     public void copyRollbacksToExecDir(List<SqlScript> rollbacks) {
-        cleanExecDir();
-
         for (SqlScript rollback : rollbacks) {
             copyRollbackToExecDir(rollback);
         }
@@ -89,12 +87,12 @@ public class SqlScriptsFacade {
         return sqlScriptDaoOra.readCount().equals(0L);
     }
 
-    private void cleanExecDir() {
+    public void cleanExecDir() {
         if (execDir.exists()) {
             try {
                 FileUtils.deleteDirectory(execDir);
             } catch (IOException e) {
-                logger.error("Can't delete directory by path {" + execDir.getAbsolutePath() + "}", e);
+                throw new RuntimeException("Can't delete execution directory by path [" + execDir.getAbsolutePath() + "]", e);
             }
         }
     }
@@ -178,7 +176,6 @@ public class SqlScriptsFacade {
     }
 
     public void copyScriptsToExecDir(List<SqlScript> scripts) {
-        cleanExecDir();
         for (SqlScript script : scripts) {
             File srcFile = new File(appArguments.getScriptDirectory()
                                                 .getAbsolutePath() + File.separator + script.getName());
