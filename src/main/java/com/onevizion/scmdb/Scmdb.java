@@ -25,11 +25,11 @@ public class Scmdb {
         ds.setPassword(appArguments.getOwnerCredentials().getPassword());
         ds.setURL(appArguments.getOwnerCredentials().getOracleUrl());
 
-        Checkouter checkouter = ctx.getBean(Checkouter.class);
+        DbManager dbManager = ctx.getBean(DbManager.class);
         if (appArguments.isGenDdl()) {
-            checkouter.generateDdl();
+            dbManager.generateDdl();
         } else {
-            checkouter.updateDb();
+            dbManager.updateDb();
         }
     }
 }

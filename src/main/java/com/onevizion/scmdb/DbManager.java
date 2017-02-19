@@ -19,8 +19,8 @@ import java.util.stream.Collectors;
 
 import static com.onevizion.scmdb.vo.ScriptType.ROLLBACK;
 
-public class Checkouter {
-    private static final Logger logger = LoggerFactory.getLogger(Checkouter.class);
+public class DbManager {
+    private static final Logger logger = LoggerFactory.getLogger(DbManager.class);
     private static final String SCRIPT_EXECUTION_ERROR_MESSAGE = "Fix and execute manually script [{}] and then run scmdb again to execute other scripts.";
 
     @Resource
@@ -181,12 +181,14 @@ public class Checkouter {
     }
 
     public void generateDdl() {
-        List<SqlScript> newScripts = scriptsFacade.getNewScripts();
-        List<SqlScript> newCommitScripts = newScripts.stream()
+        logger.info("Extracting DDL for new and updated scripts");
+        List<SqlScript> scripts = scriptsFacade.getNewScripts();
+        scripts.addAll(scriptsFacade.getUpdatedScripts());
+        List<SqlScript> scriptsToGenDdl = scripts.stream()
                                                      .sorted()
                                                      .filter(script -> script.getType() == ScriptType.COMMIT)
                                                      .filter(script -> !script.isUserSchemaScript())
                                                      .collect(Collectors.toList());
-        ddlFacade.generateDdl(newCommitScripts);
+        ddlFacade.generateDdl(scriptsToGenDdl);
     }
 }

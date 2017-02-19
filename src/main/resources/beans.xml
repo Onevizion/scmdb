@@ -30,7 +30,7 @@
         <constructor-arg ref="dataSource"/>
     </bean>
 
-    <bean class="com.onevizion.scmdb.Checkouter"/>
+    <bean class="com.onevizion.scmdb.DbManager"/>
     <bean class="com.onevizion.scmdb.AppArguments"/>
     <bean class="com.onevizion.scmdb.SqlScriptExecutor"/>
 
