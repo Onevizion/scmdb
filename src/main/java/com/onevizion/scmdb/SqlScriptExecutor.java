@@ -34,7 +34,7 @@ public class SqlScriptExecutor {
         commandLine.addArgument("-L");
         commandLine.addArgument("-S");
         if (script.isUserSchemaScript()) {
-            commandLine.addArgument(appArguments.getUserCredentials().getUserCnnStr());
+            commandLine.addArgument(appArguments.getUserCredentials().getConnectionString());
         } else {
             commandLine.addArgument(appArguments.getOwnerCredentials().getConnectionString());
         }

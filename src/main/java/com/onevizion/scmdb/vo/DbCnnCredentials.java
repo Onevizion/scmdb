@@ -9,13 +9,11 @@ public class DbCnnCredentials {
     private static final String JDBC_THIN_URL_PREFIX = "jdbc:oracle:thin:@";
     public static final String DB_CNN_STR_ERROR_MESSAGE = "You should specify db connection properties using one of following formats:"
             + " <username>/<password>@<host>:<port>:<SID> or <username>/<password>@<host>:<port>/<service>";
-    private static final String USER_SCHEMA_ERROR_MESSAGE = "You should use owner schema in db connection string.";
     private static final String USER_SCHEMA_SUFFIX = "_user";
 
     private String user;
     private String password;
     private String ownerCnnStr;
-    private String userCnnStr;
     private String oracleUrl;
 
     private DbCnnCredentials() {}
@@ -26,7 +24,6 @@ public class DbCnnCredentials {
         }
         DbCnnCredentials cnnCredentials = new DbCnnCredentials();
         cnnCredentials.setOwnerCnnStr(ownerCnnStr);
-        cnnCredentials.setUserCnnStr(genUserCnnStr(ownerCnnStr));
 
         Pattern p = Pattern.compile("(.+?)/(.+?)@(.+)");
         Matcher m = p.matcher(ownerCnnStr);
@@ -37,13 +34,19 @@ public class DbCnnCredentials {
         } else {
             throw new IllegalArgumentException(DB_CNN_STR_ERROR_MESSAGE);
         }
-        if (isUserSchema(cnnCredentials.getUser())) {
-            throw new IllegalArgumentException(USER_SCHEMA_ERROR_MESSAGE);
-        }
         return cnnCredentials;
     }
 
-    private static String genUserCnnStr(String ownerCnnStr) {
+    public static boolean isCorrectConnectionString(String cnnStr) {
+        if (isOldJdbcFormat(cnnStr)) {
+            cnnStr = convertToNewJdbcFormat(cnnStr);
+        }
+        Pattern p = Pattern.compile("(.+?)/(.+?)@(.+)");
+        Matcher m = p.matcher(cnnStr);
+        return m.matches() && m.groupCount() == 3;
+    }
+
+    public static String genUserCnnStr(String ownerCnnStr) {
         String owner = ownerCnnStr.substring(0, ownerCnnStr.indexOf("/"));
         String user = owner + USER_SCHEMA_SUFFIX;
         return user + ownerCnnStr.substring(ownerCnnStr.indexOf("/"));
@@ -80,14 +83,6 @@ public class DbCnnCredentials {
 
     public String getConnectionString() {
         return ownerCnnStr;
-    }
-
-    public String getUserCnnStr() {
-        return userCnnStr;
-    }
-
-    public void setUserCnnStr(String userCnnStr) {
-        this.userCnnStr = userCnnStr;
     }
 
     public void setOwnerCnnStr(String ownerCnnStr) {

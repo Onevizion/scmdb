@@ -26,11 +26,16 @@ public class AppArguments {
         if (args.length == 0) {
             throw new IllegalArgumentException(DbCnnCredentials.DB_CNN_STR_ERROR_MESSAGE + "\n" + DB_SCRIPT_DIR_ERROR_MESSAGE);
         }
-        ownerCredentials = DbCnnCredentials.create(args[0]);
-        userCredentials = DbCnnCredentials.create(args[0]);
-        scriptDirectory = parseDbScriptDir(args[1]);
+        int argIndex = 0;
+        ownerCredentials = DbCnnCredentials.create(args[argIndex++]);
+        if (DbCnnCredentials.isCorrectConnectionString(args[argIndex])) {
+            userCredentials = DbCnnCredentials.create(args[argIndex++]);
+        } else {
+            userCredentials = DbCnnCredentials.create(DbCnnCredentials.genUserCnnStr(ownerCredentials.getConnectionString()));
+        }
+        scriptDirectory = parseDbScriptDir(args[argIndex++]);
 
-        if (args.length > 2) {
+        if (args.length > argIndex) {
             for (int i = 2; i < args.length; i++) {
                 String arg = args[i];
                 if (ARG_GEN_DDL.equals(arg)) {
