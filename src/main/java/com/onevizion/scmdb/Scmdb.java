@@ -1,6 +1,7 @@
 package com.onevizion.scmdb;
 
-import com.onevizion.scmdb.facade.SqlScriptsFacade;
+import com.onevizion.scmdb.dao.DbScriptDaoOra;
+import com.onevizion.scmdb.facade.DbScriptFacade;
 import oracle.jdbc.pool.OracleDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +18,7 @@ public class Scmdb {
         AppArguments appArguments = ctx.getBean(AppArguments.class);
         appArguments.parse(args);
 
-        SqlScriptsFacade sqlScriptsFacade = ctx.getBean(SqlScriptsFacade.class);
+        DbScriptFacade sqlScriptsFacade = ctx.getBean(DbScriptFacade.class);
         sqlScriptsFacade.init();
 
         OracleDataSource ds = (OracleDataSource) ctx.getBean("dataSource");
@@ -31,5 +32,7 @@ public class Scmdb {
         } else {
             dbManager.updateDb();
         }
+
+
     }
 }

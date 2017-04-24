@@ -1,7 +1,7 @@
 package com.onevizion.scmdb.facade;
 
 import com.onevizion.scmdb.AppArguments;
-import com.onevizion.scmdb.dao.SqlScriptDaoOra;
+import com.onevizion.scmdb.dao.DbScriptDaoOra;
 import com.onevizion.scmdb.vo.SqlScript;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -22,9 +22,9 @@ import java.util.stream.Collectors;
 import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
 
 @Component
-public class SqlScriptsFacade {
+public class DbScriptFacade {
     @Resource
-    private SqlScriptDaoOra sqlScriptDaoOra;
+    private DbScriptDaoOra sqlScriptDaoOra;
 
     @Resource
     private AppArguments appArguments;
@@ -127,7 +127,7 @@ public class SqlScriptsFacade {
     }
 
     public void batchCreate(List<SqlScript> scripts) {
-        sqlScriptDaoOra.batchCreate(scripts);
+        sqlScriptDaoOra.createAll(scripts);
     }
 
     public Map<String, SqlScript> getDeletedScriptsMap() {
@@ -160,7 +160,7 @@ public class SqlScriptsFacade {
     public void deleteAll(Collection<SqlScript> scripts) {
         sqlScriptDaoOra.deleteByIds(scripts.stream()
                                            .map(SqlScript::getId)
-                                           .collect(Collectors.toSet()));
+                                           .collect(Collectors.toList()));
     }
 
     public void create(SqlScript script) {
@@ -168,7 +168,7 @@ public class SqlScriptsFacade {
     }
 
     public void createAllFromDirectory() {
-        sqlScriptDaoOra.batchCreate(createScriptsFromFiles());
+        sqlScriptDaoOra.createAll(createScriptsFromFiles());
     }
 
     public void delete(Long id) {

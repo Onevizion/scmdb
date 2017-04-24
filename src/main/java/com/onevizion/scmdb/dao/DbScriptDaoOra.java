@@ -6,7 +6,6 @@ import com.onevizion.scmdb.vo.SqlScript;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.BeanPropertySqlParameterSource;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.SqlParameterSourceUtils;
 import org.springframework.stereotype.Repository;
 
@@ -16,11 +15,10 @@ import java.util.List;
 import java.util.Map;
 
 @Repository
-public class SqlScriptDaoOra extends AbstractDaoOra {
+public class DbScriptDaoOra extends AbstractDaoOra {
 
     private static final String UPDATE = "update db_script set file_hash = :fileHash,text = :text,ts = :ts where db_script_id = :id";
     private static final String CREATE = "insert into db_script (name,file_hash,text,ts,output,type,status) values (:name,:fileHash,:text,:ts,:output,:type.id,:status.id)";
-    private static final String DELETE_BY_IDS = "delete from db_script where db_script_id in (:p_ids)";
     private static final String DELETE = "delete from db_script where db_script_id = ?";
     private static final String READ_ALL = "select * from db_script";
     private static final String READ_COUNT = "select count(*) from db_script";
@@ -54,7 +52,7 @@ public class SqlScriptDaoOra extends AbstractDaoOra {
         return jdbcTemplate.queryForObject(READ_COUNT, Long.class);
     }
 
-    public void batchCreate(Collection<SqlScript> scripts) {
+    public void createAll(Collection<SqlScript> scripts) {
         SqlScript[] dbScriptsArr = scripts.toArray(new SqlScript[scripts.size()]);
         namedParameterJdbcTemplate.batchUpdate(CREATE, SqlParameterSourceUtils.createBatch(dbScriptsArr));
     }
@@ -63,13 +61,14 @@ public class SqlScriptDaoOra extends AbstractDaoOra {
         namedParameterJdbcTemplate.update(CREATE, new BeanPropertySqlParameterSource(script));
     }
 
-    public void deleteByIds(Collection<Long> ids) {
+    public void deleteByIds(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             return;
         }
-        MapSqlParameterSource params = new MapSqlParameterSource();
-        params.addValue("p_ids", ids);
-        namedParameterJdbcTemplate.update(DELETE_BY_IDS, params);
+        Map<String, Object> params = new HashMap<>();
+        String sql = "delete from db_script where ";
+        sql += appendIn("db_script_id", ids, params);
+        namedParameterJdbcTemplate.update(sql, params);
     }
 
     public void batchUpdate(List<SqlScript> scripts) {
