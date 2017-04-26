@@ -3,8 +3,6 @@ package com.onevizion.scmdb;
 import com.onevizion.scmdb.vo.SqlScript;
 import org.apache.commons.exec.*;
 import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Resource;
 import java.io.File;
@@ -12,12 +10,14 @@ import java.io.IOException;
 import java.net.URL;
 
 public class SqlScriptExecutor {
-    private static final Logger logger = LoggerFactory.getLogger(SqlScriptExecutor.class);
     private static final String SQL_PLUS_COMMAND = "sqlplus";
     private Executor executor;
 
     @Resource
     private AppArguments appArguments;
+
+    @Resource
+    private ColorLogger logger;
 
     public SqlScriptExecutor() {
         executor = new DefaultExecutor();
@@ -25,6 +25,11 @@ public class SqlScriptExecutor {
             @Override
             protected void processLine(String line, int logLevel) {
                 logger.info(line);
+            }
+        }, new LogOutputStream() {
+            @Override
+            protected void processLine(String line, int logLevel) {
+                logger.error(line);
             }
         }));
     }

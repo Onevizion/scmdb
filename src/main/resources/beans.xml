@@ -33,6 +33,7 @@
     <bean class="com.onevizion.scmdb.DbManager"/>
     <bean class="com.onevizion.scmdb.AppArguments"/>
     <bean class="com.onevizion.scmdb.SqlScriptExecutor"/>
+    <bean class="com.onevizion.scmdb.ColorLogger"/>
 
     <context:component-scan base-package="com.onevizion.scmdb"/>
 

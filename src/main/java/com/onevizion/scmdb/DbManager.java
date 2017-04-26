@@ -5,8 +5,6 @@ import com.onevizion.scmdb.facade.DbScriptFacade;
 import com.onevizion.scmdb.vo.ScriptStatus;
 import com.onevizion.scmdb.vo.ScriptType;
 import com.onevizion.scmdb.vo.SqlScript;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Resource;
 import java.io.BufferedReader;
@@ -17,10 +15,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.vo.ScriptType.ROLLBACK;
 
 public class DbManager {
-    private static final Logger logger = LoggerFactory.getLogger(DbManager.class);
     private static final String SCRIPT_EXECUTION_ERROR_MESSAGE = "Fix and execute manually script [{}] and then run scmdb again to execute other scripts.";
 
     @Resource
@@ -34,6 +32,9 @@ public class DbManager {
 
     @Resource
     private SqlScriptExecutor scriptExecutor;
+
+    @Resource
+    private ColorLogger logger;
 
     public void updateDb() {
         logger.info("Updating your database");
@@ -146,7 +147,7 @@ public class DbManager {
     private void checkUpdatedScripts() {
         List<SqlScript> updatedScripts = scriptsFacade.getUpdatedScripts();
         scriptsFacade.batchUpdate(updatedScripts);
-        updatedScripts.forEach(script -> logger.warn("Script file [{}] was changed", script.getName()));
+        updatedScripts.forEach(script -> logger.warn("Script file [{}] was changed", GREEN, script.getName()));
     }
 
     private boolean userGrantsPermission() {
@@ -185,10 +186,10 @@ public class DbManager {
         List<SqlScript> scripts = scriptsFacade.getNewScripts();
         scripts.addAll(scriptsFacade.getUpdatedScripts());
         List<SqlScript> scriptsToGenDdl = scripts.stream()
-                                                     .sorted()
-                                                     .filter(script -> script.getType() == ScriptType.COMMIT)
-                                                     .filter(script -> !script.isUserSchemaScript())
-                                                     .collect(Collectors.toList());
+                                                 .sorted()
+                                                 .filter(script -> script.getType() == ScriptType.COMMIT)
+                                                 .filter(script -> !script.isUserSchemaScript())
+                                                 .collect(Collectors.toList());
         ddlFacade.generateDdl(scriptsToGenDdl);
     }
 }

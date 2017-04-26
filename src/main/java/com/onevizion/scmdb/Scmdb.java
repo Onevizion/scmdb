@@ -1,6 +1,5 @@
 package com.onevizion.scmdb;
 
-import com.onevizion.scmdb.dao.DbScriptDaoOra;
 import com.onevizion.scmdb.facade.DbScriptFacade;
 import oracle.jdbc.pool.OracleDataSource;
 import org.slf4j.Logger;
@@ -32,7 +31,5 @@ public class Scmdb {
         } else {
             dbManager.updateDb();
         }
-
-
     }
 }

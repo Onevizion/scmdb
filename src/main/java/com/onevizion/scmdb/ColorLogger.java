@@ -21,27 +21,44 @@ public class ColorLogger {
         encoder.setPattern("%msg%n");
         encoder.start();
 
-        ConsoleAppender<ILoggingEvent> appender = new ConsoleAppender<ILoggingEvent>();
+        ConsoleAppender<ILoggingEvent> appender = new ConsoleAppender<>();
         appender.setContext(loggerContext);
         appender.setEncoder(encoder);
         appender.start();
 
         logger.addAppender(appender);
-
-        encoder.stop();
-        encoder.setPattern("%cyan(%message%n)");
-        encoder.start();
     }
 
-    public void info(String msg, Color color) {
+    public void info(String msg, Color color, Object... argArray) {
         encoder.stop();
         encoder.setPattern("%" + color.getColor() + "(%message%n)");
         encoder.start();
 
-        logger.info(msg);
+        logger.info(msg, argArray);
+    }
+
+    public void info(String msg, Object... argArray) {
+        info(msg, Color.WHITE, argArray);
+    }
+
+    public void warn(String msg, Color color, Object... argArray) {
+        encoder.stop();
+        encoder.setPattern("%" + color.getColor() + "(%message%n)");
+        encoder.start();
+
+        logger.warn(msg, argArray);
+    }
+
+    public void error(String msg, Object... argArray) {
+        encoder.stop();
+        encoder.setPattern("%" + Color.RED.getColor() + "(%message%n)");
+        encoder.start();
+
+        logger.error(msg, argArray);
     }
 
     public enum Color {
+        WHITE("boldWhite"),
         CYAN("cyan"),
         RED("red"),
         GREEN("green");
