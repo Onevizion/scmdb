@@ -9,8 +9,12 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 
+import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
+
 public class SqlScriptExecutor {
     private static final String SQL_PLUS_COMMAND = "sqlplus";
+    private static final String INVALID_OBJECT_POSTFIX = "is invalid.";
+
     private Executor executor;
 
     @Resource
@@ -24,7 +28,11 @@ public class SqlScriptExecutor {
         executor.setStreamHandler(new PumpStreamHandler(new LogOutputStream() {
             @Override
             protected void processLine(String line, int logLevel) {
-                logger.info(line);
+                if (line.endsWith(INVALID_OBJECT_POSTFIX)) {
+                    logger.warn(line, YELLOW);
+                } else {
+                    logger.info(line);
+                }
             }
         }, new LogOutputStream() {
             @Override

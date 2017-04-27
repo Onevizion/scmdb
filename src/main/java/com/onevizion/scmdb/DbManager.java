@@ -1,7 +1,7 @@
 package com.onevizion.scmdb;
 
-import com.onevizion.scmdb.facade.DdlFacade;
 import com.onevizion.scmdb.facade.DbScriptFacade;
+import com.onevizion.scmdb.facade.DdlFacade;
 import com.onevizion.scmdb.vo.ScriptStatus;
 import com.onevizion.scmdb.vo.ScriptType;
 import com.onevizion.scmdb.vo.SqlScript;
@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static com.onevizion.scmdb.ColorLogger.Color.CYAN;
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.vo.ScriptType.ROLLBACK;
 
@@ -147,16 +148,16 @@ public class DbManager {
     private void checkUpdatedScripts() {
         List<SqlScript> updatedScripts = scriptsFacade.getUpdatedScripts();
         scriptsFacade.batchUpdate(updatedScripts);
-        updatedScripts.forEach(script -> logger.warn("Script file [{}] was changed", GREEN, script.getName()));
+        updatedScripts.forEach(script -> logger.info("Script file [{}] was changed", CYAN, script.getName()));
     }
 
     private boolean userGrantsPermission() {
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
         try {
             String str = br.readLine();
-            if ("YES".equalsIgnoreCase(str)) {
+            if ("yes".equalsIgnoreCase(str)) {
                 return true;
-            } else if ("NO".equalsIgnoreCase(str)) {
+            } else if ("no".equalsIgnoreCase(str)) {
                 return false;
             } else {
                 logger.info("Type yes or no");
@@ -169,7 +170,7 @@ public class DbManager {
     }
 
     private void executeScript(SqlScript script) {
-        logger.info("Executing script: [" + script.getName() + "]");
+        logger.info("Executing script: [{}]", GREEN, script.getName());
         int exitCode = scriptExecutor.execute(script);
         if (exitCode == 0) {
             script.setStatus(ScriptStatus.EXECUTED);

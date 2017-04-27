@@ -103,10 +103,13 @@ exec dbms_utility.compile_schema('&_USER._RPT',false);
 select 'Invalid objects in [' || user || ']:'
 from dual;
 column object_type format a15
-column object_name format a30
+column object_name format a30 wra
+column invalid_message format a15
+set tab off
 select
   substr(object_type, 1, 15) object_type,
-  substr(object_name, 1, 30) object_name
+  substr(object_name, 1, 30) object_name,
+  ' is invalid.' invalid_message
 from user_objects
 where status <> 'VALID' and object_name not like 'BIN$%';
 exit

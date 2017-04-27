@@ -60,6 +60,7 @@ public class ColorLogger {
     public enum Color {
         WHITE("boldWhite"),
         CYAN("cyan"),
+        YELLOW("yellow"),
         RED("red"),
         GREEN("green");
 
