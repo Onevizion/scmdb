@@ -9,12 +9,14 @@ public class AppArguments {
     private static final String ARGUMENTS_ERROR_MESSAGE = "You can't specify both -genDdl and -exec. Choose one.";
     private static final String ARG_GEN_DDL = "-genDdl";
     private static final String ARG_EXECUTE_SCRIPTS = "-exec";
+    private static final String ARG_NOT_USE_COLOR_LOGGING = "--no-color";
 
     private File scriptDirectory;
     private DbCnnCredentials ownerCredentials;
     private DbCnnCredentials userCredentials;
     private boolean isGenDdl;
     private boolean isExecuteScripts;
+    private boolean useColorLogging = true;
 
     private AppArguments() {}
 
@@ -48,6 +50,8 @@ public class AppArguments {
                         throw new IllegalArgumentException(ARGUMENTS_ERROR_MESSAGE);
                     }
                     isExecuteScripts = true;
+                } else if (ARG_NOT_USE_COLOR_LOGGING.equals(arg)) {
+                    useColorLogging = false;
                 }
             }
         }
@@ -100,5 +104,13 @@ public class AppArguments {
 
     public void setExecuteScripts(boolean executeScripts) {
         isExecuteScripts = executeScripts;
+    }
+
+    public boolean isUseColorLogging() {
+        return useColorLogging;
+    }
+
+    public void setUseColorLogging(boolean useColorLogging) {
+        this.useColorLogging = useColorLogging;
     }
 }
