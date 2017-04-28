@@ -116,7 +116,7 @@ public class DbManager {
         } else {
             logger.info("At first you should execute following rollbacks to revert changes of deleted scripts:");
             scriptsFacade.copyRollbacksToExecDir(rollbacksToExec);
-            rollbacksToExec.forEach(script -> logger.info(script.getFile().getAbsolutePath()));
+            rollbacksToExec.forEach(script -> logger.info(script.getFile().getAbsolutePath(), GREEN));
             scriptsFacade.deleteAll(deletedScripts.values());
 
             if (appArguments.isExecuteScripts()) {
