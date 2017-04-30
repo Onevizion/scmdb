@@ -29,7 +29,7 @@ public class DdlFacade {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
     public void generateDdl(List<SqlScript> scripts) {
-        String ddlDir = appArguments.getScriptDirectory().getParentFile().getAbsolutePath() + File.separator + DDL_FOLDER_NAME;
+        String ddlDir = appArguments.getScriptsDirectory().getParentFile().getAbsolutePath() + File.separator + DDL_FOLDER_NAME;
         String[] newDbObjectArr = findChangedDbObjects(scripts);
         if (newDbObjectArr == null) {
             return;
@@ -46,7 +46,7 @@ public class DdlFacade {
     private String[] findChangedDbObjects(List<SqlScript> scripts) {
         List<String> cats = new ArrayList<>();
         for (SqlScript script : scripts) {
-            File f = new File(appArguments.getScriptDirectory().getAbsolutePath() + File.separator + script.getName());
+            File f = new File(appArguments.getScriptsDirectory().getAbsolutePath() + File.separator + script.getName());
             try {
                 String content = FileUtils.readFileToString(f);
                 cats.add(content);

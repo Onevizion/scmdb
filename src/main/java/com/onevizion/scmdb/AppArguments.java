@@ -1,21 +1,20 @@
 package com.onevizion.scmdb;
 
 import com.onevizion.scmdb.vo.DbCnnCredentials;
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
+import joptsimple.OptionSpec;
 
 import java.io.File;
 
-public class AppArguments {
-    private static final String DB_SCRIPT_DIR_ERROR_MESSAGE = "You should specify absolute path to db scripts";
-    private static final String ARGUMENTS_ERROR_MESSAGE = "You can't specify both -genDdl and -exec. Choose one.";
-    private static final String ARG_GEN_DDL = "-genDdl";
-    private static final String ARG_EXECUTE_SCRIPTS = "-exec";
-    private static final String ARG_NOT_USE_COLOR_LOGGING = "--no-color";
+import static java.util.Arrays.asList;
 
-    private File scriptDirectory;
+public class AppArguments {
+    private File scriptsDirectory;
     private DbCnnCredentials ownerCredentials;
     private DbCnnCredentials userCredentials;
-    private boolean isGenDdl;
-    private boolean isExecuteScripts;
+    private boolean genDdl;
+    private boolean executeScripts;
     private boolean useColorLogging = true;
 
     private AppArguments() {}
@@ -25,53 +24,43 @@ public class AppArguments {
     }
 
     public void parse(String[] args) {
-        if (args.length == 0) {
-            throw new IllegalArgumentException(DbCnnCredentials.DB_CNN_STR_ERROR_MESSAGE + "\n" + DB_SCRIPT_DIR_ERROR_MESSAGE);
-        }
-        int argIndex = 0;
-        ownerCredentials = DbCnnCredentials.create(args[argIndex++]);
-        if (DbCnnCredentials.isCorrectConnectionString(args[argIndex])) {
-            userCredentials = DbCnnCredentials.create(args[argIndex++]);
+        OptionParser parser = new OptionParser();
+        OptionSpec<String> ownerSchemaOption = parser.accepts("owner-schema").withRequiredArg().ofType(String.class);
+        OptionSpec<String> userSchemaOption = parser.accepts("user-schema").withRequiredArg().ofType(String.class);
+        OptionSpec<File> scriptsOption = parser.accepts("scripts-dir").withRequiredArg().ofType(File.class);
+
+        OptionSpec execOption = parser.acceptsAll(asList("e", "exec"));
+        OptionSpec genDdlOption = parser.acceptsAll(asList("d", "gen-ddl"));
+        OptionSpec noColorOption = parser.accepts("no-color");
+
+        OptionSet options = parser.parse(args);
+
+        ownerCredentials = DbCnnCredentials.create(options.valueOf(ownerSchemaOption));
+        if (options.has(userSchemaOption)) {
+            userCredentials = DbCnnCredentials.create(options.valueOf(userSchemaOption));
         } else {
             userCredentials = DbCnnCredentials.create(DbCnnCredentials.genUserCnnStr(ownerCredentials.getConnectionString()));
         }
-        scriptDirectory = parseDbScriptDir(args[argIndex++]);
-
-        if (args.length > argIndex) {
-            for (int i = 2; i < args.length; i++) {
-                String arg = args[i];
-                if (ARG_GEN_DDL.equals(arg)) {
-                    if (isExecuteScripts) {
-                        throw new IllegalArgumentException(ARGUMENTS_ERROR_MESSAGE);
-                    }
-                    isGenDdl = true;
-                } else if (ARG_EXECUTE_SCRIPTS.equals(arg)) {
-                    if (isGenDdl) {
-                        throw new IllegalArgumentException(ARGUMENTS_ERROR_MESSAGE);
-                    }
-                    isExecuteScripts = true;
-                } else if (ARG_NOT_USE_COLOR_LOGGING.equals(arg)) {
-                    useColorLogging = false;
-                }
-            }
+        scriptsDirectory = options.valueOf(scriptsOption);
+        if (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory()) {
+            throw new IllegalArgumentException("Path [" + scriptsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
+                    " [--scripts-dir] should contains absolute path and points to scripts directory");
         }
-    }
 
-    private File parseDbScriptDir(String path) {
-        File f = new File(path);
-        if (f.exists()) {
-            return f;
-        } else {
-            throw new IllegalArgumentException("File or directory doesn't exist: " + path);
+        if (options.has(execOption) && options.has(genDdlOption)) {
+            throw new IllegalArgumentException("You can't specify both --gen-ddl and --exec arguments. Choose one.");
         }
+        executeScripts = options.has(execOption);
+        genDdl = options.has(genDdlOption);
+        useColorLogging = !options.has(noColorOption);
     }
 
-    public File getScriptDirectory() {
-        return scriptDirectory;
+    public File getScriptsDirectory() {
+        return scriptsDirectory;
     }
 
-    public void setScriptDirectory(File scriptDirectory) {
-        this.scriptDirectory = scriptDirectory;
+    public void setScriptsDirectory(File scriptsDirectory) {
+        this.scriptsDirectory = scriptsDirectory;
     }
 
     public DbCnnCredentials getOwnerCredentials() {
@@ -91,19 +80,19 @@ public class AppArguments {
     }
 
     public boolean isGenDdl() {
-        return isGenDdl;
+        return genDdl;
     }
 
     public void setGenDdl(boolean genDdl) {
-        isGenDdl = genDdl;
+        this.genDdl = genDdl;
     }
 
     public boolean isExecuteScripts() {
-        return isExecuteScripts;
+        return executeScripts;
     }
 
     public void setExecuteScripts(boolean executeScripts) {
-        isExecuteScripts = executeScripts;
+        this.executeScripts = executeScripts;
     }
 
     public boolean isUseColorLogging() {

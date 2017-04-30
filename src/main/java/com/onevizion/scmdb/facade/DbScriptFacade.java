@@ -39,12 +39,12 @@ public class DbScriptFacade {
 
 
     public void init() {
-        execDir = new File(appArguments.getScriptDirectory().getAbsolutePath() + File.separator + EXEC_FOLDER_NAME);
+        execDir = new File(appArguments.getScriptsDirectory().getAbsolutePath() + File.separator + EXEC_FOLDER_NAME);
         scriptsInDir = createScriptsFromFiles();
     }
 
     public List<SqlScript> getNewScripts() {
-        logger.debug("Searching new scripts in [{}]", appArguments.getScriptDirectory().getAbsolutePath());
+        logger.debug("Searching new scripts in [{}]", appArguments.getScriptsDirectory().getAbsolutePath());
 
         Map<String, SqlScript> savedScripts = sqlScriptDaoOra.readMap();
 
@@ -98,7 +98,7 @@ public class DbScriptFacade {
     }
 
     private List<SqlScript> createScriptsFromFiles() {
-        List<File> scriptFiles = (List<File>) FileUtils.listFiles(appArguments.getScriptDirectory(), new String[]{"sql"}, false);
+        List<File> scriptFiles = (List<File>) FileUtils.listFiles(appArguments.getScriptsDirectory(), new String[]{"sql"}, false);
         return scriptFiles.stream()
                           .map(SqlScript::create)
                           .collect(Collectors.toList());
@@ -136,7 +136,7 @@ public class DbScriptFacade {
                                                              .collect(Collectors.toMap(SqlScript::getName, Function.identity()));
 
 
-        logger.debug("Searching deleted scripts in [{}]", appArguments.getScriptDirectory().getAbsolutePath());
+        logger.debug("Searching deleted scripts in [{}]", appArguments.getScriptsDirectory().getAbsolutePath());
         Map<String, SqlScript> deletedScripts = dbScripts.values().stream()
                                                          .filter(dbScript -> !scriptsInDirMap.containsKey(dbScript.getName()))
                                                          .collect(Collectors.toMap(SqlScript::getName, Function.identity()));
@@ -177,7 +177,7 @@ public class DbScriptFacade {
 
     public void copyScriptsToExecDir(List<SqlScript> scripts) {
         for (SqlScript script : scripts) {
-            File srcFile = new File(appArguments.getScriptDirectory()
+            File srcFile = new File(appArguments.getScriptsDirectory()
                                                 .getAbsolutePath() + File.separator + script.getName());
             File destFile = new File(execDir.getAbsolutePath() + File.separator + script.getName());
             try {
