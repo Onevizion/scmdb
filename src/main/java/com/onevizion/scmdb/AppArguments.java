@@ -31,7 +31,7 @@ public class AppArguments {
 
         OptionSpec execOption = parser.acceptsAll(asList("e", "exec"));
         OptionSpec genDdlOption = parser.acceptsAll(asList("d", "gen-ddl"));
-        OptionSpec noColorOption = parser.accepts("no-color");
+        OptionSpec noColorOption = parser.acceptsAll(asList("n", "no-color"));
 
         OptionSet options = parser.parse(args);
 

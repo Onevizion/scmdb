@@ -7,10 +7,14 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.ConsoleAppender;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Resource;
+
 public class ColorLogger {
     private Logger logger = (Logger) LoggerFactory.getLogger("STDOUT");
     private PatternLayoutEncoder encoder;
 
+    @Resource
+    private AppArguments appArguments;
 
     public ColorLogger() {
         LoggerContext loggerContext = logger.getLoggerContext();
@@ -30,10 +34,7 @@ public class ColorLogger {
     }
 
     public void info(String msg, Color color, Object... argArray) {
-        encoder.stop();
-        encoder.setPattern("%" + color.getColor() + "(%message%n)");
-        encoder.start();
-
+        setColor(color);
         logger.info(msg, argArray);
     }
 
@@ -42,23 +43,25 @@ public class ColorLogger {
     }
 
     public void warn(String msg, Color color, Object... argArray) {
-        encoder.stop();
-        encoder.setPattern("%" + color.getColor() + "(%message%n)");
-        encoder.start();
-
+        setColor(color);
         logger.warn(msg, argArray);
     }
 
     public void error(String msg, Object... argArray) {
-        encoder.stop();
-        encoder.setPattern("%" + Color.RED.getColor() + "(%message%n)");
-        encoder.start();
-
+        setColor(Color.RED);
         logger.error(msg, argArray);
     }
 
+    private void setColor(Color color) {
+        if (appArguments.isUseColorLogging()) {
+            encoder.stop();
+            encoder.setPattern("%" + color.getColor() + "(%message%n)");
+            encoder.start();
+        }
+    }
+
     public enum Color {
-        WHITE("boldWhite"),
+        WHITE("white"),
         CYAN("cyan"),
         YELLOW("yellow"),
         RED("red"),
