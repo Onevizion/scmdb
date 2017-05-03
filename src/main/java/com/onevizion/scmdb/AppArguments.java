@@ -27,7 +27,7 @@ public class AppArguments {
         OptionParser parser = new OptionParser();
         OptionSpec<String> ownerSchemaOption = parser.accepts("owner-schema").withRequiredArg().ofType(String.class);
         OptionSpec<String> userSchemaOption = parser.accepts("user-schema").withRequiredArg().ofType(String.class);
-        OptionSpec<File> scriptsOption = parser.accepts("scripts-dir").withRequiredArg().ofType(File.class);
+        OptionSpec<File> scriptsDirectoryOption = parser.accepts("scripts-dir").withRequiredArg().ofType(File.class);
 
         OptionSpec execOption = parser.acceptsAll(asList("e", "exec"));
         OptionSpec genDdlOption = parser.acceptsAll(asList("d", "gen-ddl"));
@@ -35,13 +35,17 @@ public class AppArguments {
 
         OptionSet options = parser.parse(args);
 
+        if(!options.has(ownerSchemaOption) || !options.has(scriptsDirectoryOption)){
+            throw new IllegalArgumentException("--owner-schema and --scripts-dir are required parameters.");
+        }
+
         ownerCredentials = DbCnnCredentials.create(options.valueOf(ownerSchemaOption));
         if (options.has(userSchemaOption)) {
             userCredentials = DbCnnCredentials.create(options.valueOf(userSchemaOption));
         } else {
             userCredentials = DbCnnCredentials.create(DbCnnCredentials.genUserCnnStr(ownerCredentials.getConnectionString()));
         }
-        scriptsDirectory = options.valueOf(scriptsOption);
+        scriptsDirectory = options.valueOf(scriptsDirectoryOption);
         if (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory()) {
             throw new IllegalArgumentException("Path [" + scriptsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
                     " [--scripts-dir] should contains absolute path and points to scripts directory");
