@@ -98,7 +98,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <finalName>scm-db</finalName>
+                    <finalName>scmdb</finalName>
                     <filters>
                         <filter>
                             <artifact>*:*</artifact>
