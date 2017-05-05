@@ -104,9 +104,9 @@ public class DbManager {
         boolean executeRollbacks = false;
 
         if (appArguments.isExecuteScripts()) {
-            logger.info("Do you really want to execute {} rollbacks? ", rollbacksToExec.size());
-            logger.info("Type [no] and rollbacks will be copied to EXECUTE_ME directory and marked as executed. Execute them manually and run scmdb again to execute new scripts.");
-            logger.info("Type [yes] to continue and execute all rollbacks");
+            logger.info("Do you really want to execute {} rollbacks? ", GREEN, rollbacksToExec.size());
+            logger.info("Type [no] and rollbacks will be copied to EXECUTE_ME directory and marked as executed. Execute them manually and run scmdb again to execute new scripts.", GREEN);
+            logger.info("Type [yes] to continue and execute all rollbacks", GREEN);
             executeRollbacks = userGrantsPermission();
         }
 
