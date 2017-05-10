@@ -9,9 +9,27 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.onevizion</groupId>
-            <artifactId>maven-plugin-dbschema</artifactId>
-            <version>1.0.3</version>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <version>4.3.8.RELEASE</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-jdbc</artifactId>
+            <version>4.3.8.RELEASE</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.oracle.jdbc</groupId>
+            <artifactId>ojdbc8</artifactId>
+            <version>12.2.0.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.5</version>
         </dependency>
 
         <dependency>
@@ -129,25 +147,17 @@
 
     <repositories>
         <repository>
-            <id>internal</id>
-            <name>internal</name>
-            <url>${mvn.repo.addr}/archiva/repository/internal/</url>
-        </repository>
-        <repository>
-            <id>releases</id>
-            <name>releases</name>
-            <url>${mvn.repo.addr}/archiva/repository/releases/</url>
+            <id>maven.oracle.com</id>
+            <url>https://maven.oracle.com</url>
             <layout>default</layout>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
         </repository>
     </repositories>
-
-    <pluginRepositories>
-        <pluginRepository>
-            <id>pluginReleases</id>
-            <name>releases</name>
-            <url>${mvn.repo.addr}/archiva/repository/releases/</url>
-        </pluginRepository>
-    </pluginRepositories>
 
     <distributionManagement>
         <repository>

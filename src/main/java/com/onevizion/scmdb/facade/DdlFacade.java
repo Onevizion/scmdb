@@ -1,7 +1,7 @@
 package com.onevizion.scmdb.facade;
 
-import com.onevizion.maven.plugin.dbschema.ScriptsGenerator;
 import com.onevizion.scmdb.AppArguments;
+import com.onevizion.scmdb.ScriptsGenerator;
 import com.onevizion.scmdb.vo.SqlScript;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
