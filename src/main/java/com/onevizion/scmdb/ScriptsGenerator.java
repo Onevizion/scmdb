@@ -16,8 +16,6 @@ import javax.annotation.Resource;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.io.InputStream;
-import java.sql.SQLException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -26,6 +24,9 @@ import java.util.regex.Pattern;
 public class ScriptsGenerator {
     @Resource
     private DdlDao dao;
+
+    @Resource
+    private AppArguments appArguments;
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
@@ -36,17 +37,6 @@ public class ScriptsGenerator {
     private final String packagesPathSuf = "/packages";
     private final String tablesPathSuf = "/tables";
     private final String viewsPathSuf = "/views";
-
-    public void setConCacheProperties(String fileName) throws IOException {
-        Properties props = new Properties();
-        try {
-            InputStream inputStream = getClass().getClassLoader().getResourceAsStream(fileName);
-            props.loadFromXML(inputStream);
-            dao.setConCacheProperties(props);
-        } catch (SQLException e) {
-            logger.error(e.toString());
-        }
-    }
 
     public void executeSettingTransformParams() {
         dao.executeTransformParamStatements();
@@ -59,7 +49,7 @@ public class ScriptsGenerator {
         if (dbObject == null) {
             packagesSpec = dao.extractPackageSpecDdls();
         } else {
-            packagesSpec = new ArrayList<DbObject>();
+            packagesSpec = new ArrayList<>();
             packagesSpec.add(dbObject);
         }
 
@@ -84,7 +74,7 @@ public class ScriptsGenerator {
         if (dbObject == null) {
             packagesBodies = dao.extractPackageBodiesDdls();
         } else {
-            packagesBodies = new ArrayList<DbObject>();
+            packagesBodies = new ArrayList<>();
             packagesBodies.add(dbObject);
         }
 
@@ -109,7 +99,7 @@ public class ScriptsGenerator {
         if (dbObject == null) {
             tables = dao.extractTablesDdls();
         } else {
-            tables = new ArrayList<DbObject>();
+            tables = new ArrayList<>();
             tables.add(dbObject);
         }
 
@@ -252,7 +242,7 @@ public class ScriptsGenerator {
         if (dbObject == null) {
             views = dao.extractViewsDdls();
         } else {
-            views = new ArrayList<DbObject>();
+            views = new ArrayList<>();
             views.add(dbObject);
         }
 
@@ -316,7 +306,7 @@ public class ScriptsGenerator {
                 return;
             }
 
-            if(DbObjectType.COMMENT.toString().equals(type)){
+            if (DbObjectType.COMMENT.toString().equals(type)) {
                 type = dao.getObjectTypeByName(name);
             }
 
@@ -369,13 +359,11 @@ public class ScriptsGenerator {
 
     private String getTableNameByDepObject(String name) {
         int posNumber = name.indexOf("_");
-        String tableName = name.substring(posNumber + 1);
-        return tableName;
+        return name.substring(posNumber + 1);
     }
 
     public String removeSchemaNameInDdl(String ddl) {
-        String schemaName = dao.getSchemaName();
-        String regexp = String.format("\"%s\".", schemaName.toUpperCase());
+        String regexp = String.format("\"%s\".", appArguments.getOwnerCredentials().getSchemaName().toUpperCase());
         ddl = ddl.replaceAll(regexp, "");
         return ddl;
     }
@@ -412,7 +400,7 @@ public class ScriptsGenerator {
 
         if (fileName != null && fileDir != null) {
             deleteFilteredFiles(fileDir, fileName);
-            if(isDeletePackSpecWithBody){
+            if (isDeletePackSpecWithBody) {
                 String packBodyName = dbObjectName + ".sql";
                 deleteFilteredFiles(fileDir, packBodyName);
             }

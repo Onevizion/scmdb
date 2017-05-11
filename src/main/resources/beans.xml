@@ -7,18 +7,10 @@
         http://www.springframework.org/schema/context/spring-context-4.2.xsd">
     <context:property-placeholder ignore-unresolvable="true"/>
 
-    <bean id="dataSource" class="oracle.jdbc.pool.OracleDataSource" destroy-method="close">
-        <property name="explicitCachingEnabled" value="true"/>
-        <property name="connectionCachingEnabled" value="true"/>
-        <property name="connectionCacheProperties">
-            <props>
-                <prop key="MinLimit">0</prop>
-                <prop key="MaxLimit">2</prop>
-                <prop key="InitialLimit">1</prop>
-                <prop key="InactivityTimeout">600</prop>
-                <prop key="PropertyCheckInterval">300</prop>
-            </props>
-        </property>
+    <bean id="dataSource" class="oracle.ucp.jdbc.PoolDataSourceImpl">
+        <property name="connectionFactoryClassName" value="oracle.jdbc.pool.OracleDataSource"/>
+        <property name="maxPoolSize" value="5"/>
+        <property name="initialPoolSize" value="2"/>
     </bean>
 
     <bean id="jdbcTemplate"
@@ -37,6 +29,4 @@
     <bean class="com.onevizion.scmdb.SqlScriptExecutor"/>
 
     <context:component-scan base-package="com.onevizion.scmdb"/>
-
-    <import resource="classpath:app-context.xml"/>
 </beans>

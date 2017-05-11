@@ -7,11 +7,11 @@ import java.util.regex.Pattern;
 
 public class DbCnnCredentials {
     private static final String JDBC_THIN_URL_PREFIX = "jdbc:oracle:thin:@";
-    public static final String DB_CNN_STR_ERROR_MESSAGE = "You should specify db connection properties using one of following formats:"
+    private static final String DB_CNN_STR_ERROR_MESSAGE = "You should specify db connection properties using one of following formats:"
             + " <username>/<password>@<host>:<port>:<SID> or <username>/<password>@<host>:<port>/<service>";
     private static final String USER_SCHEMA_SUFFIX = "_user";
 
-    private String user;
+    private String schemaName;
     private String password;
     private String ownerCnnStr;
     private String oracleUrl;
@@ -19,6 +19,10 @@ public class DbCnnCredentials {
     private DbCnnCredentials() {}
 
     public static DbCnnCredentials create(String ownerCnnStr) {
+        if (!isCorrectConnectionString(ownerCnnStr)) {
+            throw new IllegalArgumentException(DB_CNN_STR_ERROR_MESSAGE);
+        }
+
         if (isOldJdbcFormat(ownerCnnStr)) {
             ownerCnnStr = convertToNewJdbcFormat(ownerCnnStr);
         }
@@ -28,7 +32,7 @@ public class DbCnnCredentials {
         Pattern p = Pattern.compile("(.+?)/(.+?)@(.+)");
         Matcher m = p.matcher(ownerCnnStr);
         if (m.matches() && m.groupCount() == 3) {
-            cnnCredentials.setUser(m.group(1));
+            cnnCredentials.setSchemaName(m.group(1));
             cnnCredentials.setPassword(m.group(2));
             cnnCredentials.setOracleUrl(JDBC_THIN_URL_PREFIX + m.group(3));
         } else {
@@ -65,12 +69,12 @@ public class DbCnnCredentials {
         return oldCnnStr.substring(0, i) + "/" + oldCnnStr.substring(i + 1);
     }
 
-    public String getUser() {
-        return user;
+    public String getSchemaName() {
+        return schemaName;
     }
 
-    public void setUser(String user) {
-        this.user = user;
+    public void setSchemaName(String schemaName) {
+        this.schemaName = schemaName;
     }
 
     public String getPassword() {

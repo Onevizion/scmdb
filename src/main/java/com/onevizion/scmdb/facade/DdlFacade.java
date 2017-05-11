@@ -35,7 +35,6 @@ public class DdlFacade {
             return;
         }
         try {
-            scriptsGenerator.setConCacheProperties("connectionCacheProperties.xml");
             scriptsGenerator.executeSettingTransformParams();
             scriptsGenerator.generateDbObjectScripts(ddlDir, newDbObjectArr);
         } catch (IOException e) {

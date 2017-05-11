@@ -2,7 +2,6 @@ package com.onevizion.scmdb.dao;
 
 import com.onevizion.scmdb.vo.DbObject;
 import com.onevizion.scmdb.vo.DbObjectType;
-import oracle.jdbc.pool.OracleDataSource;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -11,17 +10,9 @@ import org.springframework.stereotype.Component;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
-import java.util.Properties;
 
 @Component
 public class DdlDao extends AbstractDaoOra {
-
-    public void setConCacheProperties(Properties conCacheProps) throws SQLException {
-        OracleDataSource oraDs = (OracleDataSource) jdbcTemplate.getDataSource();
-        oraDs.setConnectionCachingEnabled(true);
-        oraDs.setConnectionCacheProperties(conCacheProps);
-    }
-
     public void executeTransformParamStatements() {
         String plsqlBlock = "begin" +
                 "\n dbms_metadata.set_transform_param(dbms_metadata.session_transform,'PRETTY',true);" +
