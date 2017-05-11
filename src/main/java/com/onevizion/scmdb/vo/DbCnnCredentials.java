@@ -13,7 +13,7 @@ public class DbCnnCredentials {
 
     private String schemaName;
     private String password;
-    private String ownerCnnStr;
+    private String connectionString;
     private String oracleUrl;
 
     private DbCnnCredentials() {}
@@ -27,7 +27,7 @@ public class DbCnnCredentials {
             ownerCnnStr = convertToNewJdbcFormat(ownerCnnStr);
         }
         DbCnnCredentials cnnCredentials = new DbCnnCredentials();
-        cnnCredentials.setOwnerCnnStr(ownerCnnStr);
+        cnnCredentials.setConnectionString(ownerCnnStr);
 
         Pattern p = Pattern.compile("(.+?)/(.+?)@(.+)");
         Matcher m = p.matcher(ownerCnnStr);
@@ -86,11 +86,11 @@ public class DbCnnCredentials {
     }
 
     public String getConnectionString() {
-        return ownerCnnStr;
+        return connectionString;
     }
 
-    public void setOwnerCnnStr(String ownerCnnStr) {
-        this.ownerCnnStr = ownerCnnStr;
+    public void setConnectionString(String connectionString) {
+        this.connectionString = connectionString;
     }
 
     public String getOracleUrl() {

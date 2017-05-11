@@ -4,7 +4,6 @@ import java.lang.String;
 
 public class DbObject {
     private String name;
-
     private String ddl;
 
     public String getName() {
