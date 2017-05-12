@@ -11,11 +11,14 @@ import static java.util.Arrays.asList;
 
 public class AppArguments {
     private File scriptsDirectory;
+    private File ddlsDirectory;
     private DbCnnCredentials ownerCredentials;
     private DbCnnCredentials userCredentials;
     private boolean genDdl;
     private boolean executeScripts;
     private boolean useColorLogging = true;
+
+    private final static String DDL_DIRECTORY_NAME = "ddl";
 
     private AppArguments() {}
 
@@ -50,6 +53,12 @@ public class AppArguments {
             throw new IllegalArgumentException("Path [" + scriptsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
                     " [--scripts-dir] should contains absolute path and points to scripts directory");
         }
+        ddlsDirectory = new File(scriptsDirectory.getParentFile().getAbsolutePath() + File.separator +
+                DDL_DIRECTORY_NAME);
+        if (!ddlsDirectory.exists() || !ddlsDirectory.isDirectory()) {
+            throw new IllegalArgumentException("Path [" + ddlsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
+                    " Can't find ddl directory");
+        }
 
         if (options.has(execOption) && options.has(genDdlOption)) {
             throw new IllegalArgumentException("You can't specify both --gen-ddl and --exec arguments. Choose one.");
@@ -65,6 +74,14 @@ public class AppArguments {
 
     public void setScriptsDirectory(File scriptsDirectory) {
         this.scriptsDirectory = scriptsDirectory;
+    }
+
+    public File getDdlsDirectory() {
+        return ddlsDirectory;
+    }
+
+    public void setDdlsDirectory(File ddlsDirectory) {
+        this.ddlsDirectory = ddlsDirectory;
     }
 
     public DbCnnCredentials getOwnerCredentials() {

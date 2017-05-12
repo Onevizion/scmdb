@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 @Component
 public class DdlFacade {
     @Resource
-    private DdlGenerator scriptsGenerator;
+    private DdlGenerator ddlGenerator;
 
     @Resource
     private AppArguments appArguments;
@@ -27,15 +27,11 @@ public class DdlFacade {
     @Resource
     private ColorLogger logger;
 
-    private final static String DDL_FOLDER_NAME = "ddl";
 
     public void generateDdl(List<SqlScript> scripts) {
-        String ddlDirectory = appArguments.getScriptsDirectory()
-                                          .getParentFile()
-                                          .getAbsolutePath() + File.separator + DDL_FOLDER_NAME;
         List<DbObject> changedDbObjects = findChangedDbObjects(scripts);
-        scriptsGenerator.executeSettingTransformParams();
-        scriptsGenerator.createDdlsForChangedDbObjects(ddlDirectory, changedDbObjects);
+        ddlGenerator.executeSettingTransformParams();
+        ddlGenerator.createDdlsForChangedDbObjects(changedDbObjects);
     }
 
     private List<DbObject> findChangedDbObjects(List<SqlScript> scripts) {

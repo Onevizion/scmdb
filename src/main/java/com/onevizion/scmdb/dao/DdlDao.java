@@ -80,11 +80,11 @@ public class DdlDao extends AbstractDaoOra {
         return dbObjects;
     }
 
-    public String extractDdlByNameAndType(String dbObjName, String dbObjType) {
+    public String extractDdl(DbObject dbObject) {
         String sql = "select dbms_metadata.get_ddl(upper(:dbObjType), upper(:dbObjName)) from dual";
         MapSqlParameterSource namedParams = new MapSqlParameterSource();
-        namedParams.addValue("dbObjName", dbObjName);
-        namedParams.addValue("dbObjType", dbObjType);
+        namedParams.addValue("dbObjName", dbObject.getName());
+        namedParams.addValue("dbObjType", dbObject.getType().getName());
         String ddl = namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);
         return ddl;
     }
@@ -126,15 +126,15 @@ public class DdlDao extends AbstractDaoOra {
         return dbObjects;
     }
 
-    public String getTableNameByDepObject(String objName, String objType) {
+    public String getTableNameByDepObject(DbObject dbObject) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource();
-        namedParams.addValue("objName", objName);
+        namedParams.addValue("objName", dbObject.getName());
         String sql;
-        if (DbObjectType.INDEX.toString().equals(objType)) {
+        if (dbObject.getType() == DbObjectType.INDEX) {
             sql = "select table_name from user_indexes where index_name = upper(:objName)";
-        } else if (DbObjectType.TRIGGER.toString().equals(objType)) {
+        } else if (dbObject.getType() == DbObjectType.TRIGGER) {
             sql = "select table_name from user_triggers where trigger_name = upper(:objName)";
-        } else if (DbObjectType.SEQUENCE.toString().equals(objType)) {
+        } else if (dbObject.getType() == DbObjectType.SEQUENCE) {
             sql = "select trgrs.table_name from user_dependencies depends, user_triggers trgrs" +
                 " where trgrs.trigger_name = depends.name and depends.type = 'TRIGGER'" +
                 " and depends.referenced_type = 'SEQUENCE' and depends.referenced_name = upper(:objName)";
@@ -148,13 +148,13 @@ public class DdlDao extends AbstractDaoOra {
         }
     }
 
-    public String getObjectTypeByName(String dbObjName) {
+    public DbObjectType getObjectTypeByName(String dbObjName) {
         String sql = "select 'TABLE' object_type from user_tables where table_name = upper(:dbObjName)" +
             " union all select 'VIEW' object_type from user_views where view_name = upper(:dbObjName)";
         MapSqlParameterSource namedParams = new MapSqlParameterSource();
         namedParams.addValue("dbObjName", dbObjName);
-        String dbObjType = namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);
-        return dbObjType;
+        String dbObjTypeString = namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);
+        return DbObjectType.valueOf(dbObjTypeString);
     }
 
     public List<DbObject> extractTabCommentsDdls() {
@@ -192,15 +192,10 @@ public class DdlDao extends AbstractDaoOra {
         return dbObjects;
     }
 
-    public boolean isExist(String objName, String objType) {
-        if (DbObjectType.PACKAGE_SPEC.toString().equals(objType)) {
-            objType = "PACKAGE";
-        } else if (DbObjectType.PACKAGE_BODY.toString().equals(objType)) {
-            objType = "PACKAGE BODY";
-        }
+    public boolean isExist(String objectName, DbObjectType objectType) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource();
-        namedParams.addValue("objName", objName);
-        namedParams.addValue("objType", objType);
+        namedParams.addValue("objName", objectName);
+        namedParams.addValue("objType", objectType.getName().toUpperCase());
         String sql = "select case when" +
                 "                count(object_name) > 0 then 'true'" +
                 "            else 'false'" +

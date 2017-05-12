@@ -1,9 +1,7 @@
 package com.onevizion.scmdb;
 
-
 import com.onevizion.scmdb.dao.DdlDao;
 import com.onevizion.scmdb.vo.DbObject;
-import com.onevizion.scmdb.vo.DbObjectType;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOCase;
 import org.apache.commons.io.filefilter.WildcardFileFilter;
@@ -16,9 +14,12 @@ import javax.annotation.Resource;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static com.onevizion.scmdb.vo.DbObjectType.*;
 
 @Component
 public class DdlGenerator {
@@ -34,17 +35,15 @@ public class DdlGenerator {
     private final String[] excludedPackages = {"PKGR_"};
     private final String[] excludedViews = {"VX_"};
 
-    private final String packagesPathSuf = "/packages";
-    private final String tablesPathSuf = "/tables";
-    private final String viewsPathSuf = "/views";
+    private static final String PACKAGES_DDL_DIRECTORY_NAME = "packages";
+    private static final String TABLES_DDL_DIRECTORY_NAME = "tables";
+    private static final String VIEWS_DDL_DIRECTORY_NAME = "views";
 
     public void executeSettingTransformParams() {
         ddlDao.executeTransformParamStatements();
     }
 
-    public void generatePackageSpecScripts(String outputDirectory, DbObject dbObject) throws IOException {
-        String packagesDir = outputDirectory + packagesPathSuf;
-
+    public void generatePackageSpecScripts(DbObject dbObject) {
         List<DbObject> packagesSpec;
         if (dbObject == null) {
             packagesSpec = ddlDao.extractPackageSpecDdls();
@@ -61,15 +60,12 @@ public class DdlGenerator {
                 ddl = ddl.replaceFirst("\\s+/$", "\n/");
                 ddl = ddl.replaceAll("\\n", "\r\n");
                 pkgSpec.setDdl(ddl);
-                File file = new File(packagesDir + "/" + pkgSpec.getName().toLowerCase() + "_spec.sql");
-                FileUtils.write(file, pkgSpec.getDdl(), "UTF-8", false);
+                writeDdlToFile(pkgSpec, PACKAGES_DDL_DIRECTORY_NAME);
             }
         }
     }
 
-    public void generatePackageBodyScripts(String outputDirectory, DbObject dbObject) throws IOException {
-        String packagesDir = outputDirectory + packagesPathSuf;
-
+    public void generatePackageBodyScripts(DbObject dbObject) {
         List<DbObject> packagesBodies;
         if (dbObject == null) {
             packagesBodies = ddlDao.extractPackageBodiesDdls();
@@ -86,15 +82,12 @@ public class DdlGenerator {
                 ddl = ddl.replaceFirst("\\s+/$", "\n/");
                 ddl = ddl.replaceAll("\\n", "\r\n");
                 pkgBody.setDdl(ddl);
-                File file = new File(packagesDir + "/" + pkgBody.getName().toLowerCase() + ".sql");
-                FileUtils.write(file, pkgBody.getDdl(), "UTF-8", false);
+                writeDdlToFile(pkgBody, PACKAGES_DDL_DIRECTORY_NAME);
             }
         }
     }
 
-    public void generateTableScripts(String outputDirectory, DbObject dbObject) throws IOException {
-        String tablesDir = outputDirectory + tablesPathSuf;
-
+    public void generateTableScripts(DbObject dbObject) {
         List<DbObject> tables;
         if (dbObject == null) {
             tables = ddlDao.extractTablesDdls();
@@ -114,22 +107,32 @@ public class DdlGenerator {
             ddl = ddl.replaceAll("\\t", "    ");
             ddl = ddl.replaceAll("\\r\\n\\s+REFERENCES\\s", " REFERENCES ");
             table.setDdl(ddl);
-            File file = new File(tablesDir + "/" + table.getName().toLowerCase() + ".sql");
-            FileUtils.write(file, table.getDdl(), "UTF-8", false);
+            writeDdlToFile(table, TABLES_DDL_DIRECTORY_NAME);
         }
-        generateTabCommentsScripts(tablesDir, dbObject);
-        generateIndexScripts(tablesDir, dbObject);
-        generateSequenceScripts(tablesDir, dbObject);
-        generateTriggerScripts(tablesDir, dbObject);
+        generateTabCommentsScripts(dbObject);
+        generateIndexScripts(dbObject);
+        generateSequenceScripts(dbObject);
+        generateTriggerScripts(dbObject);
     }
 
-    private void generateTabCommentsScripts(String tablesDir, DbObject table) throws IOException {
+    private void writeDdlToFile(DbObject dbObject, String ddlDirectoryName) {
+        String directoryPath = appArguments.getDdlsDirectory().getAbsolutePath() + File.separator + ddlDirectoryName;
+
+        File file = new File(directoryPath + "/" + dbObject.getName().toLowerCase() + ".sql");
+        try {
+            FileUtils.write(file, dbObject.getDdl(), "UTF-8", false);
+        } catch (IOException e) {
+            throw new RuntimeException("Can't write ddl to file[" + file.getAbsolutePath() + "]", e);
+        }
+    }
+
+    private void generateTabCommentsScripts(DbObject table) {
         logger.info("Adding comments...");
         List<DbObject> comments;
         if (table == null) {
             comments = ddlDao.extractTabCommentsDdls();
         } else {
-            comments = ddlDao.extractTableDependentObjectsDdl(table.getName(), DbObjectType.COMMENT.toString());
+            comments = ddlDao.extractTableDependentObjectsDdl(table.getName(), COMMENT.toString());
         }
         for (DbObject comment : comments) {
             String ddl = removeSchemaNameInDdl(comment.getDdl());
@@ -149,18 +152,17 @@ public class DdlGenerator {
             ddl = ddl.trim();
             ddl = "\r\n\r\n" + ddl;
             comment.setDdl(ddl);
-            File file = new File(tablesDir + "/" + comment.getName().toLowerCase() + ".sql");
-            FileUtils.write(file, comment.getDdl(), "UTF-8", true);
+            writeDdlToFile(comment, TABLES_DDL_DIRECTORY_NAME);
         }
     }
 
-    private void generateIndexScripts(String tablesDir, DbObject table) throws IOException {
+    private void generateIndexScripts(DbObject table) {
         logger.info("Adding indexes...");
         List<DbObject> indexes;
         if (table == null) {
             indexes = ddlDao.extractIndexesDdls();
         } else {
-            indexes = ddlDao.extractTableDependentObjectsDdl(table.getName(), DbObjectType.INDEX.toString());
+            indexes = ddlDao.extractTableDependentObjectsDdl(table.getName(), INDEX.toString());
         }
         for (int i = 0; i < indexes.size(); i++) {
             DbObject index = indexes.get(i);
@@ -173,21 +175,20 @@ public class DdlGenerator {
             }
             ddl = ddl.replaceAll("\\s+;$", ";");
             index.setDdl(ddl);
-            File file = new File(tablesDir + "/" + index.getName().toLowerCase() + ".sql");
-            FileUtils.write(file, index.getDdl(), "UTF-8", true);
+            writeDdlToFile(index, TABLES_DDL_DIRECTORY_NAME);
         }
     }
 
-    private void generateSequenceScripts(String tablesDir, DbObject table) throws IOException {
+    private void generateSequenceScripts(DbObject table) {
         logger.info("Adding sequences...");
         List<DbObject> sequences;
         if (table == null) {
             sequences = ddlDao.extractSequencesDdls();
         } else {
-            sequences = ddlDao.extractTableDependentObjectsDdl(table.getName(), DbObjectType.SEQUENCE.toString());
+            sequences = ddlDao.extractTableDependentObjectsDdl(table.getName(), SEQUENCE.toString());
         }
-        for (DbObject seq : sequences) {
-            String ddl = removeSchemaNameInDdl(seq.getDdl());
+        for (DbObject sequence : sequences) {
+            String ddl = removeSchemaNameInDdl(sequence.getDdl());
             boolean isExcludable = false;
             for (String exclSeq : excludedSequences) {
                 if (ddl.contains(exclSeq)) {
@@ -208,19 +209,18 @@ public class DdlGenerator {
             } else {
                 ddl = ddl.replaceAll("\\s+;$", ";");
             }
-            seq.setDdl(ddl);
-            File file = new File(tablesDir + "/" + seq.getName().toLowerCase() + ".sql");
-            FileUtils.write(file, seq.getDdl(), "UTF-8", true);
+            sequence.setDdl(ddl);
+            writeDdlToFile(sequence, TABLES_DDL_DIRECTORY_NAME);
         }
     }
 
-    private void generateTriggerScripts(String tablesDir, DbObject table) throws IOException {
+    private void generateTriggerScripts(DbObject table) {
         logger.info("Adding triggers...");
         List<DbObject> triggers;
         if (table == null) {
             triggers = ddlDao.extractTriggersDdls();
         } else {
-            triggers = ddlDao.extractTableDependentObjectsDdl(table.getName(), DbObjectType.TRIGGER.toString());
+            triggers = ddlDao.extractTableDependentObjectsDdl(table.getName(), TRIGGER.toString());
         }
         for (DbObject trigger : triggers) {
             String ddl = removeSchemaNameInDdl(trigger.getDdl());
@@ -230,14 +230,11 @@ public class DdlGenerator {
             ddl = ddl.replaceAll("\\s+/", "\r\n/");
             ddl = ddl.replaceFirst("ALTER TRIGGER \"\\w+\" ENABLE;", "");
             trigger.setDdl(ddl);
-            File file = new File(tablesDir + "/" + trigger.getName().toLowerCase() + ".sql");
-            FileUtils.write(file, trigger.getDdl(), "UTF-8", true);
+            writeDdlToFile(trigger, TABLES_DDL_DIRECTORY_NAME);
         }
     }
 
-    public void generateViewScripts(String outputDirectory, DbObject dbObject) throws IOException {
-        String viewsDir = outputDirectory + viewsPathSuf;
-
+    public void generateViewScripts(DbObject dbObject) {
         List<DbObject> views;
         if (dbObject == null) {
             views = ddlDao.extractViewsDdls();
@@ -254,85 +251,73 @@ public class DdlGenerator {
                 ddl = ddl.replaceAll("\\s+;", ";");
                 ddl = ddl.replaceAll("\\n", "\r\n");
                 view.setDdl(ddl);
-                File file = new File(viewsDir + "/" + view.getName().toLowerCase() + ".sql");
-                FileUtils.write(file, view.getDdl(), "UTF-8", false);
+                writeDdlToFile(view, VIEWS_DDL_DIRECTORY_NAME);
             }
         }
 
-        generateViewCommentsScripts(viewsDir, dbObject);
+        generateViewCommentsScripts(dbObject);
     }
 
-    private void generateViewCommentsScripts(String viewsDir, DbObject view) throws IOException {
+    private void generateViewCommentsScripts(DbObject view) {
         logger.info("Adding views comments...");
         List<DbObject> comments;
         if (view == null) {
             comments = ddlDao.extractViewCommentsDdls();
         } else {
-            comments = ddlDao.extractTableDependentObjectsDdl(view.getName(), DbObjectType.COMMENT.toString());
+            comments = ddlDao.extractTableDependentObjectsDdl(view.getName(), COMMENT.toString());
         }
         for (DbObject comment : comments) {
             String ddl = removeSchemaNameInDdl(comment.getDdl());
             ddl = ddl.replaceAll("\\s+COMMENT", "\r\nCOMMENT");
             ddl = ddl.replaceFirst("COMMENT", "\r\nCOMMENT");
             comment.setDdl(ddl);
-            File file = new File(viewsDir + "/" + comment.getName().toLowerCase() + ".sql");
-            FileUtils.write(file, comment.getDdl(), "UTF-8", true);
+            writeDdlToFile(comment, VIEWS_DDL_DIRECTORY_NAME);
         }
     }
 
-    public void createDdlsForChangedDbObjects(String outputDirectory, List<DbObject> dbObjects) {
-        Pattern pattern = Pattern.compile("\\W");
-        Map<String, String> tables = new HashMap<>();
+    public void createDdlsForChangedDbObjects(List<DbObject> dbObjects) {
+        List<DbObject> tables = new ArrayList<>();
         for (DbObject dbObject : dbObjects) {
-
-            if (dbObject.getType() == DbObjectType.COMMENT) {
-                type = ddlDao.getObjectTypeByName(name);
+            if (dbObject.getType() == COMMENT) {
+                dbObject.setType(ddlDao.getObjectTypeByName(dbObject.getName()));
             }
 
-            if (DbObjectType.INDEX.toString().equals(type)
-                    || DbObjectType.TRIGGER.toString().equals(type)) {
-                String tableName = ddlDao.getTableNameByDepObject(name, type);
-                if (ddlDao.isExist(tableName, DbObjectType.TABLE.toString())) {
-                    tables.put(tableName, DbObjectType.TABLE.toString());
+            if (dbObject.getType() == INDEX || dbObject.getType() == TRIGGER) {
+                String tableName = ddlDao.getTableNameByDepObject(dbObject);
+                if (ddlDao.isExist(tableName, TABLE)) {
+                    tables.add(new DbObject(tableName, TABLE));
                 } else {
-                    logger.warn("Parent object not found for {} {}! Please, modify related DDL manually.", type, name);
+                    logger.warn("Parent object not found for {} {}! Please, modify related DDL manually.",
+                            dbObject.getType(), dbObject.getName());
                 }
-            } else if (DbObjectType.SEQUENCE.toString().equals(type)) {
-                String tableName = ddlDao.getTableNameByDepObject(name, type);
+            } else if (dbObject.getType() == SEQUENCE) {
+                String tableName = ddlDao.getTableNameByDepObject(dbObject);
                 if (StringUtils.isNotBlank(tableName)) {
-                    tables.put(tableName, DbObjectType.TABLE.toString());
+                    tables.add(new DbObject(tableName, TABLE));
                 } else {
-                    logger.warn("Parent object not found for {} {}! Please, modify related DDL manually.", type, name);
+                    logger.warn("Parent object not found for {} {}! Please, modify related DDL manually.",
+                            dbObject.getType(), dbObject.getName());
                 }
-            } else if (DbObjectType.TABLE.toString().equals(type)) {
-                if (!checkAndDeleteRedundantDdl(outputDirectory, name, type)) {
-                    tables.put(name, DbObjectType.TABLE.toString());
+            } else if (dbObject.getType() == TABLE) {
+                if (!checkAndDeleteRedundantDdl(dbObject)) {
+                    tables.add(dbObject);
                 }
             } else {
-                if (!checkAndDeleteRedundantDdl(outputDirectory, name, type)) {
-                    String ddl = ddlDao.extractDdlByNameAndType(name, type);
-                    DbObject dbObject = new DbObject();
-                    dbObject.setName(name);
-                    dbObject.setDdl(ddl);
-                    if (DbObjectType.PACKAGE_BODY.toString().equals(type)) {
-                        generatePackageBodyScripts(outputDirectory, dbObject);
-                    } else if (DbObjectType.PACKAGE_SPEC.toString().equals(type)) {
-                        generatePackageSpecScripts(outputDirectory, dbObject);
-                    } else if (DbObjectType.VIEW.toString().equals(type)) {
-                        generateViewScripts(outputDirectory, dbObject);
+                if (!checkAndDeleteRedundantDdl(dbObject)) {
+                    dbObject.setDdl(ddlDao.extractDdl(dbObject));
+                    if (dbObject.getType() == PACKAGE_BODY) {
+                        generatePackageBodyScripts(dbObject);
+                    } else if (dbObject.getType() == PACKAGE_SPEC) {
+                        generatePackageSpecScripts(dbObject);
+                    } else if (dbObject.getType() == VIEW) {
+                        generateViewScripts(dbObject);
                     }
                 }
             }
         }
-        DbObject dbObject = new DbObject();
-        Set<String> keys = tables.keySet();
-        for (String key : keys) {
-            if (!key.isEmpty()) {
-                String ddl = ddlDao.extractDdlByNameAndType(key, tables.get(key));
-                dbObject.setName(key);
-                dbObject.setDdl(ddl);
-                generateTableScripts(outputDirectory, dbObject);
-            }
+        for (DbObject table : tables) {
+            table.setDdl(ddlDao.extractDdl(table));
+            generateTableScripts(table);
         }
     }
 
@@ -351,31 +336,32 @@ public class DdlGenerator {
         return false;
     }
 
-    private boolean checkAndDeleteRedundantDdl(String outputDir, String dbObjectName, String type) throws IOException {
-        boolean isDeletePackSpecWithBody = false;
+    private boolean checkAndDeleteRedundantDdl(DbObject dbObject) {
+        String ddlsDirectoryPath = appArguments.getDdlsDirectory().getAbsolutePath();
+        boolean isDeletePackageSpecWithBody = false;
         File fileDir = null;
         String fileName = null;
-        if (!ddlDao.isExist(dbObjectName, type)) {
-            if (DbObjectType.PACKAGE_BODY.toString().equals(type)) {
-                fileDir = new File(outputDir + packagesPathSuf);
-                fileName = dbObjectName + ".sql";
-            } else if (DbObjectType.PACKAGE_SPEC.toString().equals(type)) {
-                fileDir = new File(outputDir + packagesPathSuf);
-                fileName = dbObjectName + "_spec.sql";
-                isDeletePackSpecWithBody = true;
-            } else if (DbObjectType.TABLE.toString().equals(type)) {
-                fileDir = new File(outputDir + tablesPathSuf);
-                fileName = dbObjectName + ".sql";
-            } else if (DbObjectType.VIEW.toString().equals(type)) {
-                fileDir = new File(outputDir + viewsPathSuf);
-                fileName = dbObjectName + ".sql";
+        if (!ddlDao.isExist(dbObject.getName(), dbObject.getType())) {
+            if (dbObject.getType() == PACKAGE_BODY) {
+                fileDir = new File(appArguments.getDdlsDirectory() + PACKAGES_DDL_DIRECTORY_NAME);
+                fileName = dbObject.getName() + ".sql";
+            } else if (dbObject.getType() == PACKAGE_SPEC) {
+                fileDir = new File(ddlsDirectoryPath + File.separator + PACKAGES_DDL_DIRECTORY_NAME);
+                fileName = dbObject.getName() + "_spec.sql";
+                isDeletePackageSpecWithBody = true;
+            } else if (dbObject.getType() == TABLE) {
+                fileDir = new File(ddlsDirectoryPath + File.separator + TABLES_DDL_DIRECTORY_NAME);
+                fileName = dbObject.getName() + ".sql";
+            } else if (dbObject.getType() == VIEW) {
+                fileDir = new File(ddlsDirectoryPath + File.separator + VIEWS_DDL_DIRECTORY_NAME);
+                fileName = dbObject.getName() + ".sql";
             }
         }
 
-        if (fileName != null && fileDir != null) {
+        if (fileName != null) {
             deleteFilteredFiles(fileDir, fileName);
-            if (isDeletePackSpecWithBody) {
-                String packBodyName = dbObjectName + ".sql";
+            if (isDeletePackageSpecWithBody) {
+                String packBodyName = dbObject.getName() + ".sql";
                 deleteFilteredFiles(fileDir, packBodyName);
             }
             return true;
@@ -383,12 +369,16 @@ public class DdlGenerator {
         return false;
     }
 
-    private void deleteFilteredFiles(File fileDir, String fileName) throws IOException {
+    private void deleteFilteredFiles(File fileDir, String fileName) {
         FileFilter filter = new WildcardFileFilter(fileName, IOCase.INSENSITIVE);
         File[] filteredFiles = fileDir.listFiles(filter);
         if (filteredFiles != null && filteredFiles.length > 0) {
             for (File file : filteredFiles) {
-                FileUtils.forceDeleteOnExit(file);
+                try {
+                    FileUtils.forceDeleteOnExit(file);
+                } catch (IOException e) {
+                    throw new RuntimeException("Can't delete ddl file [" + file.getAbsolutePath() + "]", e);
+                }
             }
         }
     }
