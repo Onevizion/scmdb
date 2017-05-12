@@ -170,7 +170,7 @@ public class DbManager {
     }
 
     private void executeScript(SqlScript script) {
-        logger.info("Executing script: [{}]", GREEN, script.getName());
+        logger.info("\n Executing script: [{}]", GREEN, script.getName());
         int exitCode = scriptExecutor.execute(script);
         if (exitCode == 0) {
             script.setStatus(ScriptStatus.EXECUTED);

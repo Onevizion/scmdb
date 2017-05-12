@@ -1,116 +1,58 @@
 package com.onevizion.scmdb.facade;
 
 import com.onevizion.scmdb.AppArguments;
-import com.onevizion.scmdb.ScriptsGenerator;
+import com.onevizion.scmdb.ColorLogger;
+import com.onevizion.scmdb.DdlGenerator;
+import com.onevizion.scmdb.vo.DbObject;
+import com.onevizion.scmdb.vo.DbObjectType;
 import com.onevizion.scmdb.vo.SqlScript;
-import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Component
 public class DdlFacade {
     @Resource
-    private ScriptsGenerator scriptsGenerator;
+    private DdlGenerator scriptsGenerator;
 
     @Resource
     private AppArguments appArguments;
 
+    @Resource
+    private ColorLogger logger;
+
     private final static String DDL_FOLDER_NAME = "ddl";
 
-    private final Logger logger = LoggerFactory.getLogger(getClass());
-
     public void generateDdl(List<SqlScript> scripts) {
-        String ddlDir = appArguments.getScriptsDirectory().getParentFile().getAbsolutePath() + File.separator + DDL_FOLDER_NAME;
-        String[] newDbObjectArr = findChangedDbObjects(scripts);
-        if (newDbObjectArr == null) {
-            return;
-        }
-        try {
-            scriptsGenerator.executeSettingTransformParams();
-            scriptsGenerator.generateDbObjectScripts(ddlDir, newDbObjectArr);
-        } catch (IOException e) {
-            logger.error(e.toString());
-        }
+        String ddlDirectory = appArguments.getScriptsDirectory()
+                                          .getParentFile()
+                                          .getAbsolutePath() + File.separator + DDL_FOLDER_NAME;
+        List<DbObject> changedDbObjects = findChangedDbObjects(scripts);
+        scriptsGenerator.executeSettingTransformParams();
+        scriptsGenerator.createDdlsForChangedDbObjects(ddlDirectory, changedDbObjects);
     }
 
-    private String[] findChangedDbObjects(List<SqlScript> scripts) {
-        List<String> cats = new ArrayList<>();
-        for (SqlScript script : scripts) {
-            File f = new File(appArguments.getScriptsDirectory().getAbsolutePath() + File.separator + script.getName());
-            try {
-                String content = FileUtils.readFileToString(f);
-                cats.add(content);
-            } catch (IOException e) {
-                logger.warn("Can't read file [{}]", f.getName(), e);
-            }
-        }
+    private List<DbObject> findChangedDbObjects(List<SqlScript> scripts) {
+        List<DbObject> updatedDbObjects ;
 
-        if (cats.isEmpty()) {
-            return null;
-        }
+        updatedDbObjects = scripts.stream()
+                                  .map(script -> removeSpecialFromScriptText(script.getText()))
+                                  .flatMap(scriptText -> findChangedDbObjectsInScriptText(scriptText).stream())
+                                  .collect(Collectors.toList());
 
-        String[] objTypes = new String[] {"package body", "package", "view", "comment", "table", "index", "trigger", "sequence"};
-        String[] keywords = new String[] {"create package body", "replace package body", "drop package body", "create package", "replace package",
-                "drop package", "package", "create view", "replace view", "drop view", "create force view", "replace force view",
-                "create table", "alter table", "drop table", "create index", "create unique index", "drop index",
-                "create trigger", "replace trigger", "drop trigger", "alter trigger", "create sequence", "drop sequence", "comment on table",
-                "comment on column"};
-        List<String> dbObjectsNames = new ArrayList<>();
-        List<String> dbObjectsTypes = new ArrayList<>();
-        List<String> delDbObjectsNames = new ArrayList<>();
-        List<String> delDbObjectsTypes = new ArrayList<>();
-
-        for (String cat : cats) {
-            cat = cat.replaceAll("--.*\r*\n", "");
-            cat = cat.replaceAll("/\\*([\\s\\S]*?)\\*/", "");
-            cat = cat.replaceAll("\n+", " ");
-            cat = cat.replaceAll("\\s\\s+", " ");
-            cat = cat.replaceAll("\"", "");
-            cat = cat.toLowerCase();
-
-            for (String keyword : keywords) {
-                String regexp = keyword + "\\s+\\w+";
-                Pattern pattern = Pattern.compile(regexp);
-                Matcher matcher = pattern.matcher(cat);
-                if (!matcher.find()) {
-                    continue;
-                }
-                matcher.reset();
-                cat = cat.replaceFirst(regexp, "");
-                regexp = keyword + "\\s";
-                while (matcher.find()) {
-                    String name = matcher.group().replaceFirst(regexp, "");
-                    if (!"BODY".equals(name.toUpperCase())) {
-                        if ("drop package body".equals(keyword) || "drop package".equals(keyword)
-                                || "drop table".equals(keyword) || "drop view".equals(keyword)
-                                || "drop index".equals(keyword) || "drop trigger".equals(keyword)
-                                || "drop sequence".equals(keyword)) {
-                            delDbObjectsNames.add(name.replaceFirst("\"", ""));
-                            delDbObjectsTypes.add(keyword);
-                        } else {
-                            dbObjectsNames.add(name.replace("\"", ""));
-                            dbObjectsTypes.add(keyword);
-                        }
-                    }
-                }
-            }
-        }
-
+        System.out.println("!!!");
         String packageBody = "package_body";
         String packageSpec = "package_spec";
         String columnCommentKw = "comment on column";
         String tableCommentKw = "comment on table";
 
-        for (String objType : objTypes) {
+        /*for (String objType : objTypes) {
             String regexp = ".*?" + objType;
             for (int i = 0; i < dbObjectsTypes.size(); i++) {
                 String dbObjectsType = dbObjectsTypes.get(i);
@@ -173,8 +115,41 @@ public class DdlFacade {
 
         for (int i = 0; i < delDbObjectsNames.size(); i++) {
             extractDdlArr.add(delDbObjectsNames.get(i) + "|" + delDbObjectsTypes.get(i));
+        }*/
+
+        //return extractDdlArr.toArray(new String[extractDdlArr.size()]);
+        return updatedDbObjects;
+    }
+
+    private List<DbObject> findChangedDbObjectsInScriptText(String scriptText) {
+        List<DbObject> dbObjects = new ArrayList<>();
+        Matcher matcher;
+        for (DbObjectType dbObjectType : DbObjectType.values()) {
+            for (String keyword : dbObjectType.getChangeKeywords()) {
+
+                String keywordRegexp = keyword + "\\s+\\w+";
+                matcher = Pattern.compile(keywordRegexp).matcher(scriptText);
+                if (!matcher.find()) {
+                    continue;
+                }
+                scriptText = scriptText.replaceAll(keywordRegexp, "");
+                matcher.reset();
+                while (matcher.find()) {
+                    String objectName = matcher.group().replaceFirst(keyword + "\\s", "");
+                    dbObjects.add(new DbObject(objectName, dbObjectType));
+                }
+            }
         }
 
-        return extractDdlArr.toArray(new String[extractDdlArr.size()]);
+        return dbObjects;
+    }
+
+    private String removeSpecialFromScriptText(String scriptText) {
+        scriptText = scriptText.replaceAll("--.*\r*\n", "");
+        scriptText = scriptText.replaceAll("/\\*([\\s\\S]*?)\\*/", "");
+        scriptText = scriptText.replaceAll("\n+", " ");
+        scriptText = scriptText.replaceAll("\\s\\s+", " ");
+        scriptText = scriptText.replaceAll("\"", "");
+        return scriptText.toLowerCase();
     }
 }

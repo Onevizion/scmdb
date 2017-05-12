@@ -4,7 +4,15 @@ import java.lang.String;
 
 public class DbObject {
     private String name;
+    private DbObjectType type;
     private String ddl;
+
+    public DbObject(String name, DbObjectType type) {
+        this.name = name;
+        this.type = type;
+    }
+
+    public DbObject() {}
 
     public String getName() {
         return name;
@@ -20,5 +28,13 @@ public class DbObject {
 
     public void setDdl(String ddl) {
         this.ddl = ddl;
+    }
+
+    public DbObjectType getType() {
+        return type;
+    }
+
+    public void setType(DbObjectType type) {
+        this.type = type;
     }
 }

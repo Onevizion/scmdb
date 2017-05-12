@@ -21,7 +21,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
-public class ScriptsGenerator {
+public class DdlGenerator {
     @Resource
     private DdlDao ddlDao;
 
@@ -280,33 +280,12 @@ public class ScriptsGenerator {
         }
     }
 
-    public void generateDbObjectScripts(String outputDirectory, String[] dbObjects) throws IOException {
+    public void createDdlsForChangedDbObjects(String outputDirectory, List<DbObject> dbObjects) {
         Pattern pattern = Pattern.compile("\\W");
-        Map<String, String> tables = new HashMap<String, String>();
-        for (String object : dbObjects) {
-            object = object.toUpperCase();
-            Matcher matcher = pattern.matcher(object);
-            if (!matcher.find()) {
-                logger.error("Can not find separator in this arg: {}" +
-                        " Separator can be symbol by regexp: '\\W'", object);
-                return;
-            }
-            String separator = matcher.group(0);
-            int sepIndex = object.indexOf(separator);
+        Map<String, String> tables = new HashMap<>();
+        for (DbObject dbObject : dbObjects) {
 
-            String name = object.substring(0, sepIndex);
-            if (name.isEmpty()) {
-                logger.error("Incorrect arg: {}. Name of db object can not be empty", object);
-                return;
-            }
-
-            String type = object.substring(sepIndex + 1);
-            if (type.isEmpty()) {
-                logger.error("Incorrect db type in this arg: {}", object);
-                return;
-            }
-
-            if (DbObjectType.COMMENT.toString().equals(type)) {
+            if (dbObject.getType() == DbObjectType.COMMENT) {
                 type = ddlDao.getObjectTypeByName(name);
             }
 

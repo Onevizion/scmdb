@@ -3,8 +3,6 @@ package com.onevizion.scmdb.vo;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -21,7 +19,6 @@ public class SqlScript implements Comparable<SqlScript> {
     private ScriptStatus status;
     private File file;
 
-    private static final Logger logger = LoggerFactory.getLogger(SqlScript.class);
     private static final String ROLLBACK_SUFFIX = "_rollback";
 
     public static SqlScript create(File scriptFile) {
@@ -29,17 +26,17 @@ public class SqlScript implements Comparable<SqlScript> {
 
         script.setFile(scriptFile);
         script.setName(scriptFile.getName());
-        String fileContent = null;
+        String fileContent;
         try {
-            fileContent = FileUtils.readFileToString(scriptFile);
+            fileContent = FileUtils.readFileToString(scriptFile, "UTF-8");
+            script.setText(fileContent);
             script.setFileHash(DigestUtils.sha1Hex(fileContent.replaceAll("\\r\\n", "\n")));
         } catch (IOException e) {
-            logger.warn("Can't read file content [{}]", scriptFile.getName(), e);
+            throw new RuntimeException("Can't read file content [" + scriptFile.getName() + "]", e);
         }
         script.setTs(new Date(scriptFile.lastModified()));
 
         if (FilenameUtils.getBaseName(script.getName()).endsWith(ROLLBACK_SUFFIX)) {
-            script.setText(fileContent);
             script.setType(ScriptType.ROLLBACK);
         } else {
             script.setType(ScriptType.COMMIT);

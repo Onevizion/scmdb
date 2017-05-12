@@ -37,7 +37,6 @@ public class DbScriptFacade {
     private File execDir;
     private List<SqlScript> scriptsInDir;
 
-
     public void init() {
         execDir = new File(appArguments.getScriptsDirectory().getAbsolutePath() + File.separator + EXEC_FOLDER_NAME);
         scriptsInDir = createScriptsFromFiles();
@@ -76,7 +75,7 @@ public class DbScriptFacade {
         rollback.setFile(rollBackFile);
         try {
             logger.debug("Creating rollback script [{}]", rollBackFile.getAbsolutePath());
-            FileUtils.writeStringToFile(rollBackFile, rollback.getText());
+            FileUtils.writeStringToFile(rollBackFile, rollback.getText(), "UTF-8");
         } catch (IOException e) {
             logger.error("Can't create file [{}]", rollBackFile.getAbsolutePath(), e);
             throw new RuntimeException(e);
@@ -114,8 +113,8 @@ public class DbScriptFacade {
             }
             SqlScript savedScript = dbScripts.get(scriptInDir.getName());
             if (!scriptInDir.getFileHash().equals(savedScript.getFileHash())) {
-                savedScript.setFileHash(scriptInDir.getFileHash());
-                updatedScripts.add(savedScript);
+                scriptInDir.setId(savedScript.getId());
+                updatedScripts.add(scriptInDir);
             }
         }
 
