@@ -1,14 +1,12 @@
 package com.onevizion.scmdb.vo;
 
-import java.lang.String;
-
 public class DbObject {
     private String name;
     private DbObjectType type;
     private String ddl;
 
     public DbObject(String name, DbObjectType type) {
-        this.name = name;
+        this.name = name.toLowerCase();
         this.type = type;
     }
 
@@ -19,7 +17,7 @@ public class DbObject {
     }
 
     public void setName(String name) {
-        this.name = name;
+        this.name = name.toLowerCase();
     }
 
     public String getDdl() {
@@ -41,5 +39,24 @@ public class DbObject {
     @Override
     public String toString() {
         return name + " | " + type;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        DbObject dbObject = (DbObject) o;
+        return name.equals(dbObject.name) && type == dbObject.type;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = name.hashCode();
+        result = 31 * result + type.hashCode();
+        return result;
     }
 }

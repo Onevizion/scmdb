@@ -6,19 +6,20 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOCase;
 import org.apache.commons.io.filefilter.WildcardFileFilter;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
+import static com.onevizion.scmdb.ColorLogger.Color.RED;
 import static com.onevizion.scmdb.vo.DbObjectType.*;
 
 @Component
@@ -30,7 +31,8 @@ public class DdlGenerator {
     @Resource
     private AppArguments appArguments;
 
-    private final Logger logger = LoggerFactory.getLogger(getClass());
+    @Resource
+    private ColorLogger logger;
 
     private final String[] excludedSequences = {"SEQ_BPD_ITEMS_UNIT_ID"};
     private final String[] excludedPackages = {"PKGR_"};
@@ -44,52 +46,32 @@ public class DdlGenerator {
         ddlDao.executeTransformParamStatements();
     }
 
-    public void generatePackageSpecScripts(DbObject dbObject) {
-        List<DbObject> packagesSpec;
-        if (dbObject == null) {
-            packagesSpec = ddlDao.extractPackageSpecDdls();
-        } else {
-            packagesSpec = new ArrayList<>();
-            packagesSpec.add(dbObject);
-        }
-
-        for (DbObject pkgSpec : packagesSpec) {
-            if (!isExcludeObject(pkgSpec.getName(), excludedPackages)) {
-                logger.info("Generating DDL for package spec [{}]", pkgSpec.getName());
-                String ddl = removeSchemaNameInDdl(pkgSpec.getDdl());
-                ddl = ddl.trim();
-                ddl = ddl.replaceFirst("\\s+/$", "\n/");
-                ddl = ddl.replaceAll("\\n", "\r\n");
-                pkgSpec.setDdl(ddl);
-                writeDdlToFile(pkgSpec, PACKAGES_DDL_DIRECTORY_NAME);
-            }
+    public void generatePackageSpecScripts(DbObject pkgSpec) {
+        if (!isExcludeObject(pkgSpec.getName(), excludedPackages)) {
+            logger.info("Generating DDL for package spec [{}]", GREEN, pkgSpec.getName());
+            String ddl = removeSchemaNameInDdl(pkgSpec.getDdl());
+            ddl = ddl.trim();
+            ddl = ddl.replaceFirst("\\s+/$", "\n/");
+            ddl = ddl.replaceAll("\\n", "\r\n");
+            pkgSpec.setDdl(ddl);
+            writeDdlToFile(pkgSpec, PACKAGES_DDL_DIRECTORY_NAME);
         }
     }
 
-    public void generatePackageBodyScripts(DbObject dbObject) {
-        List<DbObject> packagesBodies;
-        if (dbObject == null) {
-            packagesBodies = ddlDao.extractPackageBodiesDdls();
-        } else {
-            packagesBodies = new ArrayList<>();
-            packagesBodies.add(dbObject);
-        }
-
-        for (DbObject pkgBody : packagesBodies) {
-            if (!isExcludeObject(pkgBody.getName(), excludedPackages)) {
-                logger.info("Generating DDL for package body [{}]", pkgBody.getName());
-                String ddl = removeSchemaNameInDdl(pkgBody.getDdl());
-                ddl = ddl.trim();
-                ddl = ddl.replaceFirst("\\s+/$", "\n/");
-                ddl = ddl.replaceAll("\\n", "\r\n");
-                pkgBody.setDdl(ddl);
-                writeDdlToFile(pkgBody, PACKAGES_DDL_DIRECTORY_NAME);
-            }
+    public void generatePackageBodyScripts(DbObject pkgBody) {
+        if (!isExcludeObject(pkgBody.getName(), excludedPackages)) {
+            logger.info("Generating DDL for package body [{}]", GREEN, pkgBody.getName());
+            String ddl = removeSchemaNameInDdl(pkgBody.getDdl());
+            ddl = ddl.trim();
+            ddl = ddl.replaceFirst("\\s+/$", "\n/");
+            ddl = ddl.replaceAll("\\n", "\r\n");
+            pkgBody.setDdl(ddl);
+            writeDdlToFile(pkgBody, PACKAGES_DDL_DIRECTORY_NAME);
         }
     }
 
     public void generateTableScripts(DbObject table) {
-        logger.info("Generating DDL for table [{}]", table.getName());
+        logger.info("Generating DDL for table [{}]", GREEN, table.getName());
         String ddl = removeSchemaNameInDdl(table.getDdl());
         ddl = ddl.trim();
         ddl = ddl.replaceAll("\\s+;", ";");
@@ -214,44 +196,34 @@ public class DdlGenerator {
         return triggersDdl.toString();
     }
 
-    public void generateViewScripts(DbObject dbObject) {
-        List<DbObject> views;
-        if (dbObject == null) {
-            views = ddlDao.extractViewsDdls();
-        } else {
-            views = new ArrayList<>();
-            views.add(dbObject);
+    public void generateViewScripts(DbObject view) {
+        if (!isExcludeObject(view.getName(), excludedViews)) {
+            logger.info("Generating DDL for view [{}]", GREEN, view.getName());
+            String ddl = removeSchemaNameInDdl(view.getDdl());
+            ddl = ddl.trim();
+            ddl = ddl.replaceAll("\\s+;", ";");
+            ddl = ddl.replaceAll("\\n", "\r\n");
+            ddl += generateViewCommentsScripts(view);
+            view.setDdl(ddl);
+            writeDdlToFile(view, VIEWS_DDL_DIRECTORY_NAME);
         }
-
-        for (DbObject view : views) {
-            if (!isExcludeObject(view.getName(), excludedViews)) {
-                logger.info("Generating DDL for view [{}]", view.getName());
-                String ddl = removeSchemaNameInDdl(view.getDdl());
-                ddl = ddl.trim();
-                ddl = ddl.replaceAll("\\s+;", ";");
-                ddl = ddl.replaceAll("\\n", "\r\n");
-                view.setDdl(ddl);
-                writeDdlToFile(view, VIEWS_DDL_DIRECTORY_NAME);
-            }
-        }
-
-        generateViewCommentsScripts(dbObject);
     }
 
-    private void generateViewCommentsScripts(DbObject view) {
+    private String generateViewCommentsScripts(DbObject view) {
         logger.info("Adding views comments...");
         List<DbObject> comments = ddlDao.extractTableDependentObjectsDdl(view.getName(), COMMENT);
+        StringBuilder commentsDdl = new StringBuilder();
         for (DbObject comment : comments) {
             String ddl = removeSchemaNameInDdl(comment.getDdl());
             ddl = ddl.replaceAll("\\s+COMMENT", "\r\nCOMMENT");
             ddl = ddl.replaceFirst("COMMENT", "\r\nCOMMENT");
-            comment.setDdl(ddl);
-            writeDdlToFile(comment, VIEWS_DDL_DIRECTORY_NAME);
+            commentsDdl.append(ddl);
         }
+        return commentsDdl.toString();
     }
 
-    public void createDdlsForChangedDbObjects(List<DbObject> dbObjects) {
-        List<DbObject> tables = new ArrayList<>();
+    public void createDdlsForChangedDbObjects(Set<DbObject> dbObjects) {
+        Set<DbObject> tables = new HashSet<>();
         for (DbObject dbObject : dbObjects) {
             if (dbObject.getType() == COMMENT) {
                 dbObject.setType(ddlDao.getObjectTypeByName(dbObject.getName()));
@@ -262,7 +234,7 @@ public class DdlGenerator {
                 if (ddlDao.isExist(tableName, TABLE)) {
                     tables.add(new DbObject(tableName, TABLE));
                 } else {
-                    logger.warn("Parent object not found for {} {}! Please, modify related DDL manually.",
+                    logger.warn("Parent object not found for {} {}! Please, modify related DDL manually.", RED,
                             dbObject.getType(), dbObject.getName());
                 }
             } else if (dbObject.getType() == SEQUENCE) {
@@ -270,7 +242,7 @@ public class DdlGenerator {
                 if (StringUtils.isNotBlank(tableName)) {
                     tables.add(new DbObject(tableName, TABLE));
                 } else {
-                    logger.warn("Parent object not found for {} {}! Please, modify related DDL manually.",
+                    logger.warn("Parent object not found for {} {}! Please, modify related DDL manually.", RED,
                             dbObject.getType(), dbObject.getName());
                 }
             } else if (dbObject.getType() == TABLE) {

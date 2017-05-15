@@ -1,6 +1,5 @@
 package com.onevizion.scmdb.facade;
 
-import com.onevizion.scmdb.ColorLogger;
 import com.onevizion.scmdb.DdlGenerator;
 import com.onevizion.scmdb.vo.DbObject;
 import com.onevizion.scmdb.vo.DbObjectType;
@@ -10,6 +9,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -19,23 +19,20 @@ public class DdlFacade {
     @Resource
     private DdlGenerator ddlGenerator;
 
-    @Resource
-    private ColorLogger logger;
-
-
     public void generateDdl(List<SqlScript> scripts) {
-        List<DbObject> changedDbObjects = findChangedDbObjects(scripts);
+        Set<DbObject> changedDbObjects = findChangedDbObjects(scripts);
         ddlGenerator.executeSettingTransformParams();
         ddlGenerator.createDdlsForChangedDbObjects(changedDbObjects);
     }
 
-    private List<DbObject> findChangedDbObjects(List<SqlScript> scripts) {
-        List<DbObject> updatedDbObjects ;
+    private Set<DbObject> findChangedDbObjects(List<SqlScript> scripts) {
+        Set<DbObject> updatedDbObjects;
 
         updatedDbObjects = scripts.stream()
                                   .map(script -> removeSpecialFromScriptText(script.getText()))
                                   .flatMap(scriptText -> findChangedDbObjectsInScriptText(scriptText).stream())
-                                  .collect(Collectors.toList());
+                                  .distinct()
+                                  .collect(Collectors.toSet());
         return updatedDbObjects;
     }
 
