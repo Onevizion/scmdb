@@ -11,6 +11,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 
+import static com.onevizion.scmdb.vo.DbObjectType.*;
+
 @Component
 public class DdlDao extends AbstractDaoOra {
     public void executeTransformParamStatements() {
@@ -84,18 +86,17 @@ public class DdlDao extends AbstractDaoOra {
         String sql = "select dbms_metadata.get_ddl(upper(:dbObjType), upper(:dbObjName)) from dual";
         MapSqlParameterSource namedParams = new MapSqlParameterSource();
         namedParams.addValue("dbObjName", dbObject.getName());
-        namedParams.addValue("dbObjType", dbObject.getType().getName());
-        String ddl = namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);
-        return ddl;
+        namedParams.addValue("dbObjType", dbObject.getType().toString());
+        return namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);
     }
 
-    public List<DbObject> extractTableDependentObjectsDdl(String tableName, String depObjType) {
+    public List<DbObject> extractTableDependentObjectsDdl(String tableName, DbObjectType depObjType) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource();
         namedParams.addValue("tableName", tableName);
-        namedParams.addValue("depObjType", depObjType);
+        namedParams.addValue("depObjType", depObjType.toString());
 
         List<DbObject> dbObjects = null;
-        if (DbObjectType.COMMENT.toString().equals(depObjType)) {
+        if (depObjType == COMMENT) {
             String sql = "select table_name, dbms_metadata.get_dependent_ddl('COMMENT', table_name) from" +
                     " ((select table_name from user_tab_comments" +
                     "     where comments is not null)" +
@@ -104,19 +105,19 @@ public class DdlDao extends AbstractDaoOra {
                     "     where comments is not null" +
                     "     group by table_name)) where table_name = upper(:tableName)";
             dbObjects = namedParameterJdbcTemplate.query(sql, namedParams, new DbObjectExtractor());
-        } else if (DbObjectType.SEQUENCE.toString().equals(depObjType)) {
+        } else if (depObjType == SEQUENCE) {
             String sql = "select trgrs.table_name, dbms_metadata.get_ddl('SEQUENCE', depends.referenced_name)" +
                     " from user_dependencies depends, user_triggers trgrs" +
                     " where trgrs.trigger_name = depends.name and depends.type = 'TRIGGER'" +
                     " and depends.referenced_type = 'SEQUENCE' and trgrs.table_name = upper(:tableName)" +
                     " order by depends.referenced_name";
             dbObjects = namedParameterJdbcTemplate.query(sql, namedParams, new DbObjectExtractor());
-        } else if (DbObjectType.INDEX.toString().equals(depObjType)) {
+        } else if (depObjType == INDEX) {
             String sql = "select table_name, dbms_metadata.get_ddl(upper(:depObjType), index_name)" +
                     " from user_indexes where generated = 'N' and table_name=upper(:tableName) and index_name not like 'PK_%'" +
                     " order by table_name asc, uniqueness desc, index_name asc";
             dbObjects = namedParameterJdbcTemplate.query(sql, namedParams, new DbObjectExtractor());
-        } else if (DbObjectType.TRIGGER.toString().equals(depObjType)) {
+        } else if (depObjType == TRIGGER) {
             String sql = "select table_name, dbms_metadata.get_ddl(upper(:depObjType), trigger_name)" +
                     " from user_triggers where table_name=upper(:tableName)" +
                     " and trigger_name not like 'Z_%' order by trigger_name";
@@ -130,14 +131,14 @@ public class DdlDao extends AbstractDaoOra {
         MapSqlParameterSource namedParams = new MapSqlParameterSource();
         namedParams.addValue("objName", dbObject.getName());
         String sql;
-        if (dbObject.getType() == DbObjectType.INDEX) {
+        if (dbObject.getType() == INDEX) {
             sql = "select table_name from user_indexes where index_name = upper(:objName)";
-        } else if (dbObject.getType() == DbObjectType.TRIGGER) {
+        } else if (dbObject.getType() == TRIGGER) {
             sql = "select table_name from user_triggers where trigger_name = upper(:objName)";
-        } else if (dbObject.getType() == DbObjectType.SEQUENCE) {
+        } else if (dbObject.getType() == SEQUENCE) {
             sql = "select trgrs.table_name from user_dependencies depends, user_triggers trgrs" +
-                " where trgrs.trigger_name = depends.name and depends.type = 'TRIGGER'" +
-                " and depends.referenced_type = 'SEQUENCE' and depends.referenced_name = upper(:objName)";
+                    " where trgrs.trigger_name = depends.name and depends.type = 'TRIGGER'" +
+                    " and depends.referenced_type = 'SEQUENCE' and depends.referenced_name = upper(:objName)";
         } else {
             return null;
         }
@@ -150,7 +151,7 @@ public class DdlDao extends AbstractDaoOra {
 
     public DbObjectType getObjectTypeByName(String dbObjName) {
         String sql = "select 'TABLE' object_type from user_tables where table_name = upper(:dbObjName)" +
-            " union all select 'VIEW' object_type from user_views where view_name = upper(:dbObjName)";
+                " union all select 'VIEW' object_type from user_views where view_name = upper(:dbObjName)";
         MapSqlParameterSource namedParams = new MapSqlParameterSource();
         namedParams.addValue("dbObjName", dbObjName);
         String dbObjTypeString = namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);

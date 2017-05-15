@@ -37,4 +37,9 @@ public class DbObject {
     public void setType(DbObjectType type) {
         this.type = type;
     }
+
+    @Override
+    public String toString() {
+        return name + " | " + type;
+    }
 }

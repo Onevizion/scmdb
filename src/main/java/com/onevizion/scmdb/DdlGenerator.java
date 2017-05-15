@@ -23,6 +23,7 @@ import static com.onevizion.scmdb.vo.DbObjectType.*;
 
 @Component
 public class DdlGenerator {
+    public static final String PACKAGE_SPECIFICATION_DDL_FILE_POSTFIX = "_spec";
     @Resource
     private DdlDao ddlDao;
 
@@ -87,38 +88,33 @@ public class DdlGenerator {
         }
     }
 
-    public void generateTableScripts(DbObject dbObject) {
-        List<DbObject> tables;
-        if (dbObject == null) {
-            tables = ddlDao.extractTablesDdls();
-        } else {
-            tables = new ArrayList<>();
-            tables.add(dbObject);
-        }
-
-        for (DbObject table : tables) {
-            logger.info("Generating DDL for table [{}]", table.getName());
-            String ddl = removeSchemaNameInDdl(table.getDdl());
-            ddl = ddl.trim();
-            ddl = ddl.replaceAll("\\s+;", ";");
-            ddl = ddl.replaceFirst("\\n\\s+\\(", "(\n");
-            ddl = ddl.replaceFirst("\\s+\\)", "\n)");
-            ddl = ddl.replaceAll("\\n", "\r\n");
-            ddl = ddl.replaceAll("\\t", "    ");
-            ddl = ddl.replaceAll("\\r\\n\\s+REFERENCES\\s", " REFERENCES ");
-            table.setDdl(ddl);
-            writeDdlToFile(table, TABLES_DDL_DIRECTORY_NAME);
-        }
-        generateTabCommentsScripts(dbObject);
-        generateIndexScripts(dbObject);
-        generateSequenceScripts(dbObject);
-        generateTriggerScripts(dbObject);
+    public void generateTableScripts(DbObject table) {
+        logger.info("Generating DDL for table [{}]", table.getName());
+        String ddl = removeSchemaNameInDdl(table.getDdl());
+        ddl = ddl.trim();
+        ddl = ddl.replaceAll("\\s+;", ";");
+        ddl = ddl.replaceFirst("\\n\\s+\\(", "(\n");
+        ddl = ddl.replaceFirst("\\s+\\)", "\n)");
+        ddl = ddl.replaceAll("\\n", "\r\n");
+        ddl = ddl.replaceAll("\\t", "    ");
+        ddl = ddl.replaceAll("\\r\\n\\s+REFERENCES\\s", " REFERENCES ");
+        ddl += generateTableCommentsDdl(table);
+        ddl += generateIndexScripts(table);
+        ddl += generateSequenceScripts(table);
+        ddl += generateTriggerScripts(table);
+        table.setDdl(ddl);
+        writeDdlToFile(table, TABLES_DDL_DIRECTORY_NAME);
     }
 
     private void writeDdlToFile(DbObject dbObject, String ddlDirectoryName) {
         String directoryPath = appArguments.getDdlsDirectory().getAbsolutePath() + File.separator + ddlDirectoryName;
 
-        File file = new File(directoryPath + "/" + dbObject.getName().toLowerCase() + ".sql");
+        String filePath = directoryPath + File.separator + dbObject.getName().toLowerCase();
+        if (dbObject.getType() == PACKAGE_SPEC) {
+            filePath += PACKAGE_SPECIFICATION_DDL_FILE_POSTFIX;
+        }
+        filePath += ".sql";
+        File file = new File(filePath);
         try {
             FileUtils.write(file, dbObject.getDdl(), "UTF-8", false);
         } catch (IOException e) {
@@ -126,14 +122,10 @@ public class DdlGenerator {
         }
     }
 
-    private void generateTabCommentsScripts(DbObject table) {
+    private String generateTableCommentsDdl(DbObject table) {
         logger.info("Adding comments...");
-        List<DbObject> comments;
-        if (table == null) {
-            comments = ddlDao.extractTabCommentsDdls();
-        } else {
-            comments = ddlDao.extractTableDependentObjectsDdl(table.getName(), COMMENT.toString());
-        }
+        List<DbObject> comments = ddlDao.extractTableDependentObjectsDdl(table.getName(), COMMENT);
+        StringBuilder commentsDdl = new StringBuilder();
         for (DbObject comment : comments) {
             String ddl = removeSchemaNameInDdl(comment.getDdl());
             ddl = ddl.trim();
@@ -151,19 +143,15 @@ public class DdlGenerator {
             ddl = ddl.replaceAll("COMMENT", "\r\nCOMMENT");
             ddl = ddl.trim();
             ddl = "\r\n\r\n" + ddl;
-            comment.setDdl(ddl);
-            writeDdlToFile(comment, TABLES_DDL_DIRECTORY_NAME);
+            commentsDdl.append(ddl);
         }
+        return commentsDdl.toString();
     }
 
-    private void generateIndexScripts(DbObject table) {
+    private String generateIndexScripts(DbObject table) {
         logger.info("Adding indexes...");
-        List<DbObject> indexes;
-        if (table == null) {
-            indexes = ddlDao.extractIndexesDdls();
-        } else {
-            indexes = ddlDao.extractTableDependentObjectsDdl(table.getName(), INDEX.toString());
-        }
+        List<DbObject> indexes = ddlDao.extractTableDependentObjectsDdl(table.getName(), INDEX);
+        StringBuilder indexesDdl = new StringBuilder();
         for (int i = 0; i < indexes.size(); i++) {
             DbObject index = indexes.get(i);
             String ddl = removeSchemaNameInDdl(index.getDdl());
@@ -174,19 +162,15 @@ public class DdlGenerator {
                 ddl = "\r\n" + ddl;
             }
             ddl = ddl.replaceAll("\\s+;$", ";");
-            index.setDdl(ddl);
-            writeDdlToFile(index, TABLES_DDL_DIRECTORY_NAME);
+            indexesDdl.append(ddl);
         }
+        return indexesDdl.toString();
     }
 
-    private void generateSequenceScripts(DbObject table) {
+    private String generateSequenceScripts(DbObject table) {
         logger.info("Adding sequences...");
-        List<DbObject> sequences;
-        if (table == null) {
-            sequences = ddlDao.extractSequencesDdls();
-        } else {
-            sequences = ddlDao.extractTableDependentObjectsDdl(table.getName(), SEQUENCE.toString());
-        }
+        List<DbObject> sequences = ddlDao.extractTableDependentObjectsDdl(table.getName(), SEQUENCE);
+        StringBuilder sequencesDdl = new StringBuilder();
         for (DbObject sequence : sequences) {
             String ddl = removeSchemaNameInDdl(sequence.getDdl());
             boolean isExcludable = false;
@@ -209,19 +193,15 @@ public class DdlGenerator {
             } else {
                 ddl = ddl.replaceAll("\\s+;$", ";");
             }
-            sequence.setDdl(ddl);
-            writeDdlToFile(sequence, TABLES_DDL_DIRECTORY_NAME);
+            sequencesDdl.append(ddl);
         }
+        return sequencesDdl.toString();
     }
 
-    private void generateTriggerScripts(DbObject table) {
+    private String generateTriggerScripts(DbObject table) {
         logger.info("Adding triggers...");
-        List<DbObject> triggers;
-        if (table == null) {
-            triggers = ddlDao.extractTriggersDdls();
-        } else {
-            triggers = ddlDao.extractTableDependentObjectsDdl(table.getName(), TRIGGER.toString());
-        }
+        List<DbObject> triggers = ddlDao.extractTableDependentObjectsDdl(table.getName(), TRIGGER);
+        StringBuilder triggersDdl = new StringBuilder();
         for (DbObject trigger : triggers) {
             String ddl = removeSchemaNameInDdl(trigger.getDdl());
             ddl = ddl.trim();
@@ -229,9 +209,9 @@ public class DdlGenerator {
             ddl = "\r\n" + ddl;
             ddl = ddl.replaceAll("\\s+/", "\r\n/");
             ddl = ddl.replaceFirst("ALTER TRIGGER \"\\w+\" ENABLE;", "");
-            trigger.setDdl(ddl);
-            writeDdlToFile(trigger, TABLES_DDL_DIRECTORY_NAME);
+            triggersDdl.append(ddl);
         }
+        return triggersDdl.toString();
     }
 
     public void generateViewScripts(DbObject dbObject) {
@@ -260,12 +240,7 @@ public class DdlGenerator {
 
     private void generateViewCommentsScripts(DbObject view) {
         logger.info("Adding views comments...");
-        List<DbObject> comments;
-        if (view == null) {
-            comments = ddlDao.extractViewCommentsDdls();
-        } else {
-            comments = ddlDao.extractTableDependentObjectsDdl(view.getName(), COMMENT.toString());
-        }
+        List<DbObject> comments = ddlDao.extractTableDependentObjectsDdl(view.getName(), COMMENT);
         for (DbObject comment : comments) {
             String ddl = removeSchemaNameInDdl(comment.getDdl());
             ddl = ddl.replaceAll("\\s+COMMENT", "\r\nCOMMENT");
