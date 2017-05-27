@@ -17,8 +17,7 @@ create or replace trigger tib_db_script before insert on db_script
     for each row
 begin
     if (:new.db_script_id is null) then
-        select pkg_vqutils.make_pk(seq_db_script_id.nextval)
-            into :new.db_script_id from dual;
+        select seq_db_script_id.nextval into :new.db_script_id from dual;
     end if;
 end;
 /
