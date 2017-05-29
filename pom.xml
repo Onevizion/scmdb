@@ -107,6 +107,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
+                <version>3.0.0</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -158,17 +159,4 @@
             </snapshots>
         </repository>
     </repositories>
-
-    <distributionManagement>
-        <repository>
-            <id>releases</id>
-            <name>releases</name>
-            <url>${mvn.repo.addr}/archiva/repository/releases/</url>
-            <layout>default</layout>
-        </repository>
-    </distributionManagement>
-
-    <scm>
-        <developerConnection>scm:git:https://github.com/IKAMTeam/scmdb.git</developerConnection>
-    </scm>
 </project>
