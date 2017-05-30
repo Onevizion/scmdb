@@ -12,7 +12,7 @@ import java.net.URL;
 import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
 
 public class SqlScriptExecutor {
-    private static final String SQL_PLUS_COMMAND = "sqlplus";
+    private static final String SQL_PLUS_COMMAND = "sql";
     private static final String INVALID_OBJECT_POSTFIX = "is invalid.";
 
     private Executor executor;
@@ -60,6 +60,7 @@ public class SqlScriptExecutor {
         executor.setWorkingDirectory(workingDir);
         try {
             return executor.execute(commandLine);
+
         } catch (ExecuteException e) {
             return e.getExitValue();
         } catch (IOException e) {
