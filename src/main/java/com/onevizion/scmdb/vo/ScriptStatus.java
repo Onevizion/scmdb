@@ -3,7 +3,8 @@ package com.onevizion.scmdb.vo;
 public enum ScriptStatus {
     EXECUTED(0L),
     NOT_EXECUTED(1L),
-    EXECUTED_WITH_ERRORS(2L);
+    EXECUTED_WITH_ERRORS(2L),
+    COMMAND_EXEC_FAILURE(3L);
 
     private Long id;
 
