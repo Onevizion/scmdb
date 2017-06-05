@@ -15,6 +15,7 @@ public class SqlScriptExecutor {
     private static final String SQL_PLUS_COMMAND = "sql";
     private static final String INVALID_OBJECT_PREFIX = "Invalid objects in";
     private static final String INVALID_OBJECT_POSTFIX = "is invalid.";
+    private static final String CANT_RUN_PROGRAM = "Cannot run program \"sql\"";
 
     private Executor executor;
 
@@ -67,8 +68,12 @@ public class SqlScriptExecutor {
         } catch (ExecuteException e) {
             return e.getExitValue();
         } catch (IOException e) {
-            logger.error("Error during command execution.", e);
-            return 1;
+            if (e.getMessage().startsWith(CANT_RUN_PROGRAM)) {
+                return 2;
+            } else {
+                logger.error("Error during command execution.", e);
+                return 1;
+            }
         } finally {
             wrapperScriptFile.delete();
         }

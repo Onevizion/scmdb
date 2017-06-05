@@ -21,6 +21,7 @@ import static com.onevizion.scmdb.vo.ScriptType.ROLLBACK;
 
 public class DbManager {
     private static final String SCRIPT_EXECUTION_ERROR_MESSAGE = "Fix and execute manually script [{}] and then run scmdb again to execute other scripts.";
+    private static final String CANT_RUN_SQL_ERROR_MESSAGE = "Oracle SQLcl executable is not found. Please download it and make sure bin/sql is in your path";
 
     @Resource
     private DbScriptFacade scriptsFacade;
@@ -77,7 +78,10 @@ public class DbManager {
             newCommitScripts.forEach(script -> logger.info(script.getFile().getAbsolutePath()));
             for (SqlScript script : newCommitScripts) {
                 executeScript(script);
-                scriptsFacade.create(script);
+                if (script.getStatus() != ScriptStatus.COMMAND_EXEC_FAILURE) {
+                    scriptsFacade.create(script);
+                }
+
                 if (script.getStatus() == ScriptStatus.EXECUTED_WITH_ERRORS) {
                     System.exit(0);
                 }
@@ -175,10 +179,15 @@ public class DbManager {
         int exitCode = scriptExecutor.execute(script);
         if (exitCode == 0) {
             script.setStatus(ScriptStatus.EXECUTED);
+        } else if (exitCode == 2) {
+            script.setStatus(ScriptStatus.COMMAND_EXEC_FAILURE);
         } else {
             script.setStatus(ScriptStatus.EXECUTED_WITH_ERRORS);
         }
-        if (exitCode != 0) {
+
+        if (exitCode == 2) {
+            logger.error(CANT_RUN_SQL_ERROR_MESSAGE);
+        } else if (exitCode != 0) {
             logger.error(SCRIPT_EXECUTION_ERROR_MESSAGE, script.getName());
         }
     }
