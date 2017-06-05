@@ -38,7 +38,7 @@ public class DbManager {
     private ColorLogger logger;
 
     public void updateDb() {
-        logger.info("Updating your database");
+        logger.info("SCMDB\n");
 
         if (scriptsFacade.isFirstRun()) {
             scriptsFacade.createAllFromDirectory();
@@ -53,7 +53,7 @@ public class DbManager {
 
         checkNewScripts();
 
-        logger.info("Your database is up-to-date");
+        logger.info("\nSCMDB complete");
     }
 
     private void checkNewScripts() {
@@ -73,7 +73,8 @@ public class DbManager {
         scriptsFacade.batchCreate(newRollbackScripts);
 
         if (appArguments.isExecuteScripts()) {
-            logger.info("Executing scripts in your database:");
+            logger.info("Scripts to be executed:");
+            newCommitScripts.forEach(script -> logger.info(script.getFile().getAbsolutePath()));
             for (SqlScript script : newCommitScripts) {
                 executeScript(script);
                 scriptsFacade.create(script);
@@ -170,7 +171,7 @@ public class DbManager {
     }
 
     private void executeScript(SqlScript script) {
-        logger.info("\n Executing script: [{}]", GREEN, script.getName());
+        logger.info("\nExecuting script: [{}]", GREEN, script.getName());
         int exitCode = scriptExecutor.execute(script);
         if (exitCode == 0) {
             script.setStatus(ScriptStatus.EXECUTED);

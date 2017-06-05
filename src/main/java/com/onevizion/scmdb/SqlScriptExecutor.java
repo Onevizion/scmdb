@@ -13,6 +13,7 @@ import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
 
 public class SqlScriptExecutor {
     private static final String SQL_PLUS_COMMAND = "sql";
+    private static final String INVALID_OBJECT_PREFIX = "Invalid objects in";
     private static final String INVALID_OBJECT_POSTFIX = "is invalid.";
 
     private Executor executor;
@@ -29,6 +30,8 @@ public class SqlScriptExecutor {
             @Override
             protected void processLine(String line, int logLevel) {
                 if (line.endsWith(INVALID_OBJECT_POSTFIX)) {
+                    logger.warn(line, YELLOW);
+                } else if (line.startsWith(INVALID_OBJECT_PREFIX)) {
                     logger.warn(line, YELLOW);
                 } else {
                     logger.info(line);
