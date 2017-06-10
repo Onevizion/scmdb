@@ -39,6 +39,7 @@ public class DbManager {
     private ColorLogger logger;
 
     public void updateDb() {
+        logger.info("SCMDB version: {}", getClass().getPackage().getImplementationVersion());
         logger.info("SCMDB\n");
 
         if (!checkAndCreateDbScriptTable()) {
@@ -59,6 +60,7 @@ public class DbManager {
     private void checkNewScripts() {
         List<SqlScript> newScripts = scriptsFacade.getNewScripts();
         if (newScripts.isEmpty()) {
+            logger.info("No scripts to execute");
             return;
         }
 
