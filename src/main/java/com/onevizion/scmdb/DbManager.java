@@ -48,7 +48,7 @@ public class DbManager {
             logger.info("Please execute script \"src/main/resources/create.sql\" manually");
         } else if (scriptsFacade.isFirstRun()) {
             scriptsFacade.createAllFromDirectory();
-            logger.info("It's your first run of scmdb. Scmdb was initialized.");
+            logger.info("It's your first run of SCMDB. SCMDB was initialized.");
         } else {
             scriptsFacade.cleanExecDir();
             checkUpdatedScripts();
