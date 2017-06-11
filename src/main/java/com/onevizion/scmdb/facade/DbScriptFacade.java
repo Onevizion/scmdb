@@ -188,4 +188,13 @@ public class DbScriptFacade {
             }
         }
     }
+
+    public boolean isScriptTableExist() {
+        try {
+            return sqlScriptDaoOra.isScriptTableExist();
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            return false;
+        }
+    }
 }
