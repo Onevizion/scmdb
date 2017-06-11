@@ -39,7 +39,8 @@ public class DbManager {
     private ColorLogger logger;
 
     public void updateDb() {
-        logger.info("SCMDB version: {}", getClass().getPackage().getImplementationVersion());
+        logger.info("SCMDB {}", getClass().getPackage().getImplementationVersion());
+        scriptExecutor.printVersion();
         logger.info("SCMDB\n");
 
         if (!checkAndCreateDbScriptTable()) {

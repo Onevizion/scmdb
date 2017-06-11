@@ -122,4 +122,14 @@ public class SqlScriptExecutor {
         tmpFile.delete();
         return exitCode == 0;
     }
+
+    public void printVersion() {
+        CommandLine commandLine = new CommandLine(SQL_PLUS_COMMAND);
+        commandLine.addArgument("-v");
+        try {
+            executor.execute(commandLine);
+        } catch (Exception e) {
+            logger.error("Error during command execution.", e);
+        }
+    }
 }
