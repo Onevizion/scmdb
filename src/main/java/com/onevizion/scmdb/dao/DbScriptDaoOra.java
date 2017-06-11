@@ -9,6 +9,11 @@ import org.springframework.jdbc.core.namedparam.BeanPropertySqlParameterSource;
 import org.springframework.jdbc.core.namedparam.SqlParameterSourceUtils;
 import org.springframework.stereotype.Repository;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -78,5 +83,17 @@ public class DbScriptDaoOra extends AbstractDaoOra {
 
     public void delete(Long id) {
         jdbcTemplate.update(DELETE, id);
+    }
+
+    public boolean isScriptTableExist() throws Exception {
+        DataSource dataSource = jdbcTemplate.getDataSource();
+        try (Connection connection = dataSource.getConnection()) {
+            DatabaseMetaData dbMetaData = connection.getMetaData();
+            ResultSet rs = dbMetaData.getTables(null, connection.getSchema(), "DB_SCRIPT",
+                new String[] {"TABLE"});
+            return rs.next();
+        } catch (SQLException e) {
+            throw new Exception("Can't establish a connection to the database by the parameters given");
+        }
     }
 }

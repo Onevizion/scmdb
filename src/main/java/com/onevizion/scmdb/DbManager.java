@@ -39,22 +39,22 @@ public class DbManager {
     private ColorLogger logger;
 
     public void updateDb() {
-        logger.info("SCMDB version: {}", getClass().getPackage().getImplementationVersion());
+        logger.info("SCMDB {}", getClass().getPackage().getImplementationVersion());
+        scriptExecutor.printVersion();
         logger.info("SCMDB\n");
 
-        if (scriptsFacade.isFirstRun()) {
+        if (!checkAndCreateDbScriptTable()) {
+            logger.info("Can't create DB objects used by SCMDB:");
+            logger.info("Please execute script \"src/main/resources/create.sql\" manually");
+        } else if (scriptsFacade.isFirstRun()) {
             scriptsFacade.createAllFromDirectory();
             logger.info("It's your first run of scmdb. Scmdb was initialized.");
-            return;
+        } else {
+            scriptsFacade.cleanExecDir();
+            checkUpdatedScripts();
+            checkDeletedScripts();
+            checkNewScripts();
         }
-        scriptsFacade.cleanExecDir();
-
-        checkUpdatedScripts();
-
-        checkDeletedScripts();
-
-        checkNewScripts();
-
         logger.info("\nSCMDB complete");
     }
 
@@ -204,5 +204,9 @@ public class DbManager {
                                                  .filter(script -> !script.isUserSchemaScript())
                                                  .collect(Collectors.toList());
         ddlFacade.generateDdl(scriptsToGenDdl);
+    }
+
+    private boolean checkAndCreateDbScriptTable() {
+        return scriptsFacade.isScriptTableExist() || scriptExecutor.createDbScriptTable();
     }
 }
