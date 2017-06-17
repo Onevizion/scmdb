@@ -33,7 +33,7 @@ public class SqlScriptExecutor {
         executor.setStreamHandler(new PumpStreamHandler(new LogOutputStream() {
             @Override
             protected void processLine(String line, int logLevel) {
-                if (line.endsWith(INVALID_OBJECT_POSTFIX)) {
+                if (line.trim().endsWith(INVALID_OBJECT_POSTFIX)) {
                     logger.warn(line, YELLOW);
                 } else if (line.startsWith(INVALID_OBJECT_PREFIX)) {
                     logger.warn(line, YELLOW);
