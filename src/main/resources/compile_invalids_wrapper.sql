@@ -22,8 +22,6 @@ begin
 
     exit when v_invalid_cnt = 0;
 
-    dbms_output.put_line('Compile ' || v_invalid_cnt || ' invalid objects...');
-
     for rec in (
     select *
     from user_objects

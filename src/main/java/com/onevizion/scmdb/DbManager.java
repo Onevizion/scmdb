@@ -20,7 +20,7 @@ import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.vo.ScriptType.ROLLBACK;
 
 public class DbManager {
-    private static final String SCRIPT_EXECUTION_ERROR_MESSAGE = "Fix and execute manually script [{}] and then run scmdb again to execute other scripts.";
+    private static final String SCRIPT_EXECUTION_ERROR_MESSAGE = "Fix and execute manually script [{}] and then run SCMDB again to execute other scripts.";
     private static final String CANT_RUN_SQL_ERROR_MESSAGE = "Oracle SQLcl executable is not found. Please download it and make sure bin/sql is in your path";
 
     @Resource
@@ -41,14 +41,13 @@ public class DbManager {
     public void updateDb() {
         logger.info("SCMDB {}", getClass().getPackage().getImplementationVersion());
         scriptExecutor.printVersion();
-        logger.info("SCMDB\n");
 
         if (!checkAndCreateDbScriptTable()) {
             logger.info("Can't create DB objects used by SCMDB:");
             logger.info("Please execute script \"src/main/resources/create.sql\" manually");
         } else if (scriptsFacade.isFirstRun()) {
             scriptsFacade.createAllFromDirectory();
-            logger.info("It's your first run of scmdb. Scmdb was initialized.");
+            logger.info("It's your first run of SCMDB. SCMDB was initialized.");
         } else {
             scriptsFacade.cleanExecDir();
             checkUpdatedScripts();
