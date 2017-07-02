@@ -5,7 +5,7 @@ set VERIFY OFF
 @@ &1
 
 set serveroutput on
-
+set FEEDBACK OFF
 declare
   v_invalid_cnt             number;
   v_invalid_cnt_prev        number;
@@ -93,7 +93,6 @@ begin
 end;
 /
 
-set FEEDBACK OFF
 exec dbms_utility.compile_schema('&_USER._USER',false);
 exec dbms_utility.compile_schema('&_USER._RPT',false);
 --SET FEEDBACK ON
