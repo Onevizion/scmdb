@@ -2,7 +2,12 @@ package com.onevizion.scmdb;
 
 import com.onevizion.scmdb.vo.ScriptType;
 import com.onevizion.scmdb.vo.SqlScript;
-import org.apache.commons.exec.*;
+import org.apache.commons.exec.CommandLine;
+import org.apache.commons.exec.DefaultExecutor;
+import org.apache.commons.exec.ExecuteException;
+import org.apache.commons.exec.Executor;
+import org.apache.commons.exec.LogOutputStream;
+import org.apache.commons.exec.PumpStreamHandler;
 import org.apache.commons.io.FileUtils;
 
 import javax.annotation.Resource;
@@ -18,7 +23,9 @@ public class SqlScriptExecutor {
     private static final String INVALID_OBJECT_PREFIX = "Invalid objects in";
     private static final String INVALID_OBJECT_POSTFIX = "is invalid.";
     private static final String CANT_RUN_PROGRAM = "Cannot run program \"sql\"";
+    private static final String ERROR_STARTING_AT_LINE = "Error starting at line :";
     private static final String CREATE_SQL = "create.sql";
+    private boolean isErrorMsgStarted = false;
 
     private Executor executor;
 
@@ -33,10 +40,15 @@ public class SqlScriptExecutor {
         executor.setStreamHandler(new PumpStreamHandler(new LogOutputStream() {
             @Override
             protected void processLine(String line, int logLevel) {
-                if (line.trim().endsWith(INVALID_OBJECT_POSTFIX)) {
+                if (line.startsWith(INVALID_OBJECT_PREFIX)) {
                     logger.warn(line, YELLOW);
-                } else if (line.startsWith(INVALID_OBJECT_PREFIX)) {
+                } else if (line.trim().endsWith(INVALID_OBJECT_POSTFIX)) {
                     logger.warn(line, YELLOW);
+                } else if (line.startsWith(ERROR_STARTING_AT_LINE)) {
+                    isErrorMsgStarted = true;
+                    logger.error(line);
+                } else if (isErrorMsgStarted) {
+                    logger.error(line);
                 } else {
                     logger.info(line);
                 }
