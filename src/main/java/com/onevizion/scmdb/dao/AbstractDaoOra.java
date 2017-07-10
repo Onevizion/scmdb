@@ -5,6 +5,8 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import javax.annotation.Resource;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
@@ -60,5 +62,13 @@ public class AbstractDaoOra {
             sql.append(") ");
         }
         return sql.toString();
+    }
+
+    public void checkDbConnection() throws SQLException {
+        try (Connection con = jdbcTemplate.getDataSource().getConnection()) {
+            con.close();
+        } catch (SQLException e) {
+            throw e;
+        }
     }
 }

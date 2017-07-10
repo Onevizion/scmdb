@@ -135,13 +135,14 @@ public class SqlScriptExecutor {
         return exitCode == 0;
     }
 
-    public void printVersion() {
+    public void printVersion() throws IOException {
         CommandLine commandLine = new CommandLine(SQL_PLUS_COMMAND);
         commandLine.addArgument("-v");
         try {
             executor.execute(commandLine);
-        } catch (Exception e) {
+        } catch (IOException e) {
             logger.error("Error during command execution.", e);
+            throw e;
         }
     }
 }
