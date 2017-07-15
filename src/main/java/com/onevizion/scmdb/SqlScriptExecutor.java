@@ -19,7 +19,7 @@ import java.util.Date;
 import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
 
 public class SqlScriptExecutor {
-    private static final String SQL_PLUS_COMMAND = "sql";
+    private static final String SQL_CLIENT_COMMAND = "sql";
     private static final String INVALID_OBJECT_PREFIX = "Invalid objects in";
     private static final String INVALID_OBJECT_POSTFIX = "is invalid.";
     private static final String CANT_RUN_PROGRAM = "Cannot run program \"sql\"";
@@ -62,9 +62,8 @@ public class SqlScriptExecutor {
     }
 
     public int execute(SqlScript script) {
-        CommandLine commandLine = new CommandLine(SQL_PLUS_COMMAND);
+        CommandLine commandLine = new CommandLine(SQL_CLIENT_COMMAND);
         commandLine.addArgument("-L");
-        commandLine.addArgument("-S");
         if (script.isUserSchemaScript()) {
             commandLine.addArgument(appArguments.getUserCredentials().getConnectionString());
         } else {
@@ -136,7 +135,7 @@ public class SqlScriptExecutor {
     }
 
     public void printVersion() throws IOException {
-        CommandLine commandLine = new CommandLine(SQL_PLUS_COMMAND);
+        CommandLine commandLine = new CommandLine(SQL_CLIENT_COMMAND);
         commandLine.addArgument("-v");
         try {
             executor.execute(commandLine);
