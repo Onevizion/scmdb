@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -196,5 +197,9 @@ public class DbScriptFacade {
             logger.error(e.getMessage());
             return false;
         }
+    }
+
+    public void checkDbConnection() throws SQLException {
+        sqlScriptDaoOra.checkDbConnection();
     }
 }

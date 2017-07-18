@@ -10,6 +10,7 @@ import javax.annotation.Resource;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.sql.SQLException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +41,13 @@ public class DbManager {
 
     public void updateDb() {
         logger.info("SCMDB {}", getClass().getPackage().getImplementationVersion());
-        scriptExecutor.printVersion();
+
+        try {
+            scriptsFacade.checkDbConnection();
+        } catch (SQLException e) {
+            logger.error("Cannot establish DB connection.\n{}", e.getMessage());
+            System.exit(0);
+        }
 
         if (!checkAndCreateDbScriptTable()) {
             logger.info("Can't create DB objects used by SCMDB:");
@@ -195,6 +202,14 @@ public class DbManager {
 
     public void generateDdl() {
         logger.info("Extracting DDL for new and updated scripts");
+
+        try {
+            scriptsFacade.checkDbConnection();
+        } catch (SQLException e) {
+            logger.error("Cannot establish DB connection.\n{}", e.getMessage());
+            System.exit(0);
+        }
+
         List<SqlScript> scripts = scriptsFacade.getNewScripts();
         scripts.addAll(scriptsFacade.getUpdatedScripts());
         List<SqlScript> scriptsToGenDdl = scripts.stream()
