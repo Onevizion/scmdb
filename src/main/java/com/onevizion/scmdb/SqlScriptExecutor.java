@@ -20,12 +20,21 @@ import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
 
 public class SqlScriptExecutor {
     private static final String SQL_CLIENT_COMMAND = "sql";
+
     private static final String INVALID_OBJECT_PREFIX = "Invalid objects in";
-    private static final String INVALID_OBJECT_POSTFIX = "is invalid.";
-    private static final String CANT_RUN_PROGRAM = "Cannot run program \"sql\"";
-    private static final String ERROR_STARTING_AT_LINE = "Error starting at line :";
-    private static final String CREATE_SQL = "create.sql";
+    private static final String INVALID_OBJECT_REGEX = "^\\w+\\s+[\\w|\\d]+ is invalid.";
+
+    private boolean isSqlClBannerStarted = false;
+    private static final String SQLCL_BANNER_START_REGEX = "^SQLcl: Release [\\d|.]+ Production on .+";
+    private static final String SQLCL_BANNER_ORA_VERSION_REGEX = "Oracle Database [\\w|\\d]+ \\w+ \\w+ Release [\\d|.]+ - \\d+bit Production";
+    private static final String SQLCL_BANNER_END_REGEX = "^" + SQLCL_BANNER_ORA_VERSION_REGEX;
+    private static final String SQLCL_DISCON_FROM_DB_REGEX = "^Disconnected from " + SQLCL_BANNER_ORA_VERSION_REGEX;
+
     private boolean isErrorMsgStarted = false;
+    private static final String ERROR_STARTING_AT_LINE = "Error starting at line :";
+
+    private static final String CANT_RUN_PROGRAM = "Cannot run program \"sql\"";
+    private static final String CREATE_SQL = "create.sql";
 
     private Executor executor;
 
@@ -40,9 +49,11 @@ public class SqlScriptExecutor {
         executor.setStreamHandler(new PumpStreamHandler(new LogOutputStream() {
             @Override
             protected void processLine(String line, int logLevel) {
-                if (line.startsWith(INVALID_OBJECT_PREFIX)) {
+                if (isSqlClBannerPrinted(line)) {
+                    return;
+                } else if (line.startsWith(INVALID_OBJECT_PREFIX)) {
                     logger.warn(line, YELLOW);
-                } else if (line.trim().endsWith(INVALID_OBJECT_POSTFIX)) {
+                } else if (line.trim().matches(INVALID_OBJECT_REGEX)) {
                     logger.warn(line, YELLOW);
                 } else if (line.startsWith(ERROR_STARTING_AT_LINE)) {
                     isErrorMsgStarted = true;
@@ -143,5 +154,18 @@ public class SqlScriptExecutor {
             logger.error("Error during command execution.", e);
             throw e;
         }
+    }
+
+    private boolean isSqlClBannerPrinted(String line) {
+        if (line.matches(SQLCL_BANNER_START_REGEX)) {
+            isSqlClBannerStarted = true;
+        } else if (line.matches(SQLCL_BANNER_END_REGEX)) {
+            isSqlClBannerStarted = false;
+            return true;
+        } else if (isSqlClBannerStarted || line.matches(SQLCL_DISCON_FROM_DB_REGEX)) {
+            return true;
+        }
+
+        return isSqlClBannerStarted;
     }
 }
