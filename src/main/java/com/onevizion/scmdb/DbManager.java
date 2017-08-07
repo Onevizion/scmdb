@@ -43,6 +43,13 @@ public class DbManager {
         logger.info("SCMDB {}", getClass().getPackage().getImplementationVersion());
 
         try {
+            scriptExecutor.printVersion();
+        } catch (IOException e) {
+            logger.error("Cannot find SQLcl, make sure SQLcl is available.\n{}", e.getMessage());
+            System.exit(0);
+        }
+
+        try {
             scriptsFacade.checkDbConnection();
         } catch (SQLException e) {
             logger.error("Cannot establish DB connection.\n{}", e.getMessage());
