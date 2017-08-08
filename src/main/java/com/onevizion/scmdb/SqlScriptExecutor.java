@@ -22,7 +22,7 @@ public class SqlScriptExecutor {
     private static final String SQL_CLIENT_COMMAND = "sql";
 
     private static final String INVALID_OBJECT_PREFIX = "Invalid objects in";
-    private static final String INVALID_OBJECT_REGEX = "^\\w+\\s+[\\w|\\d]+ is invalid.";
+    private static final String INVALID_OBJECT_REGEX = "^(\\w+\\s){0,2}\\w+\\s+\\S+\\s+is invalid.\\s*";
 
     private boolean isSqlClBannerStarted = false;
     private static final String SQLCL_BANNER_START_REGEX = "^SQLcl: Release [\\d|.]+ Production on .+";
@@ -53,7 +53,7 @@ public class SqlScriptExecutor {
                     return;
                 } else if (line.startsWith(INVALID_OBJECT_PREFIX)) {
                     logger.warn(line, YELLOW);
-                } else if (line.trim().matches(INVALID_OBJECT_REGEX)) {
+                } else if (line.matches(INVALID_OBJECT_REGEX)) {
                     logger.warn(line, YELLOW);
                 } else if (line.startsWith(ERROR_STARTING_AT_LINE)) {
                     isErrorMsgStarted = true;
