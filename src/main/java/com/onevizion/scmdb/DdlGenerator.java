@@ -26,6 +26,7 @@ import static com.onevizion.scmdb.vo.DbObjectType.*;
 @Component
 public class DdlGenerator {
     private static final String PACKAGE_SPECIFICATION_DDL_FILE_POSTFIX = "_spec";
+    private static final String REMOVE_DOUBLE_QUOTES_REGEX = "(?!\\B'[^']*)\"(?![^']*'\\B)";
 
     @Resource
     private DdlDao ddlDao;
@@ -48,7 +49,7 @@ public class DdlGenerator {
         ddlDao.executeTransformParamStatements();
     }
 
-    public void generatePackageSpecScripts(DbObject pkgSpec) {
+    private void generatePackageSpecScripts(DbObject pkgSpec) {
         if (!isExcludeObject(pkgSpec.getName(), excludedPackages)) {
             logger.info("Generating DDL for package spec [{}]", GREEN, pkgSpec.getName());
             String ddl = removeSchemaNameInDdl(pkgSpec.getDdl());
@@ -56,11 +57,11 @@ public class DdlGenerator {
             ddl = ddl.replaceFirst("\\s+/$", "\n/");
             ddl = ddl.replaceAll("\\n", "\r\n");
             pkgSpec.setDdl(ddl);
-            writeDdlToFile(pkgSpec, PACKAGES_DDL_DIRECTORY_NAME);
+            prepareAndWriteDdlToFile(pkgSpec, PACKAGES_DDL_DIRECTORY_NAME);
         }
     }
 
-    public void generatePackageBodyScripts(DbObject pkgBody) {
+    private void generatePackageBodyScripts(DbObject pkgBody) {
         if (!isExcludeObject(pkgBody.getName(), excludedPackages)) {
             logger.info("Generating DDL for package body [{}]", GREEN, pkgBody.getName());
             String ddl = removeSchemaNameInDdl(pkgBody.getDdl());
@@ -68,11 +69,11 @@ public class DdlGenerator {
             ddl = ddl.replaceFirst("\\s+/$", "\n/");
             ddl = ddl.replaceAll("\\n", "\r\n");
             pkgBody.setDdl(ddl);
-            writeDdlToFile(pkgBody, PACKAGES_DDL_DIRECTORY_NAME);
+            prepareAndWriteDdlToFile(pkgBody, PACKAGES_DDL_DIRECTORY_NAME);
         }
     }
 
-    public void generateTableScripts(DbObject table) {
+    private void generateTableScripts(DbObject table) {
         logger.info("Generating DDL for table [{}]", GREEN, table.getName());
         String ddl = removeSchemaNameInDdl(table.getDdl());
         ddl = ddl.trim();
@@ -87,10 +88,16 @@ public class DdlGenerator {
         ddl += generateSequenceScripts(table);
         ddl += generateTriggerScripts(table);
         table.setDdl(ddl);
-        writeDdlToFile(table, TABLES_DDL_DIRECTORY_NAME);
+        prepareAndWriteDdlToFile(table, TABLES_DDL_DIRECTORY_NAME);
     }
 
-    private void writeDdlToFile(DbObject dbObject, String ddlDirectoryName) {
+    private String applyCodeStyleFormatTingToDdl(String ddl) {
+        return ddl.replaceAll(REMOVE_DOUBLE_QUOTES_REGEX, "");
+    }
+
+    private void prepareAndWriteDdlToFile(DbObject dbObject, String ddlDirectoryName) {
+        dbObject.setDdl(applyCodeStyleFormatTingToDdl(dbObject.getDdl()));
+
         String directoryPath = appArguments.getDdlsDirectory().getAbsolutePath() + File.separator + ddlDirectoryName;
 
         String filePath = directoryPath + File.separator + dbObject.getName().toLowerCase();
@@ -198,7 +205,7 @@ public class DdlGenerator {
         return triggersDdl.toString();
     }
 
-    public void generateViewScripts(DbObject view) {
+    private void generateViewScripts(DbObject view) {
         if (!isExcludeObject(view.getName(), excludedViews)) {
             logger.info("Generating DDL for view [{}]", GREEN, view.getName());
             String ddl = removeSchemaNameInDdl(view.getDdl());
@@ -207,7 +214,7 @@ public class DdlGenerator {
             ddl = ddl.replaceAll("\\n", "\r\n");
             ddl += generateViewCommentsScripts(view);
             view.setDdl(ddl);
-            writeDdlToFile(view, VIEWS_DDL_DIRECTORY_NAME);
+            prepareAndWriteDdlToFile(view, VIEWS_DDL_DIRECTORY_NAME);
         }
     }
 
@@ -270,7 +277,7 @@ public class DdlGenerator {
         }
     }
 
-    public String removeSchemaNameInDdl(String ddl) {
+    private String removeSchemaNameInDdl(String ddl) {
         String regexp = String.format("\"%s\".", appArguments.getOwnerCredentials().getSchemaName().toUpperCase());
         ddl = ddl.replaceAll(regexp, "");
         return ddl;
