@@ -7,14 +7,37 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.stereotype.Component;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.List;
 
 import static com.onevizion.scmdb.vo.DbObjectType.*;
 
 @Component
 public class DdlDao extends AbstractDaoOra {
+    private final static String FIND_ALL_DB_OBJECTS = "select object_name,\n" +
+            "       object_type\n" +
+            "from user_objects\n" +
+            "where (object_type = 'TABLE'\n" +
+            "    and generated = 'N'\n" +
+            "    and object_name not like 'Z_%')\n" +
+            "   or object_type = 'VIEW'\n" +
+            "   or object_type = 'PACKAGE'\n" +
+            "   or object_type = 'PACKAGE BODY'\n" +
+            "   or object_type = 'TRIGGER'\n";
+
+    private final static RowMapper<DbObject> rowMapper = (rs, rowNum) -> {
+        DbObject dbObject = new DbObject();
+        dbObject.setName(rs.getString(1));
+        dbObject.setDdl(rs.getString(2));
+        return dbObject;
+    };
+
+    private final static RowMapper<DbObject> rowMapperWithObjectType = (rs, rowNum) -> {
+        DbObject dbObject = new DbObject();
+        dbObject.setName(rs.getString("object_name"));
+        dbObject.setType(DbObjectType.getByName(rs.getString("object_type")));
+        return dbObject;
+    };
+    
     public void executeTransformParamStatements() {
         String plsqlBlock = "begin" +
                 "\n dbms_metadata.set_transform_param(dbms_metadata.session_transform,'PRETTY',true);" +
@@ -24,62 +47,8 @@ public class DdlDao extends AbstractDaoOra {
         jdbcTemplate.execute(plsqlBlock);
     }
 
-    public List<DbObject> extractPackageBodiesDdls() {
-        List<DbObject> dbObjects = jdbcTemplate.query("select object_name," +
-                " dbms_metadata.get_ddl('PACKAGE_BODY', object_name)" +
-                " from user_objects" +
-                " where object_type = 'PACKAGE BODY'", new DbObjectExtractor());
-        return dbObjects;
-    }
-
-    public List<DbObject> extractPackageSpecDdls() {
-        List<DbObject> dbObjects = jdbcTemplate.query("select object_name," +
-                " dbms_metadata.get_ddl('PACKAGE_SPEC', object_name)" +
-                " from user_objects" +
-                " where object_type = 'PACKAGE'", new DbObjectExtractor());
-        return dbObjects;
-    }
-
-    public List<DbObject> extractSequencesDdls() {
-        List<DbObject> dbObjects = jdbcTemplate.query("select trgrs.table_name," +
-                " dbms_metadata.get_ddl('SEQUENCE', depends.referenced_name)" +
-                " from user_dependencies depends, user_triggers trgrs" +
-                " where trgrs.trigger_name = depends.name and depends.type = 'TRIGGER'" +
-                " and depends.referenced_type = 'SEQUENCE' order by depends.referenced_name", new DbObjectExtractor());
-        return dbObjects;
-    }
-
-    public List<DbObject> extractViewsDdls() {
-        List<DbObject> dbObjects = jdbcTemplate.query("select view_name," +
-                " dbms_metadata.get_ddl('VIEW', view_name)" +
-                " from user_views", new DbObjectExtractor());
-        return dbObjects;
-    }
-
-    public List<DbObject> extractTablesDdls() {
-        List<DbObject> dbObjects = jdbcTemplate.query("select object_name," +
-                        " dbms_metadata.get_ddl('TABLE', object_name)" +
-                        " from user_objects where object_type='TABLE' and generated = 'N' and object_name not like 'Z_%'",
-                new DbObjectExtractor()
-        );
-        return dbObjects;
-    }
-
-    public List<DbObject> extractTriggersDdls() {
-        List<DbObject> dbObjects = jdbcTemplate.query("select table_name," +
-                " dbms_metadata.get_ddl('TRIGGER', trigger_name)" +
-                " from user_triggers" +
-                " where table_name not like 'Z_%' and trigger_name not like 'Z_%'" +
-                " order by trigger_name", new DbObjectExtractor());
-        return dbObjects;
-    }
-
-    public List<DbObject> extractIndexesDdls() {
-        List<DbObject> dbObjects = jdbcTemplate.query("select table_name, dbms_metadata.get_ddl('INDEX', index_name)" +
-                " from user_indexes" +
-                " where generated = 'N' and table_name not like 'Z_%' and index_name not like 'PK_%'" +
-                " order by table_name asc, uniqueness desc, index_name asc", new DbObjectExtractor());
-        return dbObjects;
+    public List<DbObject> extractAllDbObjectsWithoutDdl() {
+        return jdbcTemplate.query(FIND_ALL_DB_OBJECTS, rowMapperWithObjectType);
     }
 
     public String extractDdl(DbObject dbObject) {
@@ -104,24 +73,24 @@ public class DdlDao extends AbstractDaoOra {
                     "  (select table_name from user_col_comments" +
                     "     where comments is not null" +
                     "     group by table_name)) where table_name = upper(:tableName)";
-            dbObjects = namedParameterJdbcTemplate.query(sql, namedParams, new DbObjectExtractor());
+            dbObjects = namedParameterJdbcTemplate.query(sql, namedParams, rowMapper);
         } else if (depObjType == SEQUENCE) {
             String sql = "select trgrs.table_name, dbms_metadata.get_ddl('SEQUENCE', depends.referenced_name)" +
                     " from user_dependencies depends, user_triggers trgrs" +
                     " where trgrs.trigger_name = depends.name and depends.type = 'TRIGGER'" +
                     " and depends.referenced_type = 'SEQUENCE' and trgrs.table_name = upper(:tableName)" +
                     " order by depends.referenced_name";
-            dbObjects = namedParameterJdbcTemplate.query(sql, namedParams, new DbObjectExtractor());
+            dbObjects = namedParameterJdbcTemplate.query(sql, namedParams, rowMapper);
         } else if (depObjType == INDEX) {
             String sql = "select table_name, dbms_metadata.get_ddl(upper(:depObjType), index_name)" +
                     " from user_indexes where generated = 'N' and table_name=upper(:tableName) and index_name not like 'PK_%'" +
                     " order by table_name asc, uniqueness desc, index_name asc";
-            dbObjects = namedParameterJdbcTemplate.query(sql, namedParams, new DbObjectExtractor());
+            dbObjects = namedParameterJdbcTemplate.query(sql, namedParams, rowMapper);
         } else if (depObjType == TRIGGER) {
             String sql = "select table_name, dbms_metadata.get_ddl(upper(:depObjType), trigger_name)" +
                     " from user_triggers where table_name=upper(:tableName)" +
                     " and trigger_name not like 'Z_%' order by trigger_name";
-            dbObjects = namedParameterJdbcTemplate.query(sql, namedParams, new DbObjectExtractor());
+            dbObjects = namedParameterJdbcTemplate.query(sql, namedParams, rowMapper);
         }
 
         return dbObjects;
@@ -158,41 +127,6 @@ public class DdlDao extends AbstractDaoOra {
         return DbObjectType.valueOf(dbObjTypeString);
     }
 
-    public List<DbObject> extractTabCommentsDdls() {
-        List<DbObject> dbObjects = jdbcTemplate.query(
-                "select table_name, dbms_metadata.get_dependent_ddl('COMMENT', table_name) from" +
-                        "(select tab1.table_name, tab1.table_type from user_tab_comments tab1" +
-                        "  inner join ((select table_name from user_tab_comments" +
-                        "                 where comments is not null)" +
-                        "               union" +
-                        "              (select table_name from user_col_comments" +
-                        "                  where comments is not null" +
-                        "                  group by table_name)) tab2" +
-                        "     on tab1.table_name=tab2.table_name)" +
-                        "  where table_type='TABLE'" +
-                        "  order by table_name", new DbObjectExtractor()
-        );
-        return dbObjects;
-    }
-
-    public List<DbObject> extractViewCommentsDdls() {
-        List<DbObject> dbObjects = jdbcTemplate.query(
-                "select table_name, dbms_metadata.get_dependent_ddl('COMMENT', table_name) from" +
-                        "(select tab1.table_name, tab1.table_type from user_tab_comments tab1" +
-                        "  inner join ((select table_name from user_tab_comments" +
-                        "                 where comments is not null)" +
-                        "               union" +
-                        "              (select table_name from user_col_comments" +
-                        "                  where comments is not null" +
-                        "                  group by table_name)) tab2" +
-                        "     on tab1.table_name=tab2.table_name)" +
-                        "  where table_type='VIEW'" +
-                        "  order by table_name",
-                new DbObjectExtractor()
-        );
-        return dbObjects;
-    }
-
     public boolean isExist(String objectName, DbObjectType objectType) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource();
         namedParams.addValue("objName", objectName);
@@ -206,14 +140,4 @@ public class DdlDao extends AbstractDaoOra {
         return Boolean.valueOf(boolStr);
     }
 
-    private static final class DbObjectExtractor implements RowMapper<DbObject> {
-
-        @Override
-        public DbObject mapRow(ResultSet rs, int rowNum) throws SQLException {
-            DbObject dbObject = new DbObject();
-            dbObject.setName(rs.getString(1));
-            dbObject.setDdl(rs.getString(2));
-            return dbObject;
-        }
-    }
 }

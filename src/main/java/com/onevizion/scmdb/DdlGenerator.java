@@ -12,6 +12,7 @@ import javax.annotation.Resource;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -24,7 +25,8 @@ import static com.onevizion.scmdb.vo.DbObjectType.*;
 
 @Component
 public class DdlGenerator {
-    public static final String PACKAGE_SPECIFICATION_DDL_FILE_POSTFIX = "_spec";
+    private static final String PACKAGE_SPECIFICATION_DDL_FILE_POSTFIX = "_spec";
+
     @Resource
     private DdlDao ddlDao;
 
@@ -222,7 +224,7 @@ public class DdlGenerator {
         return commentsDdl.toString();
     }
 
-    public void createDdlsForChangedDbObjects(Set<DbObject> dbObjects) {
+    public void generateDdls(Collection<DbObject> dbObjects) {
         Set<DbObject> tables = new HashSet<>();
         for (DbObject dbObject : dbObjects) {
             if (dbObject.getType() == COMMENT) {
@@ -328,5 +330,9 @@ public class DdlGenerator {
                 }
             }
         }
+    }
+
+    public void generateDllsForAllDbObjects() {
+        generateDdls(ddlDao.extractAllDbObjectsWithoutDdl());
     }
 }

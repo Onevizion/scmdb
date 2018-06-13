@@ -1,5 +1,6 @@
 package com.onevizion.scmdb.vo;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static java.util.Arrays.asList;
@@ -28,5 +29,13 @@ public enum DbObjectType {
 
     public List<String> getChangeKeywords() {
         return changeKeywords;
+    }
+
+    public static DbObjectType getByName(String objectType) {
+        return Arrays.stream(values())
+                     .filter(t -> t.getName().equals(objectType.toLowerCase()))
+                     .findAny()
+                     .orElseThrow(
+                             () -> new IllegalArgumentException("Can't find DbObjectType with name=" + objectType));
     }
 }

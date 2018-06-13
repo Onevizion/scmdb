@@ -28,7 +28,11 @@ public class Scmdb {
 
         DbManager dbManager = ctx.getBean(DbManager.class);
         if (appArguments.isGenDdl()) {
-            dbManager.generateDdl();
+            if(appArguments.isGenDdlAll()){
+                dbManager.generateDdlForAllObjects();
+            }else{
+                dbManager.generateDdlForNewOrChangedScripts();
+            }
         } else {
             dbManager.updateDb();
         }
