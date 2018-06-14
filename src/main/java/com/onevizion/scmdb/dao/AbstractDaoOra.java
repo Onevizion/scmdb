@@ -65,8 +65,7 @@ public class AbstractDaoOra {
     }
 
     public void checkDbConnection() throws SQLException {
-        try (Connection con = jdbcTemplate.getDataSource().getConnection()) {
-            con.close();
+        try (Connection ignored = jdbcTemplate.getDataSource().getConnection()) {
         } catch (SQLException e) {
             throw e;
         }

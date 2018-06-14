@@ -1,19 +1,16 @@
 package com.onevizion.scmdb;
 
 import com.onevizion.scmdb.facade.DbScriptFacade;
-import com.onevizion.scmdb.facade.DdlFacade;
-import com.onevizion.scmdb.vo.ScriptStatus;
-import com.onevizion.scmdb.vo.ScriptType;
-import com.onevizion.scmdb.vo.SqlScript;
+import com.onevizion.scmdb.vo.*;
 
 import javax.annotation.Resource;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.SQLException;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static com.onevizion.scmdb.ColorLogger.Color.CYAN;
@@ -28,7 +25,7 @@ public class DbManager {
     private DbScriptFacade scriptsFacade;
 
     @Resource
-    private DdlFacade ddlFacade;
+    private DdlGenerator ddlGenerator;
 
     @Resource
     private AppArguments appArguments;
@@ -207,7 +204,7 @@ public class DbManager {
         }
     }
 
-    public void generateDdl() {
+    public void generateDdlForNewOrChangedScripts() {
         logger.info("Extracting DDL for new and updated scripts");
 
         try {
@@ -224,10 +221,69 @@ public class DbManager {
                                                  .filter(script -> script.getType() == ScriptType.COMMIT)
                                                  .filter(script -> !script.isUserSchemaScript())
                                                  .collect(Collectors.toList());
-        ddlFacade.generateDdl(scriptsToGenDdl);
+
+        Set<DbObject> changedDbObjects = findChangedDbObjects(scriptsToGenDdl);
+        ddlGenerator.executeSettingTransformParams();
+        ddlGenerator.generateDdls(changedDbObjects);
+    }
+
+    private Set<DbObject> findChangedDbObjects(List<SqlScript> scripts) {
+        Set<DbObject> updatedDbObjects;
+
+        updatedDbObjects = scripts.stream()
+                                  .map(script -> removeSpecialFromScriptText(script.getText()))
+                                  .flatMap(scriptText -> findChangedDbObjectsInScriptText(scriptText).stream())
+                                  .collect(Collectors.toSet());
+        return updatedDbObjects;
+    }
+
+    private List<DbObject> findChangedDbObjectsInScriptText(String scriptText) {
+        List<DbObject> dbObjects = new ArrayList<>();
+        Matcher matcher;
+        for (DbObjectType dbObjectType : DbObjectType.values()) {
+            for (String keyword : dbObjectType.getChangeKeywords()) {
+
+                String keywordRegexp = keyword + "\\s+\\w+";
+                matcher = Pattern.compile(keywordRegexp).matcher(scriptText);
+                if (!matcher.find()) {
+                    continue;
+                }
+                scriptText = scriptText.replaceAll(keywordRegexp, "");
+                matcher.reset();
+                while (matcher.find()) {
+                    String objectName = matcher.group().replaceFirst(keyword + "\\s", "");
+                    dbObjects.add(new DbObject(objectName, dbObjectType));
+                }
+            }
+        }
+
+        return dbObjects;
+    }
+
+    private String removeSpecialFromScriptText(String scriptText) {
+        scriptText = scriptText.replaceAll("--.*\r*\n", "");
+        scriptText = scriptText.replaceAll("/\\*([\\s\\S]*?)\\*/", "");
+        scriptText = scriptText.replaceAll("\n+", " ");
+        scriptText = scriptText.replaceAll("\\s\\s+", " ");
+        scriptText = scriptText.replaceAll("\"", "");
+        return scriptText.toLowerCase();
     }
 
     private boolean checkAndCreateDbScriptTable() {
         return scriptsFacade.isScriptTableExist() || scriptExecutor.createDbScriptTable();
+    }
+
+    public void generateDdlForAllObjects() {
+        logger.info("Extracting DDL for all db objects");
+
+        try {
+            scriptsFacade.checkDbConnection();
+        } catch (SQLException e) {
+            logger.error("Cannot establish DB connection.\n{}", e.getMessage());
+            System.exit(0);
+        }
+
+        ddlGenerator.executeSettingTransformParams();
+        ddlGenerator.generateDllsForAllDbObjects();
     }
 }

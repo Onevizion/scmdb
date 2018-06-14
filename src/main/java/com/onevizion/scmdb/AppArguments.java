@@ -17,6 +17,7 @@ public class AppArguments {
     private boolean genDdl;
     private boolean executeScripts;
     private boolean useColorLogging = true;
+    private boolean all = false;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
 
@@ -34,6 +35,7 @@ public class AppArguments {
 
         OptionSpec execOption = parser.acceptsAll(asList("e", "exec"));
         OptionSpec genDdlOption = parser.acceptsAll(asList("d", "gen-ddl"));
+        OptionSpec allOption = parser.acceptsAll(asList("a", "all"));
         OptionSpec noColorOption = parser.acceptsAll(asList("n", "no-color"));
 
         OptionSet options = parser.parse(args);
@@ -65,6 +67,7 @@ public class AppArguments {
         }
         executeScripts = options.has(execOption);
         genDdl = options.has(genDdlOption);
+        all = options.has(allOption);
         useColorLogging = !options.has(noColorOption);
     }
 
@@ -72,55 +75,31 @@ public class AppArguments {
         return scriptsDirectory;
     }
 
-    public void setScriptsDirectory(File scriptsDirectory) {
-        this.scriptsDirectory = scriptsDirectory;
-    }
-
     public File getDdlsDirectory() {
         return ddlsDirectory;
-    }
-
-    public void setDdlsDirectory(File ddlsDirectory) {
-        this.ddlsDirectory = ddlsDirectory;
     }
 
     public DbCnnCredentials getOwnerCredentials() {
         return ownerCredentials;
     }
 
-    public void setOwnerCredentials(DbCnnCredentials ownerCredentials) {
-        this.ownerCredentials = ownerCredentials;
-    }
-
     public DbCnnCredentials getUserCredentials() {
         return userCredentials;
-    }
-
-    public void setUserCredentials(DbCnnCredentials userCredentials) {
-        this.userCredentials = userCredentials;
     }
 
     public boolean isGenDdl() {
         return genDdl;
     }
 
-    public void setGenDdl(boolean genDdl) {
-        this.genDdl = genDdl;
-    }
-
     public boolean isExecuteScripts() {
         return executeScripts;
-    }
-
-    public void setExecuteScripts(boolean executeScripts) {
-        this.executeScripts = executeScripts;
     }
 
     public boolean isUseColorLogging() {
         return useColorLogging;
     }
 
-    public void setUseColorLogging(boolean useColorLogging) {
-        this.useColorLogging = useColorLogging;
+    public boolean isAll() {
+        return all;
     }
 }
