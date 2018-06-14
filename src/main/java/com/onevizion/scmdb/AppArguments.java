@@ -17,7 +17,7 @@ public class AppArguments {
     private boolean genDdl;
     private boolean executeScripts;
     private boolean useColorLogging = true;
-    private boolean genDdlAll = false;
+    private boolean all = false;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
 
@@ -35,7 +35,7 @@ public class AppArguments {
 
         OptionSpec execOption = parser.acceptsAll(asList("e", "exec"));
         OptionSpec genDdlOption = parser.acceptsAll(asList("d", "gen-ddl"));
-        OptionSpec genDdlAllOption = parser.acceptsAll(asList("a", "all"));
+        OptionSpec allOption = parser.acceptsAll(asList("a", "all"));
         OptionSpec noColorOption = parser.acceptsAll(asList("n", "no-color"));
 
         OptionSet options = parser.parse(args);
@@ -67,7 +67,7 @@ public class AppArguments {
         }
         executeScripts = options.has(execOption);
         genDdl = options.has(genDdlOption);
-        genDdlAll = options.has(genDdlAllOption);
+        all = options.has(allOption);
         useColorLogging = !options.has(noColorOption);
     }
 
@@ -99,7 +99,7 @@ public class AppArguments {
         return useColorLogging;
     }
 
-    public boolean isGenDdlAll() {
-        return genDdlAll;
+    public boolean isAll() {
+        return all;
     }
 }
