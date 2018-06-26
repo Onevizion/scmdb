@@ -224,7 +224,7 @@ public class DbManager {
 
         Set<DbObject> changedDbObjects = findChangedDbObjects(scriptsToGenDdl);
         ddlGenerator.executeSettingTransformParams();
-        ddlGenerator.generateDdls(changedDbObjects);
+        ddlGenerator.generateDdls(changedDbObjects, false);
     }
 
     private Set<DbObject> findChangedDbObjects(List<SqlScript> scripts) {

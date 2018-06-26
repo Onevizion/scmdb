@@ -231,14 +231,14 @@ public class DdlGenerator {
         return commentsDdl.toString();
     }
 
-    public void generateDdls(Collection<DbObject> dbObjects) {
+    public void generateDdls(Collection<DbObject> dbObjects, boolean skipGenDdlForDepObject) {
         Set<DbObject> tables = new HashSet<>();
         for (DbObject dbObject : dbObjects) {
-            if (dbObject.getType() == COMMENT) {
+            if (dbObject.getType() == COMMENT && !skipGenDdlForDepObject) {
                 dbObject.setType(ddlDao.getObjectTypeByName(dbObject.getName()));
             }
 
-            if (dbObject.getType() == INDEX || dbObject.getType() == TRIGGER) {
+            if ((dbObject.getType() == INDEX || dbObject.getType() == TRIGGER) && !skipGenDdlForDepObject) {
                 String tableName = ddlDao.getTableNameByDepObject(dbObject);
                 if (ddlDao.isExist(tableName, TABLE)) {
                     tables.add(new DbObject(tableName, TABLE));
@@ -246,7 +246,7 @@ public class DdlGenerator {
                     logger.warn("Parent object not found for {} {}! Please, modify related DDL manually.", RED,
                             dbObject.getType(), dbObject.getName());
                 }
-            } else if (dbObject.getType() == SEQUENCE) {
+            } else if (dbObject.getType() == SEQUENCE && !skipGenDdlForDepObject) {
                 String tableName = ddlDao.getTableNameByDepObject(dbObject);
                 if (StringUtils.isNotBlank(tableName)) {
                     tables.add(new DbObject(tableName, TABLE));
@@ -254,7 +254,7 @@ public class DdlGenerator {
                     logger.warn("Parent object not found for {} {}! Please, modify related DDL manually.", RED,
                             dbObject.getType(), dbObject.getName());
                 }
-            } else if (dbObject.getType() == TABLE) {
+            } else if (dbObject.getType() == TABLE && !skipGenDdlForDepObject) {
                 if (!checkAndDeleteRedundantDdl(dbObject)) {
                     tables.add(dbObject);
                 }
@@ -340,6 +340,6 @@ public class DdlGenerator {
     }
 
     public void generateDllsForAllDbObjects() {
-        generateDdls(ddlDao.extractAllDbObjectsWithoutDdl());
+        generateDdls(ddlDao.extractAllDbObjectsWithoutDdl(), true);
     }
 }
