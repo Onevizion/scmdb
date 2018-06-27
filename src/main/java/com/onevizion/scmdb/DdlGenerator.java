@@ -12,6 +12,7 @@ import javax.annotation.Resource;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
+import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -92,7 +93,36 @@ public class DdlGenerator {
     }
 
     private String applyCodeStyleFormatTingToDdl(String ddl) {
-        return ddl.replaceAll(REMOVE_DOUBLE_QUOTES_REGEX, "");
+        return removeDoubleQuotesAroundObjectNames(ddl);
+    }
+
+    private String removeDoubleQuotesAroundObjectNames(String ddl) {
+        boolean isSingleQuoteOpened = false;
+        boolean isSingleLineCommentStarted = false;
+        boolean isMultiLineCommentStarted = false;
+        char previousSymbol = '\n';
+        StringBuilder result = new StringBuilder();
+        for (char symbol: ddl.toCharArray()) {
+            if (symbol == '-' && previousSymbol == '-' && !(isMultiLineCommentStarted || isSingleQuoteOpened)) {
+                isSingleLineCommentStarted = true;
+            } else if (symbol == '*' && previousSymbol == '/') {
+                isMultiLineCommentStarted = true;
+            } else if (symbol == '/' && previousSymbol == '*') {
+                isMultiLineCommentStarted = false;
+            } else if (symbol == '\n') {
+                isSingleLineCommentStarted = false;
+            } else if (symbol == '\'' && !(isSingleLineCommentStarted || isMultiLineCommentStarted)) {
+                isSingleQuoteOpened = !isSingleQuoteOpened;
+            }
+
+            if (isSingleQuoteOpened || isSingleLineCommentStarted || isMultiLineCommentStarted || symbol != '"') {
+                result.append(symbol);
+            }
+
+            previousSymbol = symbol;
+        }
+
+        return result.toString();
     }
 
     private void prepareAndWriteDdlToFile(DbObject dbObject, String ddlDirectoryName) {
@@ -254,7 +284,7 @@ public class DdlGenerator {
                     logger.warn("Parent object not found for {} {}! Please, modify related DDL manually.", RED,
                             dbObject.getType(), dbObject.getName());
                 }
-            } else if (dbObject.getType() == TABLE && !skipGenDdlForDepObject) {
+            } else if (dbObject.getType() == TABLE) {
                 if (!checkAndDeleteRedundantDdl(dbObject)) {
                     tables.add(dbObject);
                 }
