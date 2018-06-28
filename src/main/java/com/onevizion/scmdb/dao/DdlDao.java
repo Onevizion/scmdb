@@ -18,7 +18,8 @@ public class DdlDao extends AbstractDaoOra {
             "from user_objects\n" +
             "where (object_type = 'TABLE'\n" +
             "    and generated = 'N'\n" +
-            "    and object_name not like 'Z_%')\n" +
+            "    and object_name not like 'Z_%'" +
+            "    and object_name not like '%_OLD')\n" +
             "   or object_type = 'VIEW'\n" +
             "   or object_type = 'PACKAGE'\n" +
             "   or object_type = 'PACKAGE BODY'\n" +
