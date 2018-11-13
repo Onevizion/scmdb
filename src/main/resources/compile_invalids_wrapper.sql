@@ -9,6 +9,7 @@ set FEEDBACK OFF
 declare
   v_invalid_cnt             number;
   v_invalid_cnt_prev        number;
+  v_cnt                     number;
   v_invalid_cnt_not_changed boolean := false;
   v_sql                     varchar2(2000);
 begin
@@ -90,12 +91,18 @@ begin
     end if;
 
   end loop;
+
+  select count(*) into v_cnt from all_users where username = '&_USER._USER';
+  if v_cnt = 1 then
+    dbms_utility.compile_schema('&_USER._USER', false);
+  end if;
+
+  select count(*) into v_cnt from all_users where username = '&_USER._RPT';
+  if v_cnt = 1 then
+    dbms_utility.compile_schema('&_USER._RPT', false);
+  end if;
 end;
 /
-
-exec dbms_utility.compile_schema('&_USER._USER',false);
-exec dbms_utility.compile_schema('&_USER._RPT',false);
---SET FEEDBACK ON
 
 select 'Invalid objects in [' || user || ']:'
 from dual;
