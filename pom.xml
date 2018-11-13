@@ -5,7 +5,7 @@
     <artifactId>scmdb</artifactId>
     <packaging>jar</packaging>
     <name>scmdb</name>
-    <version>1.6-SNAPSHOT</version>
+    <version>1.7-SNAPSHOT</version>
 
     <dependencies>
         <dependency>
