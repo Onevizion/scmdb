@@ -12,7 +12,6 @@ import javax.annotation.Resource;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -27,7 +26,7 @@ import static com.onevizion.scmdb.vo.DbObjectType.*;
 @Component
 public class DdlGenerator {
     private static final String PACKAGE_SPECIFICATION_DDL_FILE_POSTFIX = "_spec";
-    private static final String REMOVE_DOUBLE_QUOTES_REGEX = "(?!\\B'[^']*)\"(?![^']*'\\B)";
+    public static final String EDITIONABLE_MODIFIER = "EDITIONABLE ";
 
     @Resource
     private DdlDao ddlDao;
@@ -92,8 +91,13 @@ public class DdlGenerator {
         prepareAndWriteDdlToFile(table, TABLES_DDL_DIRECTORY_NAME);
     }
 
-    private String applyCodeStyleFormatTingToDdl(String ddl) {
+    private String applyCodeStyleFormatingToDdl(String ddl) {
+        ddl = removeEditionableObjectsModifiers(ddl);
         return removeDoubleQuotesAroundObjectNames(ddl);
+    }
+
+    private String removeEditionableObjectsModifiers(String ddl) {
+        return ddl.replaceAll(EDITIONABLE_MODIFIER, "");
     }
 
     private String removeDoubleQuotesAroundObjectNames(String ddl) {
@@ -126,7 +130,7 @@ public class DdlGenerator {
     }
 
     private void prepareAndWriteDdlToFile(DbObject dbObject, String ddlDirectoryName) {
-        dbObject.setDdl(applyCodeStyleFormatTingToDdl(dbObject.getDdl()));
+        dbObject.setDdl(applyCodeStyleFormatingToDdl(dbObject.getDdl()));
 
         String directoryPath = appArguments.getDdlsDirectory().getAbsolutePath() + File.separator + ddlDirectoryName;
 

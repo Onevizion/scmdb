@@ -112,7 +112,7 @@ public class SqlScriptExecutor {
         } else {
             wrapperScript = classLoader.getResource("compile_invalids_wrapper.sql");
         }
-        File tmpFile = new File(workingDir.getAbsolutePath() + File.pathSeparator + "tmp.sql");
+        File tmpFile = new File(workingDir.getAbsolutePath() + File.separator + "tmp.sql");
 
         try {
             FileUtils.copyURLToFile(wrapperScript, tmpFile);
@@ -126,7 +126,7 @@ public class SqlScriptExecutor {
     public boolean createDbScriptTable() {
         File scriptsDirectory = appArguments.getScriptsDirectory();
         String tmpFileName = String.valueOf(new Date().getTime()) + CREATE_SQL;
-        String tmpFilePath = scriptsDirectory.getAbsolutePath() + File.pathSeparator + tmpFileName;
+        String tmpFilePath = scriptsDirectory.getAbsolutePath() + File.separator + tmpFileName;
         File tmpFile = new File(tmpFilePath);
         URL resource = getClass().getClassLoader().getResource(CREATE_SQL);
         try {
