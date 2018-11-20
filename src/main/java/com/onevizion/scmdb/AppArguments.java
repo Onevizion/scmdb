@@ -55,11 +55,13 @@ public class AppArguments {
             throw new IllegalArgumentException("Path [" + scriptsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
                     " [--scripts-dir] should contains absolute path and points to scripts directory");
         }
-        ddlsDirectory = new File(scriptsDirectory.getParentFile().getAbsolutePath() + File.separator +
-                DDL_DIRECTORY_NAME);
-        if (!ddlsDirectory.exists() || !ddlsDirectory.isDirectory()) {
-            throw new IllegalArgumentException("Path [" + ddlsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
-                    " Can't find ddl directory");
+        if(options.has(genDdlOption)){
+            ddlsDirectory = new File(scriptsDirectory.getParentFile().getAbsolutePath() + File.separator +
+                    DDL_DIRECTORY_NAME);
+            if (!ddlsDirectory.exists() || !ddlsDirectory.isDirectory()) {
+                throw new IllegalArgumentException("Path [" + ddlsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
+                        " Can't find ddl directory");
+            }
         }
 
         if (options.has(execOption) && options.has(genDdlOption)) {
