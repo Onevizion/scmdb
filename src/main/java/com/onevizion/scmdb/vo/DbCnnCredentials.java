@@ -1,14 +1,12 @@
 package com.onevizion.scmdb.vo;
 
-import org.apache.commons.lang3.StringUtils;
-
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class DbCnnCredentials {
     private static final String JDBC_THIN_URL_PREFIX = "jdbc:oracle:thin:@";
     private static final String DB_CNN_STR_ERROR_MESSAGE = "You should specify db connection properties using one of following formats:"
-            + " <username>/<password>@<host>:<port>:<SID> or <username>/<password>@<host>:<port>/<service>";
+            + " <username>/<password>@<host>:<port>:<SID> or <username>/<password>@//<host>:<port>/<service>";
     private static final String USER_SCHEMA_SUFFIX = "_user";
 
     private String schemaName;
@@ -23,9 +21,6 @@ public class DbCnnCredentials {
             throw new IllegalArgumentException(DB_CNN_STR_ERROR_MESSAGE);
         }
 
-        if (isOldJdbcFormat(ownerCnnStr)) {
-            ownerCnnStr = convertToNewJdbcFormat(ownerCnnStr);
-        }
         DbCnnCredentials cnnCredentials = new DbCnnCredentials();
         cnnCredentials.setConnectionString(ownerCnnStr);
 
@@ -42,9 +37,6 @@ public class DbCnnCredentials {
     }
 
     public static boolean isCorrectConnectionString(String cnnStr) {
-        if (isOldJdbcFormat(cnnStr)) {
-            cnnStr = convertToNewJdbcFormat(cnnStr);
-        }
         Pattern p = Pattern.compile("(.+?)/(.+?)@(.+)");
         Matcher m = p.matcher(cnnStr);
         return m.matches() && m.groupCount() == 3;
@@ -58,15 +50,6 @@ public class DbCnnCredentials {
 
     private static boolean isUserSchema(String cnnUser) {
         return cnnUser.endsWith(USER_SCHEMA_SUFFIX);
-    }
-
-    private static boolean isOldJdbcFormat(String cnnStr) {
-        return StringUtils.countMatches(cnnStr, ":") == 2;
-    }
-
-    private static String convertToNewJdbcFormat(String oldCnnStr) {
-        int i = oldCnnStr.lastIndexOf(":");
-        return oldCnnStr.substring(0, i) + "/" + oldCnnStr.substring(i + 1);
     }
 
     public String getSchemaName() {
