@@ -7,6 +7,7 @@ import org.apache.commons.io.FilenameUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.Date;
+import java.util.Objects;
 
 public class SqlScript implements Comparable<SqlScript> {
     private Long id;
@@ -18,6 +19,7 @@ public class SqlScript implements Comparable<SqlScript> {
     private ScriptType type;
     private ScriptStatus status;
     private File file;
+    private SchemaType schemaType;
 
     private static final String ROLLBACK_SUFFIX = "_rollback";
 
@@ -42,6 +44,8 @@ public class SqlScript implements Comparable<SqlScript> {
             script.setType(ScriptType.COMMIT);
         }
         script.setStatus(ScriptStatus.EXECUTED);
+
+        script.setSchemaType(SchemaType.getByScriptFileName(scriptFile.getName()));
 
         return script;
     }
@@ -118,12 +122,12 @@ public class SqlScript implements Comparable<SqlScript> {
         this.file = file;
     }
 
-    public boolean isUserSchemaScript() {
-        return hasUserSchemaSuffix(FilenameUtils.getBaseName(getCommitName()));
+    public SchemaType getSchemaType() {
+        return schemaType;
     }
 
-    private boolean hasUserSchemaSuffix(String baseName) {
-        return baseName.endsWith("_user") && !baseName.endsWith("pkg_user");
+    public void setSchemaType(SchemaType schemaType) {
+        this.schemaType = schemaType;
     }
 
     public String getRollbackName() {
@@ -158,7 +162,7 @@ public class SqlScript implements Comparable<SqlScript> {
         }
 
         SqlScript that = (SqlScript) o;
-        return name != null ? name.equals(that.name) : that.name == null;
+        return Objects.equals(name, that.name);
     }
 
     @Override

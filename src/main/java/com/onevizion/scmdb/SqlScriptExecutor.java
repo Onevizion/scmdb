@@ -1,13 +1,9 @@
 package com.onevizion.scmdb;
 
+import com.onevizion.scmdb.vo.DbCnnCredentials;
 import com.onevizion.scmdb.vo.ScriptType;
 import com.onevizion.scmdb.vo.SqlScript;
-import org.apache.commons.exec.CommandLine;
-import org.apache.commons.exec.DefaultExecutor;
-import org.apache.commons.exec.ExecuteException;
-import org.apache.commons.exec.Executor;
-import org.apache.commons.exec.LogOutputStream;
-import org.apache.commons.exec.PumpStreamHandler;
+import org.apache.commons.exec.*;
 import org.apache.commons.io.FileUtils;
 
 import javax.annotation.Resource;
@@ -16,6 +12,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.Date;
 
+import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
 
 public class SqlScriptExecutor {
@@ -73,23 +70,21 @@ public class SqlScriptExecutor {
     }
 
     public int execute(SqlScript script) {
+        DbCnnCredentials cnnCredentials = getConnectionString(script);
+        logger.info("\nExecuting script [{}] in schema [{}]", GREEN, script.getName(), cnnCredentials.getSchemaName());
+
         CommandLine commandLine = new CommandLine(SQL_CLIENT_COMMAND);
         commandLine.addArgument("-L");
-        if (script.isUserSchemaScript()) {
-            commandLine.addArgument(appArguments.getUserCredentials().getConnectionString());
-        } else {
-            commandLine.addArgument(appArguments.getOwnerCredentials().getConnectionString());
-        }
+        commandLine.addArgument(cnnCredentials.getConnectionString());
 
         File workingDir = script.getFile().getParentFile();
-        File wrapperScriptFile = getTmpWrapperScript(script.isUserSchemaScript(), workingDir);
+        File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType().isCompileInvalids(), workingDir);
         commandLine.addArgument("@" + wrapperScriptFile.getAbsolutePath());
         commandLine.addArgument(script.getFile().getAbsolutePath());
 
         executor.setWorkingDirectory(workingDir);
         try {
             return executor.execute(commandLine);
-
         } catch (ExecuteException e) {
             return e.getExitValue();
         } catch (IOException e) {
@@ -104,13 +99,26 @@ public class SqlScriptExecutor {
         }
     }
 
-    private File getTmpWrapperScript(boolean isUserSchemaScript, File workingDir) {
+    private DbCnnCredentials getConnectionString(SqlScript script) {
+        switch (script.getSchemaType()) {
+            case OWNER:
+                return appArguments.getOwnerCredentials();
+            case USER:
+                return appArguments.getUserCredentials();
+            case RPT:
+                return appArguments.getRptCredentials();
+            default:
+                throw new IllegalArgumentException("Unsupported schema type");
+        }
+    }
+
+    private File getTmpWrapperScript(boolean compileInvalids, File workingDir) {
         ClassLoader classLoader = getClass().getClassLoader();
         URL wrapperScript;
-        if (isUserSchemaScript) {
-            wrapperScript = classLoader.getResource("sqlplus_exit_code_wrapper.sql");
-        } else {
+        if (compileInvalids) {
             wrapperScript = classLoader.getResource("compile_invalids_wrapper.sql");
+        } else {
+            wrapperScript = classLoader.getResource("sqlplus_exit_code_wrapper.sql");
         }
         File tmpFile = new File(workingDir.getAbsolutePath() + File.separator + "tmp.sql");
 
@@ -125,7 +133,7 @@ public class SqlScriptExecutor {
 
     public boolean createDbScriptTable() {
         File scriptsDirectory = appArguments.getScriptsDirectory();
-        String tmpFileName = String.valueOf(new Date().getTime()) + CREATE_SQL;
+        String tmpFileName = new Date().getTime() + CREATE_SQL;
         String tmpFilePath = scriptsDirectory.getAbsolutePath() + File.separator + tmpFileName;
         File tmpFile = new File(tmpFilePath);
         URL resource = getClass().getClassLoader().getResource(CREATE_SQL);

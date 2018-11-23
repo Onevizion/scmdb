@@ -14,6 +14,7 @@ public class AppArguments {
     private File ddlsDirectory;
     private DbCnnCredentials ownerCredentials;
     private DbCnnCredentials userCredentials;
+    private DbCnnCredentials rptCredentials;
     private boolean genDdl;
     private boolean executeScripts;
     private boolean useColorLogging = true;
@@ -31,6 +32,7 @@ public class AppArguments {
         OptionParser parser = new OptionParser();
         OptionSpec<String> ownerSchemaOption = parser.accepts("owner-schema").withRequiredArg().ofType(String.class);
         OptionSpec<String> userSchemaOption = parser.accepts("user-schema").withRequiredArg().ofType(String.class);
+        OptionSpec<String> rptSchemaOption = parser.accepts("rpt-schema").withRequiredArg().ofType(String.class);
         OptionSpec<File> scriptsDirectoryOption = parser.accepts("scripts-dir").withRequiredArg().ofType(File.class);
 
         OptionSpec execOption = parser.acceptsAll(asList("e", "exec"));
@@ -49,6 +51,11 @@ public class AppArguments {
             userCredentials = DbCnnCredentials.create(options.valueOf(userSchemaOption));
         } else {
             userCredentials = DbCnnCredentials.create(DbCnnCredentials.genUserCnnStr(ownerCredentials.getConnectionString()));
+        }
+        if (options.has(rptSchemaOption)) {
+            rptCredentials = DbCnnCredentials.create(options.valueOf(rptSchemaOption));
+        } else {
+            rptCredentials = DbCnnCredentials.create(DbCnnCredentials.genRptCnnStr(ownerCredentials.getConnectionString()));
         }
         scriptsDirectory = options.valueOf(scriptsDirectoryOption);
         if (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory()) {
@@ -87,6 +94,10 @@ public class AppArguments {
 
     public DbCnnCredentials getUserCredentials() {
         return userCredentials;
+    }
+
+    public DbCnnCredentials getRptCredentials() {
+        return rptCredentials;
     }
 
     public boolean isGenDdl() {
