@@ -1,6 +1,7 @@
 package com.onevizion.scmdb;
 
 import com.onevizion.scmdb.vo.DbCnnCredentials;
+import com.onevizion.scmdb.vo.SchemaType;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
@@ -88,16 +89,17 @@ public class AppArguments {
         return ddlsDirectory;
     }
 
-    public DbCnnCredentials getOwnerCredentials() {
-        return ownerCredentials;
-    }
-
-    public DbCnnCredentials getUserCredentials() {
-        return userCredentials;
-    }
-
-    public DbCnnCredentials getRptCredentials() {
-        return rptCredentials;
+    public DbCnnCredentials getDbCredentials(SchemaType schemaType) {
+        switch (schemaType) {
+            case OWNER:
+                return ownerCredentials;
+            case USER:
+                return userCredentials;
+            case RPT:
+                return rptCredentials;
+            default:
+                throw new IllegalArgumentException("Unsupported schema type");
+        }
     }
 
     public boolean isGenDdl() {

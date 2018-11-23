@@ -70,7 +70,7 @@ public class SqlScriptExecutor {
     }
 
     public int execute(SqlScript script) {
-        DbCnnCredentials cnnCredentials = getConnectionString(script);
+        DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]", GREEN, script.getName(), cnnCredentials.getSchemaName());
 
         CommandLine commandLine = new CommandLine(SQL_CLIENT_COMMAND);
@@ -96,19 +96,6 @@ public class SqlScriptExecutor {
             }
         } finally {
             wrapperScriptFile.delete();
-        }
-    }
-
-    private DbCnnCredentials getConnectionString(SqlScript script) {
-        switch (script.getSchemaType()) {
-            case OWNER:
-                return appArguments.getOwnerCredentials();
-            case USER:
-                return appArguments.getUserCredentials();
-            case RPT:
-                return appArguments.getRptCredentials();
-            default:
-                throw new IllegalArgumentException("Unsupported schema type");
         }
     }
 
