@@ -21,12 +21,6 @@ public class SqlScriptExecutor {
     private static final String INVALID_OBJECT_PREFIX = "Invalid objects in";
     private static final String INVALID_OBJECT_REGEX = "^(\\w+\\s){0,2}\\w+\\s+\\S+\\s+is invalid.\\s*";
 
-    private boolean isSqlClBannerStarted = false;
-    private static final String SQLCL_BANNER_START_REGEX = "^SQLcl: Release [\\d|.]+ Production on .+";
-    private static final String SQLCL_BANNER_ORA_VERSION_REGEX = "Oracle Database [\\w|\\d]+ \\w+ \\w+ Release [\\d|.]+ - \\d+bit Production";
-    private static final String SQLCL_BANNER_END_REGEX = "^" + SQLCL_BANNER_ORA_VERSION_REGEX;
-    private static final String SQLCL_DISCON_FROM_DB_REGEX = "^Disconnected from " + SQLCL_BANNER_ORA_VERSION_REGEX;
-
     private boolean isErrorMsgStarted = false;
     private static final String ERROR_STARTING_AT_LINE = "Error starting at line :";
 
@@ -46,9 +40,7 @@ public class SqlScriptExecutor {
         executor.setStreamHandler(new PumpStreamHandler(new LogOutputStream() {
             @Override
             protected void processLine(String line, int logLevel) {
-                if (isSqlClBannerPrinted(line)) {
-                    return;
-                } else if (line.startsWith(INVALID_OBJECT_PREFIX)) {
+                if (line.startsWith(INVALID_OBJECT_PREFIX)) {
                     logger.warn(line, YELLOW);
                 } else if (line.matches(INVALID_OBJECT_REGEX)) {
                     logger.warn(line, YELLOW);
@@ -74,6 +66,7 @@ public class SqlScriptExecutor {
         logger.info("\nExecuting script [{}] in schema [{}]", GREEN, script.getName(), cnnCredentials.getSchemaName());
 
         CommandLine commandLine = new CommandLine(SQL_CLIENT_COMMAND);
+        commandLine.addArgument("-S");
         commandLine.addArgument("-L");
         commandLine.addArgument(cnnCredentials.getConnectionString());
 
@@ -149,18 +142,5 @@ public class SqlScriptExecutor {
             logger.error("Error during command execution.", e);
             throw e;
         }
-    }
-
-    private boolean isSqlClBannerPrinted(String line) {
-        if (line.matches(SQLCL_BANNER_START_REGEX)) {
-            isSqlClBannerStarted = true;
-        } else if (line.matches(SQLCL_BANNER_END_REGEX)) {
-            isSqlClBannerStarted = false;
-            return true;
-        } else if (isSqlClBannerStarted || line.matches(SQLCL_DISCON_FROM_DB_REGEX)) {
-            return true;
-        }
-
-        return isSqlClBannerStarted;
     }
 }
