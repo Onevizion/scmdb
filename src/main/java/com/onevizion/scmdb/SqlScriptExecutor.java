@@ -1,7 +1,6 @@
 package com.onevizion.scmdb;
 
 import com.onevizion.scmdb.vo.DbCnnCredentials;
-import com.onevizion.scmdb.vo.ScriptType;
 import com.onevizion.scmdb.vo.SqlScript;
 import org.apache.commons.exec.*;
 import org.apache.commons.io.FileUtils;
@@ -14,6 +13,8 @@ import java.util.Date;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
+import static com.onevizion.scmdb.vo.SchemaType.OWNER;
+import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
 
 public class SqlScriptExecutor {
     private static final String SQL_CLIENT_COMMAND = "sql";
@@ -126,7 +127,8 @@ public class SqlScriptExecutor {
         SqlScript sqlScript = new SqlScript();
         sqlScript.setName(tmpFileName);
         sqlScript.setFile(tmpFile);
-        sqlScript.setType(ScriptType.COMMIT);
+        sqlScript.setType(COMMIT);
+        sqlScript.setSchemaType(OWNER);
 
         int exitCode = execute(sqlScript);
         tmpFile.delete();
