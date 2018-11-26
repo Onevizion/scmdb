@@ -8,6 +8,7 @@ public class DbCnnCredentials {
     private static final String DB_CNN_STR_ERROR_MESSAGE = "You should specify db connection properties using one of following formats:"
             + " <username>/<password>@<host>:<port>:<SID> or <username>/<password>@//<host>:<port>/<service>";
     private static final String USER_SCHEMA_SUFFIX = "_user";
+    private static final String RPT_SCHEMA_SUFFIX = "_rpt";
 
     private String schemaName;
     private String password;
@@ -48,8 +49,10 @@ public class DbCnnCredentials {
         return user + ownerCnnStr.substring(ownerCnnStr.indexOf("/"));
     }
 
-    private static boolean isUserSchema(String cnnUser) {
-        return cnnUser.endsWith(USER_SCHEMA_SUFFIX);
+    public static String genRptCnnStr(String ownerCnnStr) {
+        String owner = ownerCnnStr.substring(0, ownerCnnStr.indexOf("/"));
+        String user = owner + RPT_SCHEMA_SUFFIX;
+        return user + ownerCnnStr.substring(ownerCnnStr.indexOf("/"));
     }
 
     public String getSchemaName() {

@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.ColorLogger.Color.RED;
 import static com.onevizion.scmdb.vo.DbObjectType.*;
+import static com.onevizion.scmdb.vo.SchemaType.OWNER;
 
 @Component
 public class DdlGenerator {
@@ -312,7 +313,7 @@ public class DdlGenerator {
     }
 
     private String removeSchemaNameInDdl(String ddl) {
-        String regexp = String.format("\"%s\".", appArguments.getOwnerCredentials().getSchemaName().toUpperCase());
+        String regexp = String.format("\"%s\".", appArguments.getDbCredentials(OWNER).getSchemaName().toUpperCase());
         ddl = ddl.replaceAll(regexp, "");
         return ddl;
     }

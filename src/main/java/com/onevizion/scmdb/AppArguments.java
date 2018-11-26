@@ -1,6 +1,7 @@
 package com.onevizion.scmdb;
 
 import com.onevizion.scmdb.vo.DbCnnCredentials;
+import com.onevizion.scmdb.vo.SchemaType;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
@@ -14,6 +15,7 @@ public class AppArguments {
     private File ddlsDirectory;
     private DbCnnCredentials ownerCredentials;
     private DbCnnCredentials userCredentials;
+    private DbCnnCredentials rptCredentials;
     private boolean genDdl;
     private boolean executeScripts;
     private boolean useColorLogging = true;
@@ -31,6 +33,7 @@ public class AppArguments {
         OptionParser parser = new OptionParser();
         OptionSpec<String> ownerSchemaOption = parser.accepts("owner-schema").withRequiredArg().ofType(String.class);
         OptionSpec<String> userSchemaOption = parser.accepts("user-schema").withRequiredArg().ofType(String.class);
+        OptionSpec<String> rptSchemaOption = parser.accepts("rpt-schema").withRequiredArg().ofType(String.class);
         OptionSpec<File> scriptsDirectoryOption = parser.accepts("scripts-dir").withRequiredArg().ofType(File.class);
 
         OptionSpec execOption = parser.acceptsAll(asList("e", "exec"));
@@ -49,6 +52,11 @@ public class AppArguments {
             userCredentials = DbCnnCredentials.create(options.valueOf(userSchemaOption));
         } else {
             userCredentials = DbCnnCredentials.create(DbCnnCredentials.genUserCnnStr(ownerCredentials.getConnectionString()));
+        }
+        if (options.has(rptSchemaOption)) {
+            rptCredentials = DbCnnCredentials.create(options.valueOf(rptSchemaOption));
+        } else {
+            rptCredentials = DbCnnCredentials.create(DbCnnCredentials.genRptCnnStr(ownerCredentials.getConnectionString()));
         }
         scriptsDirectory = options.valueOf(scriptsDirectoryOption);
         if (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory()) {
@@ -81,12 +89,17 @@ public class AppArguments {
         return ddlsDirectory;
     }
 
-    public DbCnnCredentials getOwnerCredentials() {
-        return ownerCredentials;
-    }
-
-    public DbCnnCredentials getUserCredentials() {
-        return userCredentials;
+    public DbCnnCredentials getDbCredentials(SchemaType schemaType) {
+        switch (schemaType) {
+            case OWNER:
+                return ownerCredentials;
+            case USER:
+                return userCredentials;
+            case RPT:
+                return rptCredentials;
+            default:
+                throw new IllegalArgumentException("Unsupported schema type");
+        }
     }
 
     public boolean isGenDdl() {

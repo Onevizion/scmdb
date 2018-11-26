@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 
 import static com.onevizion.scmdb.ColorLogger.Color.CYAN;
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
+import static com.onevizion.scmdb.vo.SchemaType.OWNER;
 import static com.onevizion.scmdb.vo.ScriptType.ROLLBACK;
 
 public class DbManager {
@@ -187,7 +188,6 @@ public class DbManager {
     }
 
     private void executeScript(SqlScript script) {
-        logger.info("\nExecuting script: [{}]", GREEN, script.getName());
         int exitCode = scriptExecutor.execute(script);
         if (exitCode == 0) {
             script.setStatus(ScriptStatus.EXECUTED);
@@ -219,7 +219,7 @@ public class DbManager {
         List<SqlScript> scriptsToGenDdl = scripts.stream()
                                                  .sorted()
                                                  .filter(script -> script.getType() == ScriptType.COMMIT)
-                                                 .filter(script -> !script.isUserSchemaScript())
+                                                 .filter(script -> script.getSchemaType() == OWNER)
                                                  .collect(Collectors.toList());
 
         Set<DbObject> changedDbObjects = findChangedDbObjects(scriptsToGenDdl);
