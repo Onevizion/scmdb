@@ -2,6 +2,7 @@ package com.onevizion.scmdb.facade;
 
 import com.onevizion.scmdb.AppArguments;
 import com.onevizion.scmdb.dao.DbScriptDaoOra;
+import com.onevizion.scmdb.exception.ScmdbException;
 import com.onevizion.scmdb.vo.SqlScript;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -12,7 +13,6 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -148,10 +148,9 @@ public class DbScriptFacade {
                               .filter(script -> !deletedScripts.containsKey(script.getRollbackName()))
                               .collect(Collectors.toList());
         if (!commitsDeletedWithoutRollbacks.isEmpty()) {
-            logger.error(ERROR_MSG_COMMIT_DELETED_WITHOUT_ROLLBACK);
             commitsDeletedWithoutRollbacks.forEach(script -> logger.error("Deleted script: [{}], rollback: [{}]",
                     script.getName(), script.getRollbackName()));
-            System.exit(0);
+            throw new ScmdbException(ERROR_MSG_COMMIT_DELETED_WITHOUT_ROLLBACK);
         }
 
         return deletedScripts;
@@ -199,7 +198,7 @@ public class DbScriptFacade {
         }
     }
 
-    public void checkDbConnection() throws SQLException {
+    public void checkDbConnection() {
         sqlScriptDaoOra.checkDbConnection();
     }
 }

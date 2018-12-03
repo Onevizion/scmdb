@@ -19,7 +19,7 @@ public class SqlScript implements Comparable<SqlScript> {
     private ScriptType type;
     private ScriptStatus status;
     private File file;
-    private SchemaType schemaType;
+    private SchemaType schemaType = SchemaType.OWNER;
 
     private static final String ROLLBACK_SUFFIX = "_rollback";
 

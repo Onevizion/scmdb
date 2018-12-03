@@ -1,5 +1,6 @@
 package com.onevizion.scmdb.dao;
 
+import com.onevizion.scmdb.exception.DbConnectionException;
 import com.onevizion.scmdb.vo.ScriptStatus;
 import com.onevizion.scmdb.vo.ScriptType;
 import com.onevizion.scmdb.vo.SqlScript;
@@ -94,6 +95,13 @@ public class DbScriptDaoOra extends AbstractDaoOra {
             return rs.next();
         } catch (SQLException e) {
             throw new Exception("Can't establish a connection to the database by the parameters given");
+        }
+    }
+
+    public void checkDbConnection() {
+        try (Connection ignored = jdbcTemplate.getDataSource().getConnection()) {
+        } catch (SQLException e) {
+            throw new DbConnectionException("Cannot establish DB connection. " + e.getMessage(), e);
         }
     }
 }
