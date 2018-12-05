@@ -78,8 +78,8 @@ public class DbManager {
         scriptsFacade.batchCreate(newRollbackScripts);
 
         if (appArguments.isExecuteScripts()) {
-            logger.info("Scripts to be executed:");
-            newCommitScripts.forEach(script -> logger.info(script.getFile().getAbsolutePath()));
+            logger.info("\nScripts to be executed:");
+            newCommitScripts.forEach(script -> logger.info(script.getName()));
             newCommitScripts.forEach(script -> {
                 int exitCode = scriptExecutor.execute(script);
                 script.setStatus(ScriptStatus.getByScriptExitCode(exitCode));
