@@ -20,6 +20,7 @@ public class AppArguments {
     private boolean executeScripts;
     private boolean useColorLogging = true;
     private boolean all = false;
+    private boolean omitChanged = false;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
 
@@ -40,6 +41,7 @@ public class AppArguments {
         OptionSpec genDdlOption = parser.acceptsAll(asList("d", "gen-ddl"));
         OptionSpec allOption = parser.acceptsAll(asList("a", "all"));
         OptionSpec noColorOption = parser.acceptsAll(asList("n", "no-color"));
+        OptionSpec omitChangedOption = parser.acceptsAll(asList("o", "omit-changed"));
 
         OptionSet options = parser.parse(args);
 
@@ -79,6 +81,7 @@ public class AppArguments {
         genDdl = options.has(genDdlOption);
         all = options.has(allOption);
         useColorLogging = !options.has(noColorOption);
+        omitChanged = options.has(omitChangedOption);
     }
 
     public File getScriptsDirectory() {
@@ -116,5 +119,13 @@ public class AppArguments {
 
     public boolean isAll() {
         return all;
+    }
+
+    public boolean isOmitChanged() {
+        return omitChanged;
+    }
+
+    public boolean isReadAllFilesContent() {
+        return genDdl || !omitChanged;
     }
 }

@@ -153,6 +153,9 @@ public class DbManager {
     }
 
     private void checkUpdatedScripts() {
+        if (appArguments.isOmitChanged()) {
+            return;
+        }
         List<SqlScript> updatedScripts = scriptsFacade.getUpdatedScripts();
         scriptsFacade.batchUpdate(updatedScripts);
         updatedScripts.forEach(script -> logger.info("Script file [{}] was changed", CYAN, script.getName()));
