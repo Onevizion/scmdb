@@ -1,5 +1,6 @@
 package com.onevizion.scmdb;
 
+import com.onevizion.scmdb.exception.ScriptExecException;
 import com.onevizion.scmdb.vo.DbCnnCredentials;
 import com.onevizion.scmdb.vo.SqlScript;
 import org.apache.commons.exec.*;
@@ -13,6 +14,7 @@ import java.util.Date;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
+import static com.onevizion.scmdb.Scmdb.EXIT_CODE_ERROR;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
 import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
 
@@ -27,6 +29,8 @@ public class SqlScriptExecutor {
 
     private static final String CANT_RUN_PROGRAM = "Cannot run program \"sql\"";
     private static final String CREATE_SQL = "create.sql";
+
+    private static final int SCRIPT_EXIT_CODE_ERROR = 1;
 
     private Executor executor;
 
@@ -82,12 +86,8 @@ public class SqlScriptExecutor {
         } catch (ExecuteException e) {
             return e.getExitValue();
         } catch (IOException e) {
-            if (e.getMessage().startsWith(CANT_RUN_PROGRAM)) {
-                return 2;
-            } else {
-                logger.error("Error during command execution.", e);
-                return 1;
-            }
+            logger.error("Error during command execution.", e);
+            return SCRIPT_EXIT_CODE_ERROR;
         } finally {
             wrapperScriptFile.delete();
         }
@@ -112,7 +112,7 @@ public class SqlScriptExecutor {
         return tmpFile;
     }
 
-    public boolean createDbScriptTable() {
+    public void createDbScriptTable() {
         File scriptsDirectory = appArguments.getScriptsDirectory();
         String tmpFileName = new Date().getTime() + CREATE_SQL;
         String tmpFilePath = scriptsDirectory.getAbsolutePath() + File.separator + tmpFileName;
@@ -121,7 +121,7 @@ public class SqlScriptExecutor {
         try {
             FileUtils.copyURLToFile(resource, tmpFile);
         } catch (IOException e) {
-            throw new RuntimeException("Can't copy " + CREATE_SQL +" file.", e);
+            throw new RuntimeException("Can't copy " + CREATE_SQL + " file.", e);
         }
 
         SqlScript sqlScript = new SqlScript();
@@ -132,17 +132,20 @@ public class SqlScriptExecutor {
 
         int exitCode = execute(sqlScript);
         tmpFile.delete();
-        return exitCode == 0;
+        if (exitCode != EXIT_CODE_ERROR) {
+            logger.error("Please execute script \"src/main/resources/create.sql\" manually");
+            throw new ScriptExecException("Can't create DB objects used by SCMDB.");
+        }
     }
 
-    public void printVersion() throws IOException {
+    public void printVersion() {
         CommandLine commandLine = new CommandLine(SQL_CLIENT_COMMAND);
         commandLine.addArgument("-v");
         try {
             executor.execute(commandLine);
         } catch (IOException e) {
             logger.error("Error during command execution.", e);
-            throw e;
+            throw new ScriptExecException("Cannot find SQLcl, make sure SQLcl is available.", e);
         }
     }
 }

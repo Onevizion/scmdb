@@ -1,5 +1,6 @@
 package com.onevizion.scmdb;
 
+import com.onevizion.scmdb.exception.ScriptExecException;
 import com.onevizion.scmdb.facade.DbScriptFacade;
 import com.onevizion.scmdb.vo.*;
 
@@ -7,7 +8,7 @@ import javax.annotation.Resource;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.sql.SQLException;
+import java.text.MessageFormat;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -15,12 +16,13 @@ import java.util.stream.Collectors;
 
 import static com.onevizion.scmdb.ColorLogger.Color.CYAN;
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
+import static com.onevizion.scmdb.Scmdb.EXIT_CODE_SUCCESS;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
 import static com.onevizion.scmdb.vo.ScriptType.ROLLBACK;
 
 public class DbManager {
-    private static final String SCRIPT_EXECUTION_ERROR_MESSAGE = "Fix and execute manually script [{}] and then run SCMDB again to execute other scripts.";
-    private static final String CANT_RUN_SQL_ERROR_MESSAGE = "Oracle SQLcl executable is not found. Please download it and make sure bin/sql is in your path";
+    private static final String SCRIPT_EXECUTION_ERROR_MESSAGE = "Fix and execute manually script [{0}] and then run SCMDB again to execute other scripts.";
+    private static final String FIRST_RUN_MESSAGE = "It's your first run of SCMDB. SCMDB was initialized.";
 
     @Resource
     private DbScriptFacade scriptsFacade;
@@ -39,37 +41,26 @@ public class DbManager {
 
     public void updateDb() {
         logger.info("SCMDB {}", getClass().getPackage().getImplementationVersion());
+        scriptExecutor.printVersion();
 
-        try {
-            scriptExecutor.printVersion();
-        } catch (IOException e) {
-            logger.error("Cannot find SQLcl, make sure SQLcl is available.\n{}", e.getMessage());
-            System.exit(0);
-        }
+        scriptsFacade.checkDbConnection();
 
-        try {
-            scriptsFacade.checkDbConnection();
-        } catch (SQLException e) {
-            logger.error("Cannot establish DB connection.\n{}", e.getMessage());
-            System.exit(0);
-        }
-
-        if (!checkAndCreateDbScriptTable()) {
-            logger.info("Can't create DB objects used by SCMDB:");
-            logger.info("Please execute script \"src/main/resources/create.sql\" manually");
+        if (!scriptsFacade.isScriptTableExist()) {
+            scriptExecutor.createDbScriptTable();
+            scriptsFacade.createAllFromDirectory();
+            logger.info(FIRST_RUN_MESSAGE);
         } else if (scriptsFacade.isFirstRun()) {
             scriptsFacade.createAllFromDirectory();
-            logger.info("It's your first run of SCMDB. SCMDB was initialized.");
+            logger.info(FIRST_RUN_MESSAGE);
         } else {
             scriptsFacade.cleanExecDir();
             checkUpdatedScripts();
             checkDeletedScripts();
-            checkNewScripts();
+            executeNewScripts();
         }
-        logger.info("\nSCMDB complete");
     }
 
-    private void checkNewScripts() {
+    private void executeNewScripts() {
         List<SqlScript> newScripts = scriptsFacade.getNewScripts();
         if (newScripts.isEmpty()) {
             logger.info("No scripts to execute");
@@ -87,18 +78,17 @@ public class DbManager {
         scriptsFacade.batchCreate(newRollbackScripts);
 
         if (appArguments.isExecuteScripts()) {
-            logger.info("Scripts to be executed:");
-            newCommitScripts.forEach(script -> logger.info(script.getFile().getAbsolutePath()));
-            for (SqlScript script : newCommitScripts) {
-                executeScript(script);
-                if (script.getStatus() != ScriptStatus.COMMAND_EXEC_FAILURE) {
-                    scriptsFacade.create(script);
-                }
+            logger.info("\nScripts to be executed:");
+            newCommitScripts.forEach(script -> logger.info(script.getName()));
+            newCommitScripts.forEach(script -> {
+                int exitCode = scriptExecutor.execute(script);
+                script.setStatus(ScriptStatus.getByScriptExitCode(exitCode));
+                scriptsFacade.create(script);
 
-                if (script.getStatus() == ScriptStatus.EXECUTED_WITH_ERRORS) {
-                    System.exit(0);
+                if (script.getStatus() != ScriptStatus.EXECUTED) {
+                    throw new ScriptExecException(MessageFormat.format(SCRIPT_EXECUTION_ERROR_MESSAGE, script.getName()));
                 }
-            }
+            });
         } else {
             logger.info("You should execute following script files to update your database:");
             scriptsFacade.copyScriptsToExecDir(newCommitScripts);
@@ -122,8 +112,10 @@ public class DbManager {
         boolean executeRollbacks = false;
 
         if (appArguments.isExecuteScripts()) {
-            logger.info("Do you really want to execute {} rollbacks? ", GREEN, rollbacksToExec.size());
-            logger.info("Type [no] and rollbacks will be copied to EXECUTE_ME directory and marked as executed. Execute them manually and run scmdb again to execute new scripts.", GREEN);
+            logger.info("Do you really want to execute {} rollbacks? \n", GREEN, rollbacksToExec.size());
+            rollbacksToExec.forEach(r -> logger.info(r.getName(), GREEN));
+            logger.info("\nType [no] and rollbacks will be copied to EXECUTE_ME directory and marked as executed. " +
+                    "Execute them manually and run scmdb again to execute new scripts.", GREEN);
             logger.info("Type [yes] to continue and execute all rollbacks", GREEN);
             executeRollbacks = userGrantsPermission();
         }
@@ -134,12 +126,10 @@ public class DbManager {
         } else {
             logger.info("At first you should execute following rollbacks to revert changes of deleted scripts:");
             scriptsFacade.copyRollbacksToExecDir(rollbacksToExec);
-            rollbacksToExec.forEach(script -> logger.info(script.getFile().getAbsolutePath(), GREEN));
+            rollbacksToExec.forEach(script -> logger.info(script.getName(), GREEN));
             scriptsFacade.deleteAll(deletedScripts.values());
 
-            if (appArguments.isExecuteScripts()) {
-                System.exit(0);
-            }
+            System.exit(EXIT_CODE_SUCCESS);
         }
     }
 
@@ -148,22 +138,24 @@ public class DbManager {
             if (deletedScripts.containsKey(rollback.getCommitName())) {
                 scriptsFacade.copyRollbackToExecDir(rollback);
 
-                executeScript(rollback);
+                int exitCode = scriptExecutor.execute(rollback);
+                if (exitCode != 0) {
+                    throw new ScriptExecException(MessageFormat.format(SCRIPT_EXECUTION_ERROR_MESSAGE, rollback.getName()));
+                }
 
                 SqlScript commit = deletedScripts.get(rollback.getCommitName());
                 scriptsFacade.delete(rollback.getId());
                 scriptsFacade.delete(commit.getId());
                 deletedScripts.keySet().remove(rollback.getName());
                 deletedScripts.keySet().remove(rollback.getCommitName());
-
-                if (rollback.getStatus() == ScriptStatus.EXECUTED_WITH_ERRORS) {
-                    System.exit(0);
-                }
             }
         }
     }
 
     private void checkUpdatedScripts() {
+        if (appArguments.isOmitChanged()) {
+            return;
+        }
         List<SqlScript> updatedScripts = scriptsFacade.getUpdatedScripts();
         scriptsFacade.batchUpdate(updatedScripts);
         updatedScripts.forEach(script -> logger.info("Script file [{}] was changed", CYAN, script.getName()));
@@ -187,32 +179,10 @@ public class DbManager {
         }
     }
 
-    private void executeScript(SqlScript script) {
-        int exitCode = scriptExecutor.execute(script);
-        if (exitCode == 0) {
-            script.setStatus(ScriptStatus.EXECUTED);
-        } else if (exitCode == 2) {
-            script.setStatus(ScriptStatus.COMMAND_EXEC_FAILURE);
-        } else {
-            script.setStatus(ScriptStatus.EXECUTED_WITH_ERRORS);
-        }
-
-        if (exitCode == 2) {
-            logger.error(CANT_RUN_SQL_ERROR_MESSAGE);
-        } else if (exitCode != 0) {
-            logger.error(SCRIPT_EXECUTION_ERROR_MESSAGE, script.getName());
-        }
-    }
-
     public void generateDdlForNewOrChangedScripts() {
         logger.info("Extracting DDL for new and updated scripts");
 
-        try {
-            scriptsFacade.checkDbConnection();
-        } catch (SQLException e) {
-            logger.error("Cannot establish DB connection.\n{}", e.getMessage());
-            System.exit(0);
-        }
+        scriptsFacade.checkDbConnection();
 
         List<SqlScript> scripts = scriptsFacade.getNewScripts();
         scripts.addAll(scriptsFacade.getUpdatedScripts());
@@ -269,19 +239,10 @@ public class DbManager {
         return scriptText.toLowerCase();
     }
 
-    private boolean checkAndCreateDbScriptTable() {
-        return scriptsFacade.isScriptTableExist() || scriptExecutor.createDbScriptTable();
-    }
-
     public void generateDdlForAllObjects() {
         logger.info("Extracting DDL for all db objects");
 
-        try {
-            scriptsFacade.checkDbConnection();
-        } catch (SQLException e) {
-            logger.error("Cannot establish DB connection.\n{}", e.getMessage());
-            System.exit(0);
-        }
+        scriptsFacade.checkDbConnection();
 
         ddlGenerator.executeSettingTransformParams();
         ddlGenerator.generateDllsForAllDbObjects();

@@ -7,8 +7,6 @@ public class DbCnnCredentials {
     private static final String JDBC_THIN_URL_PREFIX = "jdbc:oracle:thin:@";
     private static final String DB_CNN_STR_ERROR_MESSAGE = "You should specify db connection properties using one of following formats:"
             + " <username>/<password>@<host>:<port>:<SID> or <username>/<password>@//<host>:<port>/<service>";
-    private static final String USER_SCHEMA_SUFFIX = "_user";
-    private static final String RPT_SCHEMA_SUFFIX = "_rpt";
 
     private String schemaName;
     private String password;
@@ -45,13 +43,13 @@ public class DbCnnCredentials {
 
     public static String genUserCnnStr(String ownerCnnStr) {
         String owner = ownerCnnStr.substring(0, ownerCnnStr.indexOf("/"));
-        String user = owner + USER_SCHEMA_SUFFIX;
+        String user = owner + SchemaType.USER.getSchemaPostfix();
         return user + ownerCnnStr.substring(ownerCnnStr.indexOf("/"));
     }
 
     public static String genRptCnnStr(String ownerCnnStr) {
         String owner = ownerCnnStr.substring(0, ownerCnnStr.indexOf("/"));
-        String user = owner + RPT_SCHEMA_SUFFIX;
+        String user = owner + SchemaType.RPT.getSchemaPostfix();
         return user + ownerCnnStr.substring(ownerCnnStr.indexOf("/"));
     }
 

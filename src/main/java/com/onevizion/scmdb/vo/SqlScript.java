@@ -19,23 +19,19 @@ public class SqlScript implements Comparable<SqlScript> {
     private ScriptType type;
     private ScriptStatus status;
     private File file;
-    private SchemaType schemaType;
+    private SchemaType schemaType = SchemaType.OWNER;
 
     private static final String ROLLBACK_SUFFIX = "_rollback";
 
     public static SqlScript create(File scriptFile) {
+        return create(scriptFile, true);
+    }
+
+    public static SqlScript create(File scriptFile, boolean readFileContent) {
         SqlScript script = new SqlScript();
 
         script.setFile(scriptFile);
         script.setName(scriptFile.getName());
-        String fileContent;
-        try {
-            fileContent = FileUtils.readFileToString(scriptFile, "UTF-8");
-            script.setText(fileContent);
-            script.setFileHash(DigestUtils.sha1Hex(fileContent.replaceAll("\\r\\n", "\n")));
-        } catch (IOException e) {
-            throw new RuntimeException("Can't read file content [" + scriptFile.getName() + "]", e);
-        }
         script.setTs(new Date(scriptFile.lastModified()));
 
         if (FilenameUtils.getBaseName(script.getName()).endsWith(ROLLBACK_SUFFIX)) {
@@ -44,10 +40,24 @@ public class SqlScript implements Comparable<SqlScript> {
             script.setType(ScriptType.COMMIT);
         }
         script.setStatus(ScriptStatus.EXECUTED);
-
         script.setSchemaType(SchemaType.getByScriptFileName(scriptFile.getName()));
 
+        if (readFileContent) {
+            script.loadContentFromFile();
+        }
+
         return script;
+    }
+
+    public void loadContentFromFile() {
+        String fileContent;
+        try {
+            fileContent = FileUtils.readFileToString(file, "UTF-8");
+            text = fileContent;
+            fileHash = DigestUtils.sha1Hex(fileContent.replaceAll("\\r\\n", "\n"));
+        } catch (IOException e) {
+            throw new RuntimeException("Can't read file content [" + name + "]", e);
+        }
     }
 
     public Long getId() {

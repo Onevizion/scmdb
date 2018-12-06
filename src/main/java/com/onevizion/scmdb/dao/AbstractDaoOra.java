@@ -1,5 +1,6 @@
 package com.onevizion.scmdb.dao;
 
+import com.onevizion.scmdb.exception.DbConnectionException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -62,12 +63,5 @@ public class AbstractDaoOra {
             sql.append(") ");
         }
         return sql.toString();
-    }
-
-    public void checkDbConnection() throws SQLException {
-        try (Connection ignored = jdbcTemplate.getDataSource().getConnection()) {
-        } catch (SQLException e) {
-            throw e;
-        }
     }
 }

@@ -19,7 +19,8 @@ public enum SchemaType {
         String baseName = FilenameUtils.getBaseName(scriptFileName);
         if (baseName.endsWith("_user") && !baseName.endsWith("pkg_user")) {
             return USER;
-        } else if (baseName.endsWith("_rpt") && !baseName.endsWith("pkg_rpt")) {
+        } else if (baseName.endsWith("_rpt") &&
+                !(baseName.endsWith("pkg_rpt") || baseName.endsWith("pkg_config_field_rpt"))) {
             return RPT;
         } else {
             return OWNER;
