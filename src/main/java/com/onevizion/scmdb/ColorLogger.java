@@ -60,6 +60,11 @@ public class ColorLogger {
         }
     }
 
+    public void debug(String msg, Object... argArray) {
+        setColor(Color.WHITE);
+        logger.debug(msg, argArray);
+    }
+
     public enum Color {
         WHITE("white"),
         CYAN("cyan"),
