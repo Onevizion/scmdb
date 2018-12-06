@@ -1,18 +1,17 @@
 package com.onevizion.scmdb.facade;
 
 import com.onevizion.scmdb.AppArguments;
+import com.onevizion.scmdb.ColorLogger;
 import com.onevizion.scmdb.dao.DbScriptDaoOra;
+import com.onevizion.scmdb.exception.ScmdbException;
 import com.onevizion.scmdb.vo.SqlScript;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.math.NumberUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -30,10 +29,11 @@ public class DbScriptFacade {
     @Resource
     private AppArguments appArguments;
 
+    @Resource
+    private ColorLogger logger;
+
     private final static String EXEC_FOLDER_NAME = "EXECUTE_ME";
     private final static String ERROR_MSG_COMMIT_DELETED_WITHOUT_ROLLBACK = "Following scripts were deleted but it's rollbacks are still here. Remove rollbacks scripts or restore deleted scripts and then run scmdb again.";
-
-    private final Logger logger = LoggerFactory.getLogger(getClass());
 
     private File execDir;
     private List<SqlScript> scriptsInDir;
@@ -44,20 +44,20 @@ public class DbScriptFacade {
     }
 
     public List<SqlScript> getNewScripts() {
-        logger.debug("Searching new scripts in [{}]", appArguments.getScriptsDirectory().getAbsolutePath());
-
         Map<String, SqlScript> savedScripts = sqlScriptDaoOra.readMap();
 
         scriptsInDir.stream()
-                    .parallel()
                     .filter(this::isDevScript)
                     .forEach(script -> logger.info("Dev script [" + script.getName() + "] was ignored"));
 
-        return scriptsInDir.stream()
-                           .parallel()
-                           .filter(script -> !savedScripts.containsKey(script.getName()))
-                           .filter(script -> !isDevScript(script))
-                           .collect(Collectors.toList());
+        List<SqlScript> newScripts = scriptsInDir.stream()
+                                                 .filter(script -> !isDevScript(script))
+                                                 .filter(script -> !savedScripts.containsKey(script.getName()))
+                                                 .collect(Collectors.toList());
+        if (!appArguments.isReadAllFilesContent()) {
+            newScripts.forEach(SqlScript::loadContentFromFile);
+        }
+        return newScripts;
     }
 
     private boolean isDevScript(SqlScript script) {
@@ -100,7 +100,7 @@ public class DbScriptFacade {
     private List<SqlScript> createScriptsFromFiles() {
         List<File> scriptFiles = (List<File>) FileUtils.listFiles(appArguments.getScriptsDirectory(), new String[]{"sql"}, false);
         return scriptFiles.stream()
-                          .map(SqlScript::create)
+                          .map(f -> SqlScript.create(f, appArguments.isReadAllFilesContent()))
                           .collect(Collectors.toList());
     }
 
@@ -135,8 +135,6 @@ public class DbScriptFacade {
         Map<String, SqlScript> scriptsInDirMap = scriptsInDir.stream()
                                                              .collect(Collectors.toMap(SqlScript::getName, Function.identity()));
 
-
-        logger.debug("Searching deleted scripts in [{}]", appArguments.getScriptsDirectory().getAbsolutePath());
         Map<String, SqlScript> deletedScripts = dbScripts.values().stream()
                                                          .filter(dbScript -> !scriptsInDirMap.containsKey(dbScript.getName()))
                                                          .collect(Collectors.toMap(SqlScript::getName, Function.identity()));
@@ -148,10 +146,9 @@ public class DbScriptFacade {
                               .filter(script -> !deletedScripts.containsKey(script.getRollbackName()))
                               .collect(Collectors.toList());
         if (!commitsDeletedWithoutRollbacks.isEmpty()) {
-            logger.error(ERROR_MSG_COMMIT_DELETED_WITHOUT_ROLLBACK);
             commitsDeletedWithoutRollbacks.forEach(script -> logger.error("Deleted script: [{}], rollback: [{}]",
                     script.getName(), script.getRollbackName()));
-            System.exit(0);
+            throw new ScmdbException(ERROR_MSG_COMMIT_DELETED_WITHOUT_ROLLBACK);
         }
 
         return deletedScripts;
@@ -199,7 +196,7 @@ public class DbScriptFacade {
         }
     }
 
-    public void checkDbConnection() throws SQLException {
+    public void checkDbConnection() {
         sqlScriptDaoOra.checkDbConnection();
     }
 }

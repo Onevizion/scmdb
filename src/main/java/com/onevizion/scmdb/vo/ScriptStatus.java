@@ -1,12 +1,14 @@
 package com.onevizion.scmdb.vo;
 
+import java.util.Arrays;
+
 public enum ScriptStatus {
     EXECUTED(0L),
     NOT_EXECUTED(1L),
     EXECUTED_WITH_ERRORS(2L),
     COMMAND_EXEC_FAILURE(3L);
 
-    private Long id;
+    private final Long id;
 
     ScriptStatus(Long id) {
         this.id = id;
@@ -17,14 +19,17 @@ public enum ScriptStatus {
     }
 
     public static ScriptStatus getById(Long id) {
-        if (Long.valueOf(0L).equals(id)) {
-            return EXECUTED;
-        } else if (Long.valueOf(1L).equals(id)) {
-            return NOT_EXECUTED;
-        } else if (Long.valueOf(2L).equals(id)) {
-            return EXECUTED_WITH_ERRORS;
+        return Arrays.stream(values())
+                     .filter(s -> s.getId().equals(id))
+                     .findFirst()
+                     .orElseThrow(() -> new IllegalArgumentException("Not supported db script id: [" + id + "]"));
+    }
+
+    public static ScriptStatus getByScriptExitCode(int exitCode) {
+        if (exitCode == 0) {
+            return ScriptStatus.EXECUTED;
         } else {
-            throw new IllegalArgumentException("Not supported db script id: [" + id + "]");
+            return EXECUTED_WITH_ERRORS;
         }
     }
 }

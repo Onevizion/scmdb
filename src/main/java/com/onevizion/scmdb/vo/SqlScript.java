@@ -7,6 +7,7 @@ import org.apache.commons.io.FilenameUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.Date;
+import java.util.Objects;
 
 public class SqlScript implements Comparable<SqlScript> {
     private Long id;
@@ -18,22 +19,19 @@ public class SqlScript implements Comparable<SqlScript> {
     private ScriptType type;
     private ScriptStatus status;
     private File file;
+    private SchemaType schemaType = SchemaType.OWNER;
 
     private static final String ROLLBACK_SUFFIX = "_rollback";
 
     public static SqlScript create(File scriptFile) {
+        return create(scriptFile, true);
+    }
+
+    public static SqlScript create(File scriptFile, boolean readFileContent) {
         SqlScript script = new SqlScript();
 
         script.setFile(scriptFile);
         script.setName(scriptFile.getName());
-        String fileContent;
-        try {
-            fileContent = FileUtils.readFileToString(scriptFile, "UTF-8");
-            script.setText(fileContent);
-            script.setFileHash(DigestUtils.sha1Hex(fileContent.replaceAll("\\r\\n", "\n")));
-        } catch (IOException e) {
-            throw new RuntimeException("Can't read file content [" + scriptFile.getName() + "]", e);
-        }
         script.setTs(new Date(scriptFile.lastModified()));
 
         if (FilenameUtils.getBaseName(script.getName()).endsWith(ROLLBACK_SUFFIX)) {
@@ -42,8 +40,24 @@ public class SqlScript implements Comparable<SqlScript> {
             script.setType(ScriptType.COMMIT);
         }
         script.setStatus(ScriptStatus.EXECUTED);
+        script.setSchemaType(SchemaType.getByScriptFileName(scriptFile.getName()));
+
+        if (readFileContent) {
+            script.loadContentFromFile();
+        }
 
         return script;
+    }
+
+    public void loadContentFromFile() {
+        String fileContent;
+        try {
+            fileContent = FileUtils.readFileToString(file, "UTF-8");
+            text = fileContent;
+            fileHash = DigestUtils.sha1Hex(fileContent.replaceAll("\\r\\n", "\n"));
+        } catch (IOException e) {
+            throw new RuntimeException("Can't read file content [" + name + "]", e);
+        }
     }
 
     public Long getId() {
@@ -118,12 +132,12 @@ public class SqlScript implements Comparable<SqlScript> {
         this.file = file;
     }
 
-    public boolean isUserSchemaScript() {
-        return hasUserSchemaSuffix(FilenameUtils.getBaseName(getCommitName()));
+    public SchemaType getSchemaType() {
+        return schemaType;
     }
 
-    private boolean hasUserSchemaSuffix(String baseName) {
-        return baseName.endsWith("_user") && !baseName.endsWith("pkg_user");
+    public void setSchemaType(SchemaType schemaType) {
+        this.schemaType = schemaType;
     }
 
     public String getRollbackName() {
@@ -158,7 +172,7 @@ public class SqlScript implements Comparable<SqlScript> {
         }
 
         SqlScript that = (SqlScript) o;
-        return name != null ? name.equals(that.name) : that.name == null;
+        return Objects.equals(name, that.name);
     }
 
     @Override
