@@ -16,6 +16,7 @@ public class AppArguments {
     private DbCnnCredentials ownerCredentials;
     private DbCnnCredentials userCredentials;
     private DbCnnCredentials rptCredentials;
+    private DbCnnCredentials pkgCredentials;
     private boolean genDdl;
     private boolean executeScripts;
     private boolean useColorLogging = true;
@@ -35,6 +36,7 @@ public class AppArguments {
         OptionSpec<String> ownerSchemaOption = parser.accepts("owner-schema").withRequiredArg().ofType(String.class);
         OptionSpec<String> userSchemaOption = parser.accepts("user-schema").withRequiredArg().ofType(String.class);
         OptionSpec<String> rptSchemaOption = parser.accepts("rpt-schema").withRequiredArg().ofType(String.class);
+        OptionSpec<String> pkgSchemaOption = parser.accepts("pkg-schema").withRequiredArg().ofType(String.class);
         OptionSpec<File> scriptsDirectoryOption = parser.accepts("scripts-dir").withRequiredArg().ofType(File.class);
 
         OptionSpec execOption = parser.acceptsAll(asList("e", "exec"));
@@ -53,12 +55,17 @@ public class AppArguments {
         if (options.has(userSchemaOption)) {
             userCredentials = DbCnnCredentials.create(options.valueOf(userSchemaOption));
         } else {
-            userCredentials = DbCnnCredentials.create(DbCnnCredentials.genUserCnnStr(ownerCredentials.getConnectionString()));
+            userCredentials = DbCnnCredentials.create(DbCnnCredentials.genCnnStrForSchema(ownerCredentials.getConnectionString(),SchemaType.USER));
         }
         if (options.has(rptSchemaOption)) {
             rptCredentials = DbCnnCredentials.create(options.valueOf(rptSchemaOption));
         } else {
-            rptCredentials = DbCnnCredentials.create(DbCnnCredentials.genRptCnnStr(ownerCredentials.getConnectionString()));
+            rptCredentials = DbCnnCredentials.create(DbCnnCredentials.genCnnStrForSchema(ownerCredentials.getConnectionString(),SchemaType.RPT));
+        }
+        if (options.has(pkgSchemaOption)) {
+            pkgCredentials = DbCnnCredentials.create(options.valueOf(pkgSchemaOption));
+        } else {
+            pkgCredentials = DbCnnCredentials.create(DbCnnCredentials.genCnnStrForSchema(ownerCredentials.getConnectionString(),SchemaType.PKG));
         }
         scriptsDirectory = options.valueOf(scriptsDirectoryOption);
         if (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory()) {
