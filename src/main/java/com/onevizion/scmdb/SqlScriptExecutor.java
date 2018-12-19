@@ -10,6 +10,8 @@ import javax.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Date;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
@@ -82,7 +84,11 @@ public class SqlScriptExecutor {
 
         executor.setWorkingDirectory(workingDir);
         try {
-            return executor.execute(commandLine);
+            Instant start = Instant.now();
+            int exitCode = executor.execute(commandLine);
+            logger.info("\nScript execution time [{}] seconds", GREEN,
+                    Duration.between(start, Instant.now()).getSeconds());
+            return exitCode;
         } catch (ExecuteException e) {
             return e.getExitValue();
         } catch (IOException e) {
