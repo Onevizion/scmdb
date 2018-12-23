@@ -107,6 +107,8 @@ public class AppArguments {
                 return userCredentials;
             case RPT:
                 return rptCredentials;
+            case PKG:
+                return pkgCredentials;
             default:
                 throw new IllegalArgumentException("Unsupported schema type");
         }
