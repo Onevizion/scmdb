@@ -5,6 +5,7 @@ import com.onevizion.scmdb.vo.DbCnnCredentials;
 import com.onevizion.scmdb.vo.SqlScript;
 import org.apache.commons.exec.*;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.time.DurationFormatUtils;
 
 import javax.annotation.Resource;
 import java.io.File;
@@ -12,6 +13,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZonedDateTime;
 import java.util.Date;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
@@ -19,22 +21,19 @@ import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
 import static com.onevizion.scmdb.Scmdb.EXIT_CODE_ERROR;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
 import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
+import static org.apache.commons.lang3.time.DurationFormatUtils.*;
 
 public class SqlScriptExecutor {
     private static final String SQL_CLIENT_COMMAND = "sql";
 
     private static final String INVALID_OBJECT_PREFIX = "Invalid objects in";
     private static final String INVALID_OBJECT_REGEX = "^(\\w+\\s){0,2}\\w+\\s+\\S+\\s+is invalid.\\s*";
-
-    private boolean isErrorMsgStarted = false;
     private static final String ERROR_STARTING_AT_LINE = "Error starting at line :";
-
-    private static final String CANT_RUN_PROGRAM = "Cannot run program \"sql\"";
     private static final String CREATE_SQL = "create.sql";
-
     private static final int SCRIPT_EXIT_CODE_ERROR = 1;
 
     private Executor executor;
+    private boolean isErrorMsgStarted = false;
 
     @Resource
     private AppArguments appArguments;
@@ -70,7 +69,8 @@ public class SqlScriptExecutor {
 
     public int execute(SqlScript script) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
-        logger.info("\nExecuting script [{}] in schema [{}]", GREEN, script.getName(), cnnCredentials.getSchemaName());
+        logger.info("\nExecuting script [{}] in schema [{}]. Start time is {}", GREEN, script.getName(),
+                cnnCredentials.getSchemaName(), ZonedDateTime.now());
 
         CommandLine commandLine = new CommandLine(SQL_CLIENT_COMMAND);
         commandLine.addArgument("-S");
@@ -86,8 +86,8 @@ public class SqlScriptExecutor {
         try {
             Instant start = Instant.now();
             int exitCode = executor.execute(commandLine);
-            logger.info("\nScript execution time [{}] seconds", GREEN,
-                    Duration.between(start, Instant.now()).getSeconds());
+            String scriptExecutionTime = formatDurationHMS(Duration.between(start, Instant.now()).toMillis());
+            logger.info("\nScript execution time is {}", GREEN, scriptExecutionTime);
             return exitCode;
         } catch (ExecuteException e) {
             return e.getExitValue();
