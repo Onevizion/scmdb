@@ -7,16 +7,16 @@ import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
 
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 
+import static com.onevizion.scmdb.vo.SchemaType.*;
 import static java.util.Arrays.asList;
 
 public class AppArguments {
     private File scriptsDirectory;
     private File ddlsDirectory;
-    private DbCnnCredentials ownerCredentials;
-    private DbCnnCredentials userCredentials;
-    private DbCnnCredentials rptCredentials;
-    private DbCnnCredentials pkgCredentials;
+    private Map<SchemaType, DbCnnCredentials> credentials = new HashMap<>();
     private boolean genDdl;
     private boolean executeScripts;
     private boolean useColorLogging = true;
@@ -31,7 +31,7 @@ public class AppArguments {
         parse(args);
     }
 
-    public void parse(String[] args) {
+    void parse(String[] args) {
         OptionParser parser = new OptionParser();
         OptionSpec<String> ownerSchemaOption = parser.accepts("owner-schema").withRequiredArg().ofType(String.class);
         OptionSpec<String> userSchemaOption = parser.accepts("user-schema").withRequiredArg().ofType(String.class);
@@ -51,22 +51,11 @@ public class AppArguments {
             throw new IllegalArgumentException("--owner-schema and --scripts-dir are required parameters.");
         }
 
-        ownerCredentials = DbCnnCredentials.create(options.valueOf(ownerSchemaOption));
-        if (options.has(userSchemaOption)) {
-            userCredentials = DbCnnCredentials.create(options.valueOf(userSchemaOption));
-        } else {
-            userCredentials = DbCnnCredentials.create(DbCnnCredentials.genCnnStrForSchema(ownerCredentials.getConnectionString(),SchemaType.USER));
-        }
-        if (options.has(rptSchemaOption)) {
-            rptCredentials = DbCnnCredentials.create(options.valueOf(rptSchemaOption));
-        } else {
-            rptCredentials = DbCnnCredentials.create(DbCnnCredentials.genCnnStrForSchema(ownerCredentials.getConnectionString(),SchemaType.RPT));
-        }
-        if (options.has(pkgSchemaOption)) {
-            pkgCredentials = DbCnnCredentials.create(options.valueOf(pkgSchemaOption));
-        } else {
-            pkgCredentials = DbCnnCredentials.create(DbCnnCredentials.genCnnStrForSchema(ownerCredentials.getConnectionString(),SchemaType.PKG));
-        }
+        credentials.put(OWNER, DbCnnCredentials.create(options.valueOf(ownerSchemaOption)));
+        createCredentials(USER, options, userSchemaOption);
+        createCredentials(RPT, options, rptSchemaOption);
+        createCredentials(PKG, options, pkgSchemaOption);
+
         scriptsDirectory = options.valueOf(scriptsDirectoryOption);
         if (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory()) {
             throw new IllegalArgumentException("Path [" + scriptsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
@@ -91,6 +80,16 @@ public class AppArguments {
         omitChanged = options.has(omitChangedOption);
     }
 
+    private void createCredentials(SchemaType schemaType, OptionSet options, OptionSpec<String> schemaOption) {
+        if (options.has(schemaOption)) {
+            credentials.put(schemaType, DbCnnCredentials.create(options.valueOf(schemaOption)));
+        } else {
+            String ownerConnectionString = credentials.get(OWNER).getConnectionString();
+            credentials.put(schemaType, DbCnnCredentials.create(DbCnnCredentials.genCnnStrForSchema(ownerConnectionString,
+                    schemaType)));
+        }
+    }
+
     public File getScriptsDirectory() {
         return scriptsDirectory;
     }
@@ -100,16 +99,7 @@ public class AppArguments {
     }
 
     public DbCnnCredentials getDbCredentials(SchemaType schemaType) {
-        switch (schemaType) {
-            case OWNER:
-                return ownerCredentials;
-            case USER:
-                return userCredentials;
-            case RPT:
-                return rptCredentials;
-            default:
-                throw new IllegalArgumentException("Unsupported schema type");
-        }
+        return credentials.get(schemaType);
     }
 
     public boolean isGenDdl() {
