@@ -14,6 +14,7 @@ import java.net.URL;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
@@ -70,7 +71,7 @@ public class SqlScriptExecutor {
     public int execute(SqlScript script) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start time is {}", GREEN, script.getName(),
-                cnnCredentials.getSchemaName(), ZonedDateTime.now());
+                cnnCredentials.getSchemaName(), ZonedDateTime.now().format(DateTimeFormatter.ISO_TIME));
 
         CommandLine commandLine = new CommandLine(SQL_CLIENT_COMMAND);
         commandLine.addArgument("-S");
