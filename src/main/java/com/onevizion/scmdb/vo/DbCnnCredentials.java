@@ -41,16 +41,21 @@ public class DbCnnCredentials {
         return m.matches() && m.groupCount() == 3;
     }
 
-    public static String genUserCnnStr(String ownerCnnStr) {
-        String owner = ownerCnnStr.substring(0, ownerCnnStr.indexOf("/"));
-        String user = owner + SchemaType.USER.getSchemaPostfix();
-        return user + ownerCnnStr.substring(ownerCnnStr.indexOf("/"));
+    public static boolean isCorrectSchemaCredentials(String credentialsString) {
+        Pattern p = Pattern.compile("(.+?)/([^@]*)");
+        Matcher m = p.matcher(credentialsString);
+        return m.matches() && m.groupCount() == 2;
     }
 
-    public static String genRptCnnStr(String ownerCnnStr) {
+    public static String genCnnStrForSchema(String ownerCnnStr, SchemaType schemaType) {
         String owner = ownerCnnStr.substring(0, ownerCnnStr.indexOf("/"));
-        String user = owner + SchemaType.RPT.getSchemaPostfix();
-        return user + ownerCnnStr.substring(ownerCnnStr.indexOf("/"));
+        String schema = owner + schemaType.getSchemaPostfix();
+        return schema + ownerCnnStr.substring(ownerCnnStr.indexOf("/"));
+    }
+
+    public static String genCnnStrForSchema(String ownerCnnStr, String schemaCredentials) {
+        String ownerUrl = ownerCnnStr.substring(ownerCnnStr.indexOf("@"));
+        return schemaCredentials + ownerUrl;
     }
 
     public String getSchemaName() {

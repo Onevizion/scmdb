@@ -27,7 +27,8 @@ import static com.onevizion.scmdb.vo.SchemaType.OWNER;
 @Component
 public class DdlGenerator {
     private static final String PACKAGE_SPECIFICATION_DDL_FILE_POSTFIX = "_spec";
-    public static final String EDITIONABLE_MODIFIER = "EDITIONABLE ";
+    private static final String EDITIONABLE_MODIFIER = "EDITIONABLE ";
+    private static final String NOEDITIONABLE_MODIFIER = "NONEDITIONABLE ";
 
     @Resource
     private DdlDao ddlDao;
@@ -98,6 +99,7 @@ public class DdlGenerator {
     }
 
     private String removeEditionableObjectsModifiers(String ddl) {
+        ddl = ddl.replaceAll(NOEDITIONABLE_MODIFIER, "");
         return ddl.replaceAll(EDITIONABLE_MODIFIER, "");
     }
 
