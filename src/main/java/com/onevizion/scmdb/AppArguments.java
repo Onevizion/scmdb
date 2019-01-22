@@ -82,7 +82,14 @@ public class AppArguments {
 
     private void createCredentials(SchemaType schemaType, OptionSet options, OptionSpec<String> schemaOption) {
         if (options.has(schemaOption)) {
-            credentials.put(schemaType, DbCnnCredentials.create(options.valueOf(schemaOption)));
+            String optionValue = options.valueOf(schemaOption);
+            if (DbCnnCredentials.isCorrectSchemaCredentials(optionValue)) {
+                String ownerConnectionString = credentials.get(OWNER).getConnectionString();
+                credentials.put(schemaType, DbCnnCredentials.create(
+                        DbCnnCredentials.genCnnStrForSchema(ownerConnectionString, optionValue)));
+            } else {
+                credentials.put(schemaType, DbCnnCredentials.create(optionValue));
+            }
         } else {
             String ownerConnectionString = credentials.get(OWNER).getConnectionString();
             credentials.put(schemaType, DbCnnCredentials.create(DbCnnCredentials.genCnnStrForSchema(ownerConnectionString,
