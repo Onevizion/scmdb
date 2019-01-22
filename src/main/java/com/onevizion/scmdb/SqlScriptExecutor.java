@@ -87,7 +87,7 @@ public class SqlScriptExecutor {
             Instant start = Instant.now();
             int exitCode = executor.execute(commandLine);
             String scriptExecutionTime = formatDurationHMS(Duration.between(start, Instant.now()).toMillis());
-            logger.info("\nScript execution time is {}", GREEN, scriptExecutionTime);
+            logger.info("\n[{}] runtime: {}", GREEN, script.getName(), scriptExecutionTime);
             return exitCode;
         } catch (ExecuteException e) {
             return e.getExitValue();
