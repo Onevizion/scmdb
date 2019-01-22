@@ -69,7 +69,7 @@ public class SqlScriptExecutor {
 
     public int execute(SqlScript script) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
-        logger.info("\nExecuting script [{}] in schema [{}]. Start time is {}", GREEN, script.getName(),
+        logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
                 cnnCredentials.getSchemaName(), ZonedDateTime.now().format(DateTimeFormatter.ISO_TIME));
 
         CommandLine commandLine = new CommandLine(SQL_CLIENT_COMMAND);
