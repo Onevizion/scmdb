@@ -29,6 +29,7 @@ public class DdlGenerator {
     private static final String PACKAGE_SPECIFICATION_DDL_FILE_POSTFIX = "_spec";
     private static final String EDITIONABLE_MODIFIER = "EDITIONABLE ";
     private static final String NOEDITIONABLE_MODIFIER = "NONEDITIONABLE ";
+    public static final String PK_CONSTRAINT_INDEX_POSTFIX = "\n  USING INDEX  ENABLE";
 
     @Resource
     private DdlDao ddlDao;
@@ -79,6 +80,7 @@ public class DdlGenerator {
         logger.info("Generating DDL for table [{}]", GREEN, table.getName());
         String ddl = removeSchemaNameInDdl(table.getDdl());
         ddl = ddl.trim();
+        ddl = ddl.replaceAll(PK_CONSTRAINT_INDEX_POSTFIX, "");
         ddl = ddl.replaceAll("\\s+;", ";");
         ddl = ddl.replaceFirst("\\n\\s+\\(", "(\n");
         ddl = ddl.replaceFirst("\\s+\\)", "\n)");
@@ -93,7 +95,7 @@ public class DdlGenerator {
         prepareAndWriteDdlToFile(table, TABLES_DDL_DIRECTORY_NAME);
     }
 
-    private String applyCodeStyleFormatingToDdl(String ddl) {
+    private String applyCodeStyleFormattingToDdl(String ddl) {
         ddl = removeEditionableObjectsModifiers(ddl);
         return removeDoubleQuotesAroundObjectNames(ddl);
     }
@@ -109,7 +111,7 @@ public class DdlGenerator {
         boolean isMultiLineCommentStarted = false;
         char previousSymbol = '\n';
         StringBuilder result = new StringBuilder();
-        for (char symbol: ddl.toCharArray()) {
+        for (char symbol : ddl.toCharArray()) {
             if (symbol == '-' && previousSymbol == '-' && !(isMultiLineCommentStarted || isSingleQuoteOpened)) {
                 isSingleLineCommentStarted = true;
             } else if (symbol == '*' && previousSymbol == '/') {
@@ -129,11 +131,13 @@ public class DdlGenerator {
             previousSymbol = symbol;
         }
 
-        return result.toString();
+        String unquotedDdl = result.toString();
+
+        return unquotedDdl.replaceAll("CASE,", "\"CASE\",").replaceAll("\\(CASE\\)","(\"CASE\")");
     }
 
     private void prepareAndWriteDdlToFile(DbObject dbObject, String ddlDirectoryName) {
-        dbObject.setDdl(applyCodeStyleFormatingToDdl(dbObject.getDdl()));
+        dbObject.setDdl(applyCodeStyleFormattingToDdl(dbObject.getDdl()));
 
         String directoryPath = appArguments.getDdlsDirectory().getAbsolutePath() + File.separator + ddlDirectoryName;
 
@@ -168,7 +172,7 @@ public class DdlGenerator {
 
             ddl = ddl.replaceAll("\\n", "");
             ddl = ddl.replaceAll("\\s+COMMENT", "COMMENT");
-            ddl = ddl.replaceAll("COMMENT", "\r\nCOMMENT");
+            ddl = ddl.replaceAll(";", ";\r\n");
             ddl = ddl.trim();
             ddl = "\r\n\r\n" + ddl;
             commentsDdl.append(ddl);
