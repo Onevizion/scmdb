@@ -40,7 +40,7 @@ public class DbScriptFacade {
 
     public void init() {
         execDir = new File(appArguments.getScriptsDirectory().getAbsolutePath() + File.separator + EXEC_FOLDER_NAME);
-        scriptsInDir = createScriptsFromFiles();
+        scriptsInDir = createScriptsFromFiles(appArguments.isGenDdl() || !appArguments.isOmitChanged());
     }
 
     public List<SqlScript> getNewScripts() {
@@ -97,10 +97,10 @@ public class DbScriptFacade {
         }
     }
 
-    private List<SqlScript> createScriptsFromFiles() {
+    private List<SqlScript> createScriptsFromFiles(boolean readAllScriptsContent) {
         List<File> scriptFiles = (List<File>) FileUtils.listFiles(appArguments.getScriptsDirectory(), new String[]{"sql"}, false);
         return scriptFiles.stream()
-                          .map(f -> SqlScript.create(f, appArguments.isReadAllFilesContent()))
+                          .map(f -> SqlScript.create(f, readAllScriptsContent))
                           .collect(Collectors.toList());
     }
 
@@ -165,7 +165,7 @@ public class DbScriptFacade {
     }
 
     public void createAllFromDirectory() {
-        sqlScriptDaoOra.createAll(createScriptsFromFiles());
+        sqlScriptDaoOra.createAll(createScriptsFromFiles(true));
     }
 
     public void delete(Long id) {
