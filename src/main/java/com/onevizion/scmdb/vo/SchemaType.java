@@ -17,8 +17,9 @@ public enum SchemaType {
     }
 
     public static SchemaType getByScriptFileName(String scriptFileName) {
-        String baseName = FilenameUtils.getBaseName(scriptFileName);
-        if (baseName.endsWith(USER.getSchemaPostfix()) && !baseName.endsWith("pkg_user")) {
+        String baseName = FilenameUtils.getBaseName(scriptFileName).toLowerCase();
+        if (baseName.endsWith(USER.getSchemaPostfix()) &&
+                !(baseName.endsWith("pkg_user") || baseName.endsWith("pkg_ext_imp_user"))) {
             return USER;
         } else if (baseName.endsWith(RPT.getSchemaPostfix()) &&
                 !(baseName.endsWith("pkg_rpt") || baseName.endsWith("pkg_config_field_rpt"))) {
