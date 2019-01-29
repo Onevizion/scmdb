@@ -13,7 +13,6 @@ import java.net.URL;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Date;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
@@ -21,7 +20,7 @@ import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
 import static com.onevizion.scmdb.Scmdb.EXIT_CODE_SUCCESS;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
 import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
-import static java.time.format.DateTimeFormatter.*;
+import static java.time.format.DateTimeFormatter.ISO_TIME;
 import static org.apache.commons.lang3.time.DurationFormatUtils.formatDurationHMS;
 
 public class SqlScriptExecutor {
