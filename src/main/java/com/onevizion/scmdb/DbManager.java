@@ -23,6 +23,8 @@ import static com.onevizion.scmdb.vo.ScriptType.ROLLBACK;
 public class DbManager {
     private static final String SCRIPT_EXECUTION_ERROR_MESSAGE = "Fix and execute manually script [{0}] and then run SCMDB again to execute other scripts.";
     private static final String FIRST_RUN_MESSAGE = "It's your first run of SCMDB. SCMDB was initialized.";
+    private static final String NO_SCRIPTS_TO_EXEC_MSG = "No scripts to execute in [{}]:";
+    private static final String SCRIPTS_TO_EXEC_MSG = "\nScripts to be executed in [{}]:";
 
     @Resource
     private DbScriptFacade scriptsFacade;
@@ -63,7 +65,7 @@ public class DbManager {
     private void executeNewScripts() {
         List<SqlScript> newScripts = scriptsFacade.getNewScripts();
         if (newScripts.isEmpty()) {
-            logger.info("No scripts to execute");
+            logger.info(NO_SCRIPTS_TO_EXEC_MSG, appArguments.getDbCredentials(OWNER).getSchemaWithUrlBeforeDot());
             return;
         }
 
@@ -78,7 +80,7 @@ public class DbManager {
         scriptsFacade.batchCreate(newRollbackScripts);
 
         if (appArguments.isExecuteScripts()) {
-            logger.info("\nScripts to be executed:");
+            logger.info(SCRIPTS_TO_EXEC_MSG, appArguments.getDbCredentials(OWNER).getSchemaWithUrlBeforeDot());
             newCommitScripts.forEach(script -> logger.info(script.getName()));
             newCommitScripts.forEach(script -> {
                 int exitCode = scriptExecutor.execute(script);

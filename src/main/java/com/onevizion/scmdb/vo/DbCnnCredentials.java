@@ -1,5 +1,8 @@
 package com.onevizion.scmdb.vo;
 
+import org.springframework.util.StringUtils;
+
+import java.text.MessageFormat;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -12,6 +15,7 @@ public class DbCnnCredentials {
     private String password;
     private String connectionString;
     private String oracleUrl;
+    private String schemaWithUrlBeforeDot;
 
     private DbCnnCredentials() {}
 
@@ -41,16 +45,21 @@ public class DbCnnCredentials {
         return m.matches() && m.groupCount() == 3;
     }
 
-    public static String genUserCnnStr(String ownerCnnStr) {
-        String owner = ownerCnnStr.substring(0, ownerCnnStr.indexOf("/"));
-        String user = owner + SchemaType.USER.getSchemaPostfix();
-        return user + ownerCnnStr.substring(ownerCnnStr.indexOf("/"));
+    public static boolean isCorrectSchemaCredentials(String credentialsString) {
+        Pattern p = Pattern.compile("(.+?)/([^@]*)");
+        Matcher m = p.matcher(credentialsString);
+        return m.matches() && m.groupCount() == 2;
     }
 
-    public static String genRptCnnStr(String ownerCnnStr) {
+    public static String genCnnStrForSchema(String ownerCnnStr, SchemaType schemaType) {
         String owner = ownerCnnStr.substring(0, ownerCnnStr.indexOf("/"));
-        String user = owner + SchemaType.RPT.getSchemaPostfix();
-        return user + ownerCnnStr.substring(ownerCnnStr.indexOf("/"));
+        String schema = owner + schemaType.getSchemaPostfix();
+        return schema + ownerCnnStr.substring(ownerCnnStr.indexOf("/"));
+    }
+
+    public static String genCnnStrForSchema(String ownerCnnStr, String schemaCredentials) {
+        String ownerUrl = ownerCnnStr.substring(ownerCnnStr.indexOf("@"));
+        return schemaCredentials + ownerUrl;
     }
 
     public String getSchemaName() {
@@ -83,5 +92,31 @@ public class DbCnnCredentials {
 
     public void setOracleUrl(String oracleUrl) {
         this.oracleUrl = oracleUrl;
+    }
+
+    public String getSchemaWithUrlBeforeDot() {
+        if (StringUtils.isEmpty(schemaWithUrlBeforeDot)) {
+            schemaWithUrlBeforeDot = parseUrlToSchemaWithUrlBeforeDot();
+        }
+
+        return schemaWithUrlBeforeDot;
+    }
+
+    private String parseUrlToSchemaWithUrlBeforeDot() {
+        String url = oracleUrl.replaceAll(JDBC_THIN_URL_PREFIX, "");
+        int colonIndex = url.indexOf(':');
+        if (colonIndex != -1) {
+            url = url.substring(0, colonIndex);
+        } else {
+            int slashIndex = url.indexOf('/');
+            url = url.substring(0, slashIndex);
+        }
+
+        int dotIndex = url.indexOf('.');
+        if (dotIndex != -1) {
+            url = url.substring(0, dotIndex);
+        }
+
+        return MessageFormat.format("{0}@{1}", schemaName, url);
     }
 }
