@@ -111,8 +111,13 @@ public class DbManager {
             return;
         }
 
-        boolean executeRollbacks = false;
+        if (appArguments.isOmitChanged()) {
+            logger.info("Execution of [{}] rollbacks was skipped", rollbacksToExec.size());
+            scriptsFacade.deleteAll(deletedScripts.values());
+            return;
+        }
 
+        boolean executeRollbacks = false;
         if (appArguments.isExecuteScripts()) {
             logger.info("Do you really want to execute {} rollbacks? \n", GREEN, rollbacksToExec.size());
             rollbacksToExec.forEach(r -> logger.info(r.getName(), GREEN));
