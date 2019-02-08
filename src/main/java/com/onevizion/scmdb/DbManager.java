@@ -87,7 +87,7 @@ public class DbManager {
                 script.setStatus(ScriptStatus.getByScriptExitCode(exitCode));
                 scriptsFacade.create(script);
 
-                if (script.getStatus() != ScriptStatus.EXECUTED) {
+                if (script.getStatus() != ScriptStatus.EXECUTED && !appArguments.isOmitChanged()) {
                     throw new ScriptExecException(MessageFormat.format(SCRIPT_EXECUTION_ERROR_MESSAGE, script.getName()));
                 }
             });
@@ -111,8 +111,13 @@ public class DbManager {
             return;
         }
 
-        boolean executeRollbacks = false;
+        if (appArguments.isOmitChanged()) {
+            logger.info("Execution of [{}] rollbacks was skipped", rollbacksToExec.size());
+            scriptsFacade.deleteAll(deletedScripts.values());
+            return;
+        }
 
+        boolean executeRollbacks = false;
         if (appArguments.isExecuteScripts()) {
             logger.info("Do you really want to execute {} rollbacks? \n", GREEN, rollbacksToExec.size());
             rollbacksToExec.forEach(r -> logger.info(r.getName(), GREEN));
