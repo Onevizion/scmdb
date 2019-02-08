@@ -34,9 +34,9 @@ public class AppArguments {
     void parse(String[] args) {
         OptionParser parser = new OptionParser();
         OptionSpec<String> ownerSchemaOption = parser.accepts("owner-schema").withRequiredArg().ofType(String.class);
-        OptionSpec<String> userSchemaOption = parser.accepts("user-schema").withRequiredArg().ofType(String.class);
-        OptionSpec<String> rptSchemaOption = parser.accepts("rpt-schema").withRequiredArg().ofType(String.class);
-        OptionSpec<String> pkgSchemaOption = parser.accepts("pkg-schema").withRequiredArg().ofType(String.class);
+        OptionSpec<String> userSchemaOption = parser.accepts("user-schema").withOptionalArg().ofType(String.class);
+        OptionSpec<String> rptSchemaOption = parser.accepts("rpt-schema").withOptionalArg().ofType(String.class);
+        OptionSpec<String> pkgSchemaOption = parser.accepts("pkg-schema").withOptionalArg().ofType(String.class);
         OptionSpec<File> scriptsDirectoryOption = parser.accepts("scripts-dir").withRequiredArg().ofType(File.class);
 
         OptionSpec execOption = parser.acceptsAll(asList("e", "exec"));
@@ -81,7 +81,7 @@ public class AppArguments {
     }
 
     private void createCredentials(SchemaType schemaType, OptionSet options, OptionSpec<String> schemaOption) {
-        if (options.has(schemaOption)) {
+        if (options.hasArgument(schemaOption)) {
             String optionValue = options.valueOf(schemaOption);
             if (DbCnnCredentials.isCorrectSchemaCredentials(optionValue)) {
                 String ownerConnectionString = credentials.get(OWNER).getConnectionString();
