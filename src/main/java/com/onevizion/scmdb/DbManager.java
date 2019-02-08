@@ -25,6 +25,7 @@ public class DbManager {
     private static final String FIRST_RUN_MESSAGE = "It's your first run of SCMDB. SCMDB was initialized.";
     private static final String NO_SCRIPTS_TO_EXEC_MSG = "No scripts to execute in [{}]:";
     private static final String SCRIPTS_TO_EXEC_MSG = "\nScripts to be executed in [{}]:";
+    private static final String ROLLBACKS_TO_SKIP_MSG = "\nRollbacks skipped in [{}]:";
 
     @Resource
     private DbScriptFacade scriptsFacade;
@@ -112,7 +113,10 @@ public class DbManager {
         }
 
         if (appArguments.isOmitChanged()) {
-            logger.info("Execution of [{}] rollbacks was skipped", rollbacksToExec.size());
+            logger.info(ROLLBACKS_TO_SKIP_MSG, appArguments.getDbCredentials(OWNER).getSchemaWithUrlBeforeDot());
+            rollbacksToExec.forEach(s -> logger.info(s.getName()));
+            logger.info("\n");
+
             scriptsFacade.deleteAll(deletedScripts.values());
             return;
         }
