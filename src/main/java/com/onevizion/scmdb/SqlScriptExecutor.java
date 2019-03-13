@@ -81,7 +81,6 @@ public class SqlScriptExecutor {
                 cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
 
         CommandLine commandLine = new CommandLine(SQL_CLIENT_COMMAND);
-        commandLine.addArgument("-S");
         commandLine.addArgument("-L");
         commandLine.addArgument(cnnCredentials.getConnectionString());
 
