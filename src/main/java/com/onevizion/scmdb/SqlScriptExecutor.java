@@ -2,7 +2,9 @@ package com.onevizion.scmdb;
 
 import com.onevizion.scmdb.exception.ScriptExecException;
 import com.onevizion.scmdb.vo.DbCnnCredentials;
+import com.onevizion.scmdb.vo.SchemaType;
 import com.onevizion.scmdb.vo.SqlScript;
+import joptsimple.internal.Strings;
 import org.apache.commons.exec.*;
 import org.apache.commons.io.FileUtils;
 
@@ -31,9 +33,11 @@ public class SqlScriptExecutor {
     private static final String ERROR_STARTING_AT_LINE = "Error starting at line :";
     private static final String CREATE_SQL = "create.sql";
     private static final int SCRIPT_EXIT_CODE_ERROR = 1;
+    private static final String ERROR_LAST_LINE_START = "*Action:";
 
     private Executor executor;
     private boolean isErrorMsgStarted = false;
+    private boolean scriptExecutedWithError = false;
 
     @Resource
     private AppArguments appArguments;
@@ -51,8 +55,12 @@ public class SqlScriptExecutor {
                 } else if (line.matches(INVALID_OBJECT_REGEX)) {
                     logger.warn(line, YELLOW);
                 } else if (line.startsWith(ERROR_STARTING_AT_LINE)) {
+                    scriptExecutedWithError = true;
                     isErrorMsgStarted = true;
                     logger.error(line);
+                } else if (line.startsWith(ERROR_LAST_LINE_START) || Strings.isNullOrEmpty(line)) {
+                    logger.error(line);
+                    isErrorMsgStarted = false;
                 } else if (isErrorMsgStarted) {
                     logger.error(line);
                 } else {
@@ -73,22 +81,22 @@ public class SqlScriptExecutor {
                 cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
 
         CommandLine commandLine = new CommandLine(SQL_CLIENT_COMMAND);
-        commandLine.addArgument("-S");
         commandLine.addArgument("-L");
         commandLine.addArgument(cnnCredentials.getConnectionString());
 
         File workingDir = script.getFile().getParentFile();
-        File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType().isCompileInvalids(), workingDir);
+        File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType(), workingDir);
         commandLine.addArgument("@" + wrapperScriptFile.getAbsolutePath());
         commandLine.addArgument(script.getFile().getAbsolutePath());
 
         executor.setWorkingDirectory(workingDir);
         try {
             Instant start = Instant.now();
+            scriptExecutedWithError = false;
             int exitCode = executor.execute(commandLine);
             String scriptExecutionTime = formatDurationHMS(Duration.between(start, Instant.now()).toMillis());
             logger.info("\n[{}] runtime: {}", GREEN, script.getName(), scriptExecutionTime);
-            return exitCode;
+            return scriptExecutedWithError ? SCRIPT_EXIT_CODE_ERROR : exitCode;
         } catch (ExecuteException e) {
             return e.getExitValue();
         } catch (IOException e) {
@@ -99,14 +107,23 @@ public class SqlScriptExecutor {
         }
     }
 
-    private File getTmpWrapperScript(boolean compileInvalids, File workingDir) {
+    private File getTmpWrapperScript(SchemaType schemaType, File workingDir) {
         ClassLoader classLoader = getClass().getClassLoader();
         URL wrapperScript;
-        if (compileInvalids) {
-            wrapperScript = classLoader.getResource("compile_invalids_wrapper.sql");
+        if (schemaType.isCompileInvalids()) {
+            if (appArguments.isIgnoreErrors()) {
+                wrapperScript = classLoader.getResource("compile_invalids_wrapper_not_fail_on_error.sql");
+            } else {
+                wrapperScript = classLoader.getResource("compile_invalids_wrapper_fail_on_error.sql");
+            }
         } else {
-            wrapperScript = classLoader.getResource("sqlplus_exit_code_wrapper.sql");
+            if (appArguments.isIgnoreErrors()) {
+                wrapperScript = classLoader.getResource("script_wrapper_not_fail_on_error.sql");
+            } else {
+                wrapperScript = classLoader.getResource("script_wrapper_fail_on_error.sql");
+            }
         }
+
         File tmpFile = new File(workingDir.getAbsolutePath() + File.separator + "tmp.sql");
 
         try {
