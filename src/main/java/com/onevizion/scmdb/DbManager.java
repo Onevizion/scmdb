@@ -88,7 +88,7 @@ public class DbManager {
                 script.setStatus(ScriptStatus.getByScriptExitCode(exitCode));
                 scriptsFacade.create(script);
 
-                if (script.getStatus() != ScriptStatus.EXECUTED && !appArguments.isOmitChanged()) {
+                if (script.getStatus() != ScriptStatus.EXECUTED && !appArguments.isIgnoreErrors()) {
                     throw new ScriptExecException(MessageFormat.format(SCRIPT_EXECUTION_ERROR_MESSAGE, script.getName()));
                 }
             });
