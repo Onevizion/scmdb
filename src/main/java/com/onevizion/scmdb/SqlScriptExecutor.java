@@ -7,8 +7,8 @@ import com.onevizion.scmdb.vo.SqlScript;
 import joptsimple.internal.Strings;
 import org.apache.commons.exec.*;
 import org.apache.commons.io.FileUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 
-import javax.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -39,10 +39,10 @@ public class SqlScriptExecutor {
     private boolean isErrorMsgStarted = false;
     private boolean scriptExecutedWithError = false;
 
-    @Resource
+    @Autowired
     private AppArguments appArguments;
 
-    @Resource
+    @Autowired
     private ColorLogger logger;
 
     public SqlScriptExecutor() {

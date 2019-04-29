@@ -3,8 +3,8 @@ package com.onevizion.scmdb;
 import com.onevizion.scmdb.exception.ScriptExecException;
 import com.onevizion.scmdb.facade.DbScriptFacade;
 import com.onevizion.scmdb.vo.*;
+import org.springframework.beans.factory.annotation.Autowired;
 
-import javax.annotation.Resource;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -27,19 +27,19 @@ public class DbManager {
     private static final String SCRIPTS_TO_EXEC_MSG = "\nScripts to be executed in [{}]:";
     private static final String ROLLBACKS_TO_SKIP_MSG = "\nRollbacks skipped in [{}]:";
 
-    @Resource
+    @Autowired
     private DbScriptFacade scriptsFacade;
 
-    @Resource
+    @Autowired
     private DdlGenerator ddlGenerator;
 
-    @Resource
+    @Autowired
     private AppArguments appArguments;
 
-    @Resource
+    @Autowired
     private SqlScriptExecutor scriptExecutor;
 
-    @Resource
+    @Autowired
     private ColorLogger logger;
 
     public void updateDb() {
