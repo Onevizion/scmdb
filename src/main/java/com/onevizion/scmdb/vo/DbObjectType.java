@@ -7,7 +7,7 @@ import static java.util.Arrays.asList;
 
 public enum DbObjectType {
     PACKAGE_BODY("package body", asList("create package body", "replace package body", "drop package body")),
-    PACKAGE_SPEC("package", asList("create package", "replace package", "drop package", "package")),
+    PACKAGE_SPEC("package", asList("create package", "replace package", "drop package", "package ")),
     TABLE("table", asList("create table", "alter table", "drop table")),
     VIEW("view", asList("create view", "replace view", "drop view", "create force view", "replace force view")),
     COMMENT("comment", asList("comment on table", "comment on column")),
