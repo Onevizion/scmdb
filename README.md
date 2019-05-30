@@ -10,3 +10,15 @@ Following is name convention for script files:
 <script oder num>_<short description>.sql
 <script oder num>_<short description>_rollback.sql
 ```
+
+## Supported command line options:
+**d** gen-ddl  
+Genrate DDLs for new scripts
+
+**a** all  
+
+**n** no-color  
+Do not apply color decorations to the console output
+
+**o** omit-changed  
+Do not check for sciprt changes. Script modifications detection is based on hash code calc, omiting this procedure may improove perfomance
