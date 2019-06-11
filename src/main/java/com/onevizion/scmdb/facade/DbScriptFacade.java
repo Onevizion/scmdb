@@ -7,9 +7,9 @@ import com.onevizion.scmdb.exception.ScmdbException;
 import com.onevizion.scmdb.vo.SqlScript;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -23,13 +23,14 @@ import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
 
 @Component
 public class DbScriptFacade {
-    @Resource
+
+    @Autowired
     private DbScriptDaoOra sqlScriptDaoOra;
 
-    @Resource
+    @Autowired
     private AppArguments appArguments;
 
-    @Resource
+    @Autowired
     private ColorLogger logger;
 
     private final static String EXEC_FOLDER_NAME = "EXECUTE_ME";
