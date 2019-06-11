@@ -3,8 +3,8 @@ package com.onevizion.scmdb;
 import com.onevizion.scmdb.exception.ScriptExecException;
 import com.onevizion.scmdb.facade.DbScriptFacade;
 import com.onevizion.scmdb.vo.*;
+import org.springframework.beans.factory.annotation.Autowired;
 
-import javax.annotation.Resource;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -27,19 +27,19 @@ public class DbManager {
     private static final String SCRIPTS_TO_EXEC_MSG = "\nScripts to be executed in [{}]:";
     private static final String ROLLBACKS_TO_SKIP_MSG = "\nRollbacks skipped in [{}]:";
 
-    @Resource
+    @Autowired
     private DbScriptFacade scriptsFacade;
 
-    @Resource
+    @Autowired
     private DdlGenerator ddlGenerator;
 
-    @Resource
+    @Autowired
     private AppArguments appArguments;
 
-    @Resource
+    @Autowired
     private SqlScriptExecutor scriptExecutor;
 
-    @Resource
+    @Autowired
     private ColorLogger logger;
 
     public void updateDb() {
@@ -133,7 +133,6 @@ public class DbManager {
 
         if (executeRollbacks) {
             executeRollbacks(deletedScripts, rollbacksToExec);
-            scriptsFacade.deleteAll(deletedScripts.values());
         } else {
             logger.info("At first you should execute following rollbacks to revert changes of deleted scripts:");
             scriptsFacade.copyRollbacksToExecDir(rollbacksToExec);
@@ -149,14 +148,15 @@ public class DbManager {
             if (deletedScripts.containsKey(rollback.getCommitName())) {
                 scriptsFacade.copyRollbackToExecDir(rollback);
 
+                SqlScript commit = deletedScripts.get(rollback.getCommitName());
+                scriptsFacade.delete(rollback.getId());
+                scriptsFacade.delete(commit.getId());
+
                 int exitCode = scriptExecutor.execute(rollback);
                 if (exitCode != 0) {
                     throw new ScriptExecException(MessageFormat.format(SCRIPT_EXECUTION_ERROR_MESSAGE, rollback.getName()));
                 }
 
-                SqlScript commit = deletedScripts.get(rollback.getCommitName());
-                scriptsFacade.delete(rollback.getId());
-                scriptsFacade.delete(commit.getId());
                 deletedScripts.keySet().remove(rollback.getName());
                 deletedScripts.keySet().remove(rollback.getCommitName());
             }

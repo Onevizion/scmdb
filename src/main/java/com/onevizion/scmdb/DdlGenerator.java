@@ -6,9 +6,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOCase;
 import org.apache.commons.io.filefilter.WildcardFileFilter;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.Resource;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
@@ -29,15 +29,15 @@ public class DdlGenerator {
     private static final String PACKAGE_SPECIFICATION_DDL_FILE_POSTFIX = "_spec";
     private static final String EDITIONABLE_MODIFIER = "EDITIONABLE ";
     private static final String NOEDITIONABLE_MODIFIER = "NONEDITIONABLE ";
-    public static final String PK_CONSTRAINT_INDEX_POSTFIX = "\n  USING INDEX  ENABLE";
+    private static final String PK_CONSTRAINT_INDEX_POSTFIX = "\n  USING INDEX  ENABLE";
 
-    @Resource
+    @Autowired
     private DdlDao ddlDao;
 
-    @Resource
+    @Autowired
     private AppArguments appArguments;
 
-    @Resource
+    @Autowired
     private ColorLogger logger;
 
     private final String[] excludedSequences = {"SEQ_BPD_ITEMS_UNIT_ID"};

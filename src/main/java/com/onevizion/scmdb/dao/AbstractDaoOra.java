@@ -1,22 +1,20 @@
 package com.onevizion.scmdb.dao;
 
-import com.onevizion.scmdb.exception.DbConnectionException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-import javax.annotation.Resource;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
 @Repository
 public class AbstractDaoOra {
-    @Resource
+
+    @Autowired
     protected JdbcTemplate jdbcTemplate;
 
-    @Resource
+    @Autowired
     protected NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
     private final static int LIMIT_IN_STATEMENT = 1000;

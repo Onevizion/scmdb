@@ -6,14 +6,14 @@ import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.ConsoleAppender;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 
-import javax.annotation.Resource;
 
 public class ColorLogger {
     private Logger logger = (Logger) LoggerFactory.getLogger("STDOUT");
     private PatternLayoutEncoder encoder;
 
-    @Resource
+    @Autowired
     private AppArguments appArguments;
 
     public ColorLogger() {
