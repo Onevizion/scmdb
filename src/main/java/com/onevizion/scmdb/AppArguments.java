@@ -22,6 +22,7 @@ public class AppArguments {
     private boolean useColorLogging = true;
     private boolean all = false;
     private boolean omitChanged = false;
+    private boolean ignoreErrors = false;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
 
@@ -44,6 +45,7 @@ public class AppArguments {
         OptionSpec allOption = parser.acceptsAll(asList("a", "all"));
         OptionSpec noColorOption = parser.acceptsAll(asList("n", "no-color"));
         OptionSpec omitChangedOption = parser.acceptsAll(asList("o", "omit-changed"));
+        OptionSpec ignoreErrorsOption = parser.acceptsAll(asList("i", "ignore-errors"));
 
         OptionSet options = parser.parse(args);
 
@@ -78,6 +80,7 @@ public class AppArguments {
         all = options.has(allOption);
         useColorLogging = !options.has(noColorOption);
         omitChanged = options.has(omitChangedOption);
+        ignoreErrors = options.has(ignoreErrorsOption);
     }
 
     private void createCredentials(SchemaType schemaType, OptionSet options, OptionSpec<String> schemaOption) {
@@ -127,6 +130,10 @@ public class AppArguments {
 
     public boolean isOmitChanged() {
         return omitChanged;
+    }
+
+    public boolean isIgnoreErrors() {
+        return ignoreErrors;
     }
 
     public boolean isReadAllFilesContent() {
