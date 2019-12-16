@@ -30,4 +30,5 @@ When passwords for all schemas are the same (may be common for local dev env), o
 
 ### Usage Scenarious
 1. Execute new scripts in local dev env:
+
 ```java.exe -jar scmdb.jar --owner-schema=vqs_p01_epm/vepm@localhost:1521:orcldb --scripts-dir=./db/scripts --exec```
