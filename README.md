@@ -12,6 +12,8 @@ Following is name convention for script files:
 ```
 Additionally scripts ending with _user.sql, _rpt.sql, _pkg.sql will be executed in it's own DB schema (see below)
 
+### Requirements
+scmdb usese Oracle's command line tool [SQLcl](https://www.oracle.com/database/technologies/appdev/sqlcl.html) to execute scripts and generate DDLs. SQLcl should be installed and accessible in standard path
 
 ### Supported command line options:
 * ```--owner-schema=<user>/<password>@<db_address>:<db_port>:<db_name>```
@@ -23,12 +25,14 @@ When passwords for all schemas are the same (may be common for local dev env), o
 
 * ```--scripts-dir=<location of the directory with DB scripts>```
 * ```--gen-ddl``` generate DDL for objects created with new scripts
-* ```--exec execute``` new scripts
+* ```--exec``` execute new scripts
 * ```--omit-changed``` do not check for sciprt changes. Script modifications detection is based on hash code calc, omiting this procedure may improove perfomance
 * ```--ignore-errors``` do not stop on errors 
 * ```--no-color``` do not color output
 
 ### Usage Scenarious
+On first start for the DB schema, scmdb creates ```db_script``` table and populates it with all the scripts from ```--scripts-dir```. Subsequnt starts with ```--exec``` option will execute new scripts added to the file system, but not present in ```db_script``` table
+
 1. Execute new scripts in local dev env:
 
 ```java -jar scmdb.jar --owner-schema=vqs_p01_epm/vepm@localhost:1521:orcldb --scripts-dir=./db/scripts --exec```
