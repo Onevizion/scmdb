@@ -31,16 +31,18 @@ When passwords for all schemas are the same (may be common for local dev env), o
 * ```--no-color``` do not color output
 
 ### Usage Scenarious
-On first start for the DB schema, scmdb creates ```db_script``` table and populates it with all the scripts from ```--scripts-dir```. Subsequnt starts with ```--exec``` option will execute new scripts added to the file system, but not present in ```db_script``` table
-
-1. Execute new scripts in local dev env:
+**1. Execute new scripts in local dev env:**
 
 ```java -jar scmdb.jar --owner-schema=vqs_p01_epm/vepm@localhost:1521:orcldb --scripts-dir=./db/scripts --exec```
 
-2. Update DDL files before committing new DB scripts into VCS. DDL files are supposed to be located in ../ddl/packages, ../ddl/tables and ../ddl/views folders relatively to the --scripts-dir. DDLs will be generated for new DB scripts not yet executed with scmdb (no records in db_script table), but changes should be already made for DB schema:
+On first start for the DB schema, scmdb creates ```db_script``` table and populates it with all the scripts from ```--scripts-dir```. Subsequnt starts with ```--exec``` option will execute new scripts added to the file system, but not present in ```db_script``` table
+
+**2. Update DDL files before committing new DB scripts into VCS.** DDL files are supposed to be located in ../ddl/packages, ../ddl/tables and ../ddl/views folders (relative to the --scripts-dir). DDLs will be generated for new DB scripts not yet executed with scmdb (no records in db_script table), but changes should be already made for DB schema:
 
 ```java -jar scmdb.jar --owner-schema=vqs_p01_epm/vepm@localhost:1521:orcldb --scripts-dir=./db/scripts --gen-ddl```
 
-3. Execute DB scripts in production environment during new version deployment (do not stop on errors, do not execute rollbacks):
+DDL generation works by regexping new DB scripts for DB objects creation/modification and then extracting DDLs from the DB
+
+**3. Execute DB scripts in production environment during new version deployment** (do not stop on errors, do not execute rollbacks):
 
 ```java -jar scmdb.jar --owner-schema=$ownerSchema --user-schema=$userSchema --rpt-schema=$rptSchema --pkg-schema=$pkgSchema --scripts-dir=db/scripts --no-color --exec --omit-changed --ignore-errors```
