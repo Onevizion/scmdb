@@ -13,7 +13,7 @@ Following is name convention for script files:
 Additionally scripts ending with _user.sql, _rpt.sql, _pkg.sql will be executed in it's own DB schema (see below)
 
 ### Requirements
-scmdb usese Oracle's command line tool [SQLcl](https://www.oracle.com/database/technologies/appdev/sqlcl.html) to execute scripts and generate DDLs. SQLcl should be installed and accessible in standard path
+scmdb uses Oracle's command line tool [SQLcl](https://www.oracle.com/database/technologies/appdev/sqlcl.html) to execute scripts and generate DDLs. SQLcl should be installed and accessible in standard path
 
 ### Supported command line options:
 * ```--owner-schema=<user>/<password>@<db_address>:<db_port>:<db_name>```
