@@ -5,7 +5,7 @@
     <artifactId>scmdb</artifactId>
     <packaging>jar</packaging>
     <name>scmdb</name>
-    <version>1.7.7</version>
+    <version>1.7.9</version>
 
     <properties>
         <spring.version>5.1.7.RELEASE</spring.version>
