@@ -38,6 +38,7 @@ public class AppArguments {
         OptionSpec<String> userSchemaOption = parser.accepts("user-schema").withOptionalArg().ofType(String.class);
         OptionSpec<String> rptSchemaOption = parser.accepts("rpt-schema").withOptionalArg().ofType(String.class);
         OptionSpec<String> pkgSchemaOption = parser.accepts("pkg-schema").withOptionalArg().ofType(String.class);
+        OptionSpec<String> perfstatSchemaOption = parser.accepts("perfstat-schema").withOptionalArg().ofType(String.class);
         OptionSpec<File> scriptsDirectoryOption = parser.accepts("scripts-dir").withRequiredArg().ofType(File.class);
 
         OptionSpec execOption = parser.acceptsAll(asList("e", "exec"));
@@ -57,6 +58,7 @@ public class AppArguments {
         createCredentials(USER, options, userSchemaOption);
         createCredentials(RPT, options, rptSchemaOption);
         createCredentials(PKG, options, pkgSchemaOption);
+        createCredentials(PERFSTAT, options, perfstatSchemaOption);
 
         scriptsDirectory = options.valueOf(scriptsDirectoryOption);
         if (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory()) {

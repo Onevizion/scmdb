@@ -6,7 +6,8 @@ public enum SchemaType {
     OWNER("", true),
     USER("_user", true),
     RPT("_rpt", true),
-    PKG("_pkg", true);
+    PKG("_pkg", true),
+    PERFSTAT("_perfstat", true);
 
     private final String schemaPostfix;
     private final boolean compileInvalids;
@@ -26,6 +27,8 @@ public enum SchemaType {
             return RPT;
         }  else if (baseName.endsWith(PKG.getSchemaPostfix())) {
             return PKG;
+        } else if (baseName.endsWith(PERFSTAT.getSchemaPostfix())) {
+            return PERFSTAT;
         } else {
             return OWNER;
         }

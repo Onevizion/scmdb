@@ -177,7 +177,7 @@
         </repository>
     </repositories>
     
-    <distributionManagement>
+	  <distributionManagement>
         <snapshotRepository>
             <id>github-snapshots</id>
             <url>https://maven.pkg.github.com/Onevizion/scmdb</url>
