@@ -5,10 +5,11 @@
     <artifactId>scmdb</artifactId>
     <packaging>jar</packaging>
     <name>scmdb</name>
-    <version>1.8-SNAPSHOT</version>
+    <version>1-SNAPSHOT</version>
 
     <properties>
-        <spring.version>5.1.7.RELEASE</spring.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <spring.version>5.1.14.RELEASE</spring.version>
     </properties>
 
     <dependencies>
@@ -102,10 +103,9 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.6.1</version>
+                <version>3.8.1</version>
                 <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
+                    <release>11</release>
                 </configuration>
             </plugin>
             <plugin>
@@ -177,7 +177,6 @@
         </repository>
     </repositories>
     
-
 	  <distributionManagement>
         <snapshotRepository>
             <id>github-snapshots</id>
@@ -188,4 +187,6 @@
             <url>https://maven.pkg.github.com/Onevizion/scmdb</url>
         </repository>
     </distributionManagement>
+    
+
 </project>
