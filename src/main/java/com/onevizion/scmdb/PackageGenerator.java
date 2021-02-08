@@ -1,28 +1,40 @@
 package com.onevizion.scmdb;
 
 import com.onevizion.scmdb.dao.DdlDao;
-import com.onevizion.scmdb.vo.SqlScript;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.*;
 import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.diff.DiffFormatter;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.treewalk.AbstractTreeIterator;
+import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 public class PackageGenerator {
     private static final String PACKAGE_SPECIFICATION_SUFFIX = "_spec";
     private static final String ROLLBACK_SUFFIX = "_rollback";
     private static final String PACKAGES_DDL_DIRECTORY_NAME = "packages";
+
+    private Git git;
+    private Repository repository;
 
     @Autowired
     private DdlDao ddlDao;
@@ -33,89 +45,122 @@ public class PackageGenerator {
     @Autowired
     private ColorLogger logger;
 
-
-    public void packageScriptGenerate() {
-        File repDirectory = getRepositoryDirectory();
-        File packageDirectory = appArguments.getPackageDirectory();
-        try(Git git = Git.open(repDirectory)) {
-            List<DiffEntry> diffFiles = git.diff().call();
-            String namePackage;
-            String nameScript;
-            String nameRollback;
-            Path pathPKGSpec;
-            Path pathPKG;
-            String scriptBeforeRollback;
-            for(DiffEntry d : diffFiles) {
-                if (d.getChangeType() == DiffEntry.ChangeType.MODIFY || d.getChangeType() == DiffEntry.ChangeType.ADD) {
-                    if (d.getNewPath().contains(PACKAGES_DDL_DIRECTORY_NAME)) {
-                        logger.info("Create script for package");
-                        namePackage = getNamePackage(d.getNewPath());
-                        nameScript = getNameScript(getIssueName(git), namePackage);
-                        nameRollback = nameScript + ROLLBACK_SUFFIX;
-
-                        pathPKGSpec = Path.of(packageDirectory + File.separator + namePackage + PACKAGE_SPECIFICATION_SUFFIX + ".sql");
-                        pathPKG = Path.of(packageDirectory + File.separator + namePackage + ".sql");
-
-                        createCommitScript(nameScript, pathPKGSpec, pathPKG);
-
-                        logger.info("Created new script " + nameScript);
-
-                        File oldFile = new File(packageDirectory + File.separator + namePackage + ".sql");
-                        scriptBeforeRollback = FileUtils.readFileToString(oldFile, "UTF-8");
-
-                        git.checkout().addPath(d.getNewPath()).call();
-
-                        createRollbackScript(nameRollback, pathPKGSpec, pathPKG);
-                        FileUtils.write(oldFile, scriptBeforeRollback, "UTF-8");
-
-                        logger.info("Created rollback for new script " + nameRollback);
-                        git.add().addFilepattern("db/scripts/" + nameScript+".sql").call();
-                        git.add().addFilepattern("db/scripts/" + nameRollback+".sql").call();
-                    }
-                }
+    public void generaScript() {
+        try {
+            git = Git.open(getRepositoryDirectory());
+            repository = git.getRepository();
+            List<String> changedFilesList = getChangedFiles();
+            if (CollectionUtils.isEmpty(changedFilesList)) {
+                logger.info("Not found changes in packages");
+                return;
             }
+
+            logger.info("Create script for packages: " + changedFilesList, ColorLogger.Color.YELLOW);
+            boolean wasSpec = false;
+            String packageName;
+            String scriptCommitName = null;
+            String scriptRollbackName = null;
+            for(String fileName : changedFilesList) {
+                if (fileName.contains("_spec.sql")) {
+                    packageName = getPackageName(fileName, true);
+                    scriptCommitName = createCommitScript(packageName);
+                    scriptRollbackName = createRollbackScript(packageName);
+                    wasSpec = true;
+                } else if (!wasSpec){
+                    packageName = getPackageName(fileName, false);
+                    scriptCommitName = createCommitScript(packageName);
+                    scriptRollbackName = createRollbackScript(packageName);
+                    wasSpec = false;
+                } else {
+                    wasSpec = false;
+                    continue;
+                }
+                git.add().addFilepattern("db/scripts/" + scriptCommitName).call();
+                git.add().addFilepattern("db/scripts/" + scriptRollbackName).call();
+            }
+            git.close();
+            logger.info("Create packages done", ColorLogger.Color.GREEN);
         } catch (IOException | GitAPIException e) {
             e.printStackTrace();
         }
     }
 
-    private void createCommitScript(String nameScript, Path pathPKGSpec, Path pathPKG) throws IOException {
-        Path newScriptPKG;
-        newScriptPKG = Path.of(appArguments.getScriptsDirectory() + File.separator + nameScript + ".sql");
-
-        Files.write(newScriptPKG, Files.readAllBytes(pathPKGSpec), StandardOpenOption.CREATE_NEW);
-        Files.write(newScriptPKG, "\n\n".getBytes(), StandardOpenOption.APPEND);
-        Files.write(newScriptPKG, Files.readAllBytes(pathPKG), StandardOpenOption.APPEND);
+    private List<String> getChangedFiles() {
+        try {
+            List<DiffEntry> diffFiles = git.diff().call();
+            return diffFiles.stream()
+                    .filter(d -> d.getChangeType() == DiffEntry.ChangeType.MODIFY || d.getChangeType() == DiffEntry.ChangeType.ADD)
+                    .map(DiffEntry::getNewPath)
+                    .filter(newPath -> newPath.contains(PACKAGES_DDL_DIRECTORY_NAME))
+                    .map(newPath -> newPath.split("/")[3])
+                    .sorted(Comparator.reverseOrder())
+                    .collect(Collectors.toList());
+        } catch (GitAPIException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
-    private void createRollbackScript(String nameRollback, Path pathPKGSpec, Path pathPKG) throws IOException {
-        Path newRollbackPKG;
-        newRollbackPKG = Path.of(appArguments.getScriptsDirectory() + File.separator + nameRollback + ".sql");
+    private String createCommitScript(String packageName) throws IOException {
+        String scriptName = generateScriptName(getIssueName(), packageName);
+        Path script = Path.of(String.format("%s%s%s.sql", appArguments.getScriptsDirectory(), File.separator, scriptName));
+        Path pathPKGSpec = Path.of(appArguments.getPackageDirectory() + File.separator + packageName
+                + PACKAGE_SPECIFICATION_SUFFIX + ".sql");
+        Path pathPKG = Path.of(appArguments.getPackageDirectory() + File.separator + packageName + ".sql");
 
-        Files.write(newRollbackPKG, Files.readAllBytes(pathPKGSpec), StandardOpenOption.CREATE_NEW);
-        Files.write(newRollbackPKG, "\n\n".getBytes(), StandardOpenOption.APPEND);
-        Files.write(newRollbackPKG, Files.readAllBytes(pathPKG), StandardOpenOption.APPEND);
+        Files.write(script, Files.readAllBytes(pathPKGSpec), StandardOpenOption.CREATE_NEW);
+        Files.write(script, "\n\n".getBytes(), StandardOpenOption.APPEND);
+        Files.write(script, Files.readAllBytes(pathPKG), StandardOpenOption.APPEND);
+
+        logger.info("Created new script " + scriptName);
+        return scriptName + ".sql";
     }
 
-    private String getNameScript(String issueName, String packageName) {
+    private String createRollbackScript(String packageName) throws IOException, GitAPIException {
+        String scriptName = generateScriptName(getIssueName(), packageName) + ROLLBACK_SUFFIX;
+        Path script = Path.of(String.format("%s%s%s.sql", appArguments.getScriptsDirectory(), File.separator, scriptName));
+        Path pathPKGSpec = Path.of(appArguments.getPackageDirectory() + File.separator + packageName
+                + PACKAGE_SPECIFICATION_SUFFIX + ".sql");
+        Path pathPKG = Path.of(appArguments.getPackageDirectory() + File.separator + packageName + ".sql");
+
+        //save new text from ddl
+        String newDdlText = FileUtils.readFileToString(pathPKGSpec.toFile(), "UTF-8");
+        //rollback changes ddl
+        git.checkout().addPath("db/ddl/packages/" + packageName + PACKAGE_SPECIFICATION_SUFFIX + ".sql").call();
+        //write old text ddl to script_rollback
+        Files.write(script, Files.readAllBytes(pathPKGSpec), StandardOpenOption.CREATE_NEW);
+        Files.write(script, "\n\n".getBytes(), StandardOpenOption.APPEND);
+        //comeback new text in ddl
+        FileUtils.write(pathPKGSpec.toFile(), newDdlText, "UTF-8");
+
+        newDdlText = FileUtils.readFileToString(pathPKG.toFile(), "UTF-8");
+        git.checkout().addPath("db/ddl/packages/" + packageName + ".sql").call();
+        Files.write(script, Files.readAllBytes(pathPKG), StandardOpenOption.APPEND);
+        FileUtils.write(pathPKG.toFile(), newDdlText, "UTF-8");
+
+        logger.info("Created rollback for new script " + scriptName);
+        return scriptName + ".sql";
+    }
+
+    private String generateScriptName(String issueName, String packageName) {
         List<File> scripts = (List<File>) FileUtils.listFiles(appArguments.getScriptsDirectory(), new String[]{"sql"}, false);
 
         String lastNum = scripts.get(scripts.size() - 1).getName().split("_")[0];
         int numScript = Integer.parseInt(lastNum) + 1;
 
-        return String.format("%d_%s_pkg_%s", numScript, issueName, packageName);
+        return String.format("%d_%s_%s", numScript, issueName, packageName);
     }
 
     private File getRepositoryDirectory() {
         return new File(Path.of(appArguments.getScriptsDirectory().getParent()).toFile().getParent());
     }
 
-    private String getNamePackage(String path) {
-        String result = path.split("/")[3];
-        return result.substring(0, result.length() - 4);
+    private String getPackageName(String fileName, boolean spec) {
+        return spec ? fileName.substring(0, fileName.length() - 9) : fileName.substring(0, fileName.length() - 4);
     }
 
-    private String getIssueName(Git git) throws IOException {
+
+    private String getIssueName() throws IOException {
         return git.getRepository().getBranch().split("_")[0];
     }
 }
