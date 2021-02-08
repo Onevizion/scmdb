@@ -42,6 +42,9 @@ public class DbManager {
     @Autowired
     private ColorLogger logger;
 
+    @Autowired
+    private PackageGenerator packageGenerator;
+
     public void updateDb() {
         logger.info("SCMDB {}", getClass().getPackage().getImplementationVersion());
         scriptExecutor.printVersion();
@@ -206,6 +209,11 @@ public class DbManager {
         Set<DbObject> changedDbObjects = findChangedDbObjects(scriptsToGenDdl);
         ddlGenerator.executeSettingTransformParams();
         ddlGenerator.generateDdls(changedDbObjects, false);
+    }
+
+    public void generatePackage() {
+        logger.info("Check package");
+        packageGenerator.packageScriptGenerate();
     }
 
     private Set<DbObject> findChangedDbObjects(List<SqlScript> scripts) {
