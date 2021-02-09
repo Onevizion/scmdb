@@ -57,16 +57,16 @@ public class PackageGenerator {
 
             logger.info("Create script for packages: " + changedFilesList, ColorLogger.Color.YELLOW);
             boolean wasSpec = false;
-            String packageName;
+            String packageName = "";
             String scriptCommitName = null;
             String scriptRollbackName = null;
-            for(String fileName : changedFilesList) {
+            for (String fileName : changedFilesList) {
                 if (fileName.contains("_spec.sql")) {
                     packageName = getPackageName(fileName, true);
                     scriptCommitName = createCommitScript(packageName);
                     scriptRollbackName = createRollbackScript(packageName);
                     wasSpec = true;
-                } else if (!wasSpec){
+                } else if (!wasSpec || !fileName.contains(packageName)) {
                     packageName = getPackageName(fileName, false);
                     scriptCommitName = createCommitScript(packageName);
                     scriptRollbackName = createRollbackScript(packageName);
