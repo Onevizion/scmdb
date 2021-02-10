@@ -212,8 +212,8 @@ public class DbManager {
     }
 
     public void generatePackage() {
-        logger.info("Check package");
-        packageGenerator.packageScriptGenerate();
+        logger.info("Check packages");
+        packageGenerator.generatePackages();
     }
 
     private Set<DbObject> findChangedDbObjects(List<SqlScript> scripts) {
