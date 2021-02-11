@@ -52,7 +52,7 @@ public class PackageGenerator {
 
             List<String> changedFilesList = getChangedPackages();
             if (CollectionUtils.isEmpty(changedFilesList)) {
-                logger.info("Not found changes in packages for new scripts", YELLOW);
+                logger.info("There are no changes in the packages for generating the script.", YELLOW);
             } else {
                 generateScripts(changedFilesList);
                 return;
@@ -60,7 +60,7 @@ public class PackageGenerator {
 
             RevCommit mergeCommit = getMergeCommit();
             if (mergeCommit == null) {
-                logger.info("Not found Merge commit `master` into " + repository.getBranch(), YELLOW);
+                logger.info("Merge commit `master` into {} not found", YELLOW, repository.getBranch());
             } else {
                 updateScript(mergeCommit);
             }
@@ -74,7 +74,7 @@ public class PackageGenerator {
 
     public void generateScripts(List<String> changedFilesList) {
         try {
-            logger.info("Create script for packages: " + changedFilesList);
+            logger.info("Generating scripts for packages: " + changedFilesList);
             boolean wasSpec = false;
             String packageName = "";
             String scriptCommitName;
@@ -101,7 +101,6 @@ public class PackageGenerator {
                 git.add().addFilepattern("db/scripts/" + scriptRollbackName).call();
             }
             git.close();
-            logger.info("Create packages done", GREEN);
         } catch (GitAPIException e) {
             logger.info(e.getMessage(), RED);
             applyStash();
@@ -115,7 +114,7 @@ public class PackageGenerator {
             List<String> scriptFiles = getScriptNames();
 
             if (CollectionUtils.isEmpty(scriptFiles)) {
-                logger.info("Not found scripts for packages", YELLOW);
+                logger.info("Scripts for packages not found", YELLOW);
                 return;
             }
             logger.info("Find script file {}", scriptFiles);
@@ -126,7 +125,7 @@ public class PackageGenerator {
                 changedPackages = getPackagesWithConflicts(mergeCommit);
             }
             if (CollectionUtils.isEmpty(changedPackages)) {
-                logger.info("Not found conflicts", YELLOW);
+                logger.info("Conflicts nod found", YELLOW);
                 return;
             }
 
@@ -151,7 +150,6 @@ public class PackageGenerator {
         }
     }
 
-    //TODO: add refresh cache, after reset cache mey broke, index = 0, but diff > 0 --> maybe fixed add tree
     private List<String> getChangedPackages() throws GitAPIException, IOException {
         AbstractTreeIterator oldTree = new FileTreeIterator( git.getRepository() );
         AbstractTreeIterator newTree = new DirCacheIterator( git.getRepository().readDirCache() );
@@ -211,12 +209,21 @@ public class PackageGenerator {
         Path pathPKGSpec = Path.of(appArguments.getPackageDirectory() + File.separator + packageName
                 + PACKAGE_SPECIFICATION_SUFFIX + ".sql");
         Path pathPKG = Path.of(appArguments.getPackageDirectory() + File.separator + packageName + ".sql");
+        StandardOpenOption openOption = StandardOpenOption.CREATE_NEW;
+        if (Files.exists(script)) {
+            openOption = StandardOpenOption.TRUNCATE_EXISTING;
+        }
 
-        Files.write(script, Files.readAllBytes(pathPKGSpec), StandardOpenOption.CREATE_NEW);
+        Files.write(script, Files.readAllBytes(pathPKGSpec), openOption);
         Files.write(script, "\n\n".getBytes(), StandardOpenOption.APPEND);
         Files.write(script, Files.readAllBytes(pathPKG), StandardOpenOption.APPEND);
 
-        logger.info("Script file [{}] was created", GREEN, scriptName);
+        if (openOption == StandardOpenOption.CREATE_NEW) {
+            logger.info("Generated script file [{}]", GREEN, scriptName);
+        } else {
+            logger.info("Script file [{}] was changed", CYAN, scriptName);
+        }
+
         return scriptName + ".sql";
     }
 
@@ -239,13 +246,16 @@ public class PackageGenerator {
         Path pathPKGSpec = Path.of(appArguments.getPackageDirectory() + File.separator + packageName
                 + PACKAGE_SPECIFICATION_SUFFIX + ".sql");
         Path pathPKG = Path.of(appArguments.getPackageDirectory() + File.separator + packageName + ".sql");
-
+        StandardOpenOption openOption = StandardOpenOption.CREATE_NEW;
+        if (Files.exists(rollback)) {
+            openOption = StandardOpenOption.TRUNCATE_EXISTING;
+        }
         //save new text from ddl
         String newDdlText = FileUtils.readFileToString(pathPKGSpec.toFile(), "UTF-8");
         //rollback changes ddl
         git.checkout().addPath("db/ddl/packages/" + packageName + PACKAGE_SPECIFICATION_SUFFIX + ".sql").call();
         //write old text ddl to script_rollback
-        Files.write(rollback, Files.readAllBytes(pathPKGSpec), StandardOpenOption.CREATE_NEW);
+        Files.write(rollback, Files.readAllBytes(pathPKGSpec), openOption);
         Files.write(rollback, "\n\n".getBytes(), StandardOpenOption.APPEND);
         //comeback new text in ddl
         FileUtils.write(pathPKGSpec.toFile(), newDdlText, "UTF-8");
@@ -255,7 +265,12 @@ public class PackageGenerator {
         Files.write(rollback, Files.readAllBytes(pathPKG), StandardOpenOption.APPEND);
         FileUtils.write(pathPKG.toFile(), newDdlText, "UTF-8");
 
-        logger.info("Script file [{}] was created", GREEN, scriptName);
+        if (openOption == StandardOpenOption.CREATE_NEW) {
+            logger.info("Generating script file [{}]", GREEN, scriptName);
+        } else {
+            logger.info("Script file [{}] was changed", CYAN, scriptName);
+        }
+
         return scriptName + ".sql";
     }
 
@@ -283,14 +298,7 @@ public class PackageGenerator {
         logger.info("Script file [{}] was changed", CYAN, scriptName);
     }
 
-    //TODO: change logic and num of script file
     private String generateScriptName(String issueName, String packageName) {
-//        List<File> scripts = (List<File>) FileUtils.listFiles(appArguments.getScriptsDirectory(), new String[]{"sql"}, false);
-//
-//        String lastNum = scripts.get(scripts.size() - 1).getName().split("_")[0];
-//        int numScript = Integer.parseInt(lastNum) + 1;
-
-//        return String.format("%d_%s_%s", numScript, issueName, packageName);
         return String.format("%s_%s_%s", "XXXX", issueName, packageName);
     }
 
