@@ -77,8 +77,11 @@ public class PackageGenerator {
             logger.info("Create script for packages: " + changedFilesList);
             boolean wasSpec = false;
             String packageName = "";
-            String scriptCommitName = null;
-            String scriptRollbackName = null;
+            String scriptCommitName;
+            String scriptRollbackName;
+
+            createStash();
+
             for (String fileName : changedFilesList) {
                 if (fileName.contains("_spec.sql")) {
                     packageName = getPackageName(fileName, true);
@@ -99,7 +102,10 @@ public class PackageGenerator {
             }
             git.close();
             logger.info("Create packages done", GREEN);
-        } catch (IOException | GitAPIException e) {
+        } catch (GitAPIException e) {
+            logger.info(e.getMessage(), RED);
+            applyStash();
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -305,6 +311,26 @@ public class PackageGenerator {
 
     private String getIssueName() throws IOException {
         return git.getRepository().getBranch().split("_")[0];
+    }
+
+    private void createStash() {
+        try {
+            RevCommit stash = git.stashCreate().call();
+            logger.info("Create Stash");
+            git.stashApply().setStashRef(stash.getName()).call();
+        } catch (GitAPIException e) {
+            logger.info(e.getMessage(), RED);
+        }
+    }
+
+    private void applyStash() {
+        try {
+            logger.info("Apply auto created Stash");
+            Collection<RevCommit> stashs = git.stashList().call();
+            git.stashApply().setStashRef(stashs.iterator().next().getName()).call();
+        } catch (GitAPIException e) {
+            logger.info(e.getMessage(), RED);
+        }
     }
 
     private RevCommit getMergeCommit() {
