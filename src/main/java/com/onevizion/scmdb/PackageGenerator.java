@@ -6,11 +6,13 @@ import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.*;
 import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
+import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -110,9 +112,18 @@ public class PackageGenerator {
                 logger.info("Not found scripts for packages", YELLOW);
                 return;
             }
-            logger.info("Updating scripts: " + scriptFiles);
+            logger.info("Find script file {}", scriptFiles);
 
             List<String> changedPackages = getChangedPackages(mergeCommit);
+
+            if (CollectionUtils.isEmpty(changedPackages)) {
+                changedPackages = getPackagesWithConflicts(mergeCommit);
+            }
+            if (CollectionUtils.isEmpty(changedPackages)) {
+                logger.info("Not found conflicts", YELLOW);
+                return;
+            }
+
             String packageName;
             for(String pack : changedPackages) {
                 for(String script : scriptFiles) {
@@ -134,9 +145,11 @@ public class PackageGenerator {
         }
     }
 
-    //TODO: add refresh cache, after reset cache mey broke, index = 0, but diff > 0
-    private List<String> getChangedPackages() throws GitAPIException {
-        List<DiffEntry> diff = git.diff().call();
+    //TODO: add refresh cache, after reset cache mey broke, index = 0, but diff > 0 --> maybe fixed add tree
+    private List<String> getChangedPackages() throws GitAPIException, IOException {
+        AbstractTreeIterator oldTree = new FileTreeIterator( git.getRepository() );
+        AbstractTreeIterator newTree = new DirCacheIterator( git.getRepository().readDirCache() );
+        List<DiffEntry> diff = git.diff().setNewTree(newTree).setOldTree(oldTree).call();
         return diff.stream()
                 .filter(d -> d.getChangeType() == DiffEntry.ChangeType.MODIFY || d.getChangeType() == DiffEntry.ChangeType.ADD)
                 .map(DiffEntry::getNewPath)
@@ -144,7 +157,6 @@ public class PackageGenerator {
                 .map(newPath -> newPath.split("/")[3])
                 .sorted(Comparator.reverseOrder())
                 .collect(Collectors.toList());
-
     }
 
     private List<String> getChangedPackages(RevCommit mergeCommit) throws IOException, GitAPIException {
@@ -162,6 +174,19 @@ public class PackageGenerator {
                 .map(newPath -> newPath.split("/")[3])
                 .sorted(Comparator.reverseOrder())
                 .collect(Collectors.toList());
+    }
+
+    private List<String> getPackagesWithConflicts(RevCommit mergeCommit) {
+        String[] conflicts = mergeCommit.getFullMessage().split("#");
+        List<String> pakagesFile = new ArrayList<>();
+        String[] sp;
+        for (String str : conflicts) {
+            if (str.contains(PACKAGES_DDL_DIRECTORY_NAME)) {
+                sp = str.split("/");
+                pakagesFile.add(sp[sp.length - 1].strip());
+            }
+        }
+        return pakagesFile;
     }
 
     private List<String> getScriptNames() throws IOException {
@@ -204,7 +229,7 @@ public class PackageGenerator {
 
     private String createRollbackScript(String packageName) throws IOException, GitAPIException {
         String scriptName = generateScriptName(getIssueName(), packageName) + ROLLBACK_SUFFIX;
-        Path script = Path.of(String.format("%s%s%s.sql", appArguments.getScriptsDirectory(), File.separator, scriptName));
+        Path rollback = Path.of(String.format("%s%s%s.sql", appArguments.getScriptsDirectory(), File.separator, scriptName));
         Path pathPKGSpec = Path.of(appArguments.getPackageDirectory() + File.separator + packageName
                 + PACKAGE_SPECIFICATION_SUFFIX + ".sql");
         Path pathPKG = Path.of(appArguments.getPackageDirectory() + File.separator + packageName + ".sql");
@@ -214,14 +239,14 @@ public class PackageGenerator {
         //rollback changes ddl
         git.checkout().addPath("db/ddl/packages/" + packageName + PACKAGE_SPECIFICATION_SUFFIX + ".sql").call();
         //write old text ddl to script_rollback
-        Files.write(script, Files.readAllBytes(pathPKGSpec), StandardOpenOption.CREATE_NEW);
-        Files.write(script, "\n\n".getBytes(), StandardOpenOption.APPEND);
+        Files.write(rollback, Files.readAllBytes(pathPKGSpec), StandardOpenOption.CREATE_NEW);
+        Files.write(rollback, "\n\n".getBytes(), StandardOpenOption.APPEND);
         //comeback new text in ddl
         FileUtils.write(pathPKGSpec.toFile(), newDdlText, "UTF-8");
 
         newDdlText = FileUtils.readFileToString(pathPKG.toFile(), "UTF-8");
         git.checkout().addPath("db/ddl/packages/" + packageName + ".sql").call();
-        Files.write(script, Files.readAllBytes(pathPKG), StandardOpenOption.APPEND);
+        Files.write(rollback, Files.readAllBytes(pathPKG), StandardOpenOption.APPEND);
         FileUtils.write(pathPKG.toFile(), newDdlText, "UTF-8");
 
         logger.info("Script file [{}] was created", GREEN, scriptName);
@@ -284,10 +309,12 @@ public class PackageGenerator {
 
     private RevCommit getMergeCommit() {
         try {
+            String commitMessage;
             String mergeMessage = "Merge branch 'master' into " + repository.getBranch();
             Iterable<RevCommit> commits = git.log().setMaxCount(3).call();
             for (RevCommit commit : commits) {
-                if (commit.getShortMessage().equals(mergeMessage)) {
+                commitMessage = commit.getShortMessage();
+                if (commitMessage.contains(mergeMessage)) {
                     return commit;
                 }
             }
