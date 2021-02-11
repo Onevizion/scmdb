@@ -303,10 +303,11 @@ public class PackageGenerator {
     }
 
     private String getPackageNameFromScriptName(String fileName) throws IOException {
-        String startName = "XXXX_" + getIssueName() + "_";
+        //XXXX_issueName_
+        int length = 6 + getIssueName().length();
         return fileName.endsWith(ROLLBACK_SUFFIX + ".sql") ?
-                fileName.substring(startName.length(), fileName.length() - (ROLLBACK_SUFFIX.length() + 4)) :
-                fileName.substring(startName.length(), fileName.length() - 4);
+                fileName.substring(length, fileName.length() - (ROLLBACK_SUFFIX.length() + 4)) :
+                fileName.substring(length, fileName.length() - 4);
     }
 
     private String getIssueName() throws IOException {
