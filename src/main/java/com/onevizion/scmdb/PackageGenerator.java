@@ -216,7 +216,7 @@ public class PackageGenerator {
         }
 
         Files.write(script, Files.readAllBytes(pathPKGSpec), openOption);
-        Files.write(script, "\n\n".getBytes(), StandardOpenOption.APPEND);
+        Files.write(script, "\n\n".getBytes(StandardCharsets.UTF_8), StandardOpenOption.APPEND);
         Files.write(script, Files.readAllBytes(pathPKG), StandardOpenOption.APPEND);
 
         if (openOption == StandardOpenOption.CREATE_NEW) {
@@ -235,7 +235,7 @@ public class PackageGenerator {
         Path pathPKG = Path.of(appArguments.getPackageDirectory() + File.separator + packageName + ".sql");
 
         Files.write(script, Files.readAllBytes(pathPKGSpec), StandardOpenOption.TRUNCATE_EXISTING);
-        Files.write(script, "\n\n".getBytes(), StandardOpenOption.APPEND);
+        Files.write(script, "\n\n".getBytes(StandardCharsets.UTF_8), StandardOpenOption.APPEND);
         Files.write(script, Files.readAllBytes(pathPKG), StandardOpenOption.APPEND);
 
         logger.info("Script file [{}] was changed", CYAN, scriptName);
@@ -257,7 +257,7 @@ public class PackageGenerator {
         git.checkout().addPath("db/ddl/packages/" + packageName + PACKAGE_SPECIFICATION_SUFFIX + ".sql").call();
         //write old text ddl to script_rollback
         Files.write(rollback, Files.readAllBytes(pathPKGSpec), openOption);
-        Files.write(rollback, "\n\n".getBytes(), StandardOpenOption.APPEND);
+        Files.write(rollback, "\n\n".getBytes(StandardCharsets.UTF_8), StandardOpenOption.APPEND);
         //comeback new text in ddl
         FileUtils.write(pathPKGSpec.toFile(), newDdlText, "UTF-8");
 
