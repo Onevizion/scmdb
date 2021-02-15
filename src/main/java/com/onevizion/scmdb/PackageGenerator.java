@@ -300,7 +300,24 @@ public class PackageGenerator {
     }
 
     private String generateScriptName(String issueName, String packageName) {
-        return String.format("%s_%s_%s", "XXXX", issueName, packageName);
+        List<File> files = FileUtils.listFiles(appArguments.getScriptsDirectory(), new String[]{"sql"}, false)
+                .stream()
+                .filter(file -> file.getName().startsWith("9"))
+                .collect(Collectors.toList());
+        int num = 9000;
+        String script = String.format("_%s_%s", issueName, packageName);
+        String fileName;
+        for (File file : files) {
+            fileName = file.getName();
+            if (fileName.startsWith(String.valueOf(num))) {
+                if (fileName.contains(script)) {
+                    return fileName.substring(0, fileName.length() - 4);
+                } else {
+                    num++;
+                }
+            }
+        }
+        return num + script;
     }
 
     private File getRepositoryDirectory() {
