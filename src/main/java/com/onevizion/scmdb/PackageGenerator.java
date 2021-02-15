@@ -100,6 +100,7 @@ public class PackageGenerator {
                 git.add().addFilepattern("db/scripts/" + scriptCommitName).call();
                 git.add().addFilepattern("db/scripts/" + scriptRollbackName).call();
             }
+            deleteStash();
             git.close();
         } catch (GitAPIException e) {
             logger.info(e.getMessage(), RED);
@@ -327,6 +328,15 @@ public class PackageGenerator {
             RevCommit stash = git.stashCreate().call();
             logger.info("Create Stash");
             git.stashApply().setStashRef(stash.getName()).call();
+        } catch (GitAPIException e) {
+            logger.info(e.getMessage(), RED);
+        }
+    }
+
+    private void deleteStash() {
+        try {
+            logger.info("Delete auto created Stash");
+            git.stashDrop().setStashRef(0).call();
         } catch (GitAPIException e) {
             logger.info(e.getMessage(), RED);
         }
