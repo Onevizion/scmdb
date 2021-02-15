@@ -5,6 +5,7 @@ import com.onevizion.scmdb.vo.DbCnnCredentials;
 import com.onevizion.scmdb.vo.SchemaType;
 import com.onevizion.scmdb.vo.SqlScript;
 import joptsimple.internal.Strings;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.exec.*;
 import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,7 +16,9 @@ import java.net.URL;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
@@ -30,6 +33,7 @@ public class SqlScriptExecutor {
 
     private static final String INVALID_OBJECT_PREFIX = "Invalid objects in";
     private static final String INVALID_OBJECT_REGEX = "^(\\w+\\s){0,2}\\w+\\s+\\S+\\s+is invalid.\\s*";
+    private static final String INVALID_OBJECT_IN_SCHEMA = "INVALIDOBJECTSIN";
     private static final String ERROR_STARTING_AT_LINE = "Error starting at line :";
     private static final String CREATE_SQL = "create.sql";
     private static final int SCRIPT_EXIT_CODE_ERROR = 1;
@@ -38,6 +42,8 @@ public class SqlScriptExecutor {
     private Executor executor;
     private boolean isErrorMsgStarted = false;
     private boolean scriptExecutedWithError = false;
+    private boolean isPartInvalidObject = false;
+    private final List<String> lines = new ArrayList<>();
 
     @Autowired
     private AppArguments appArguments;
@@ -50,6 +56,19 @@ public class SqlScriptExecutor {
         executor.setStreamHandler(new PumpStreamHandler(new LogOutputStream() {
             @Override
             protected void processLine(String line, int logLevel) {
+                if (line.contains(INVALID_OBJECT_IN_SCHEMA)) {
+                    isPartInvalidObject = true;
+                    return;
+                }
+                if (line.startsWith("Disconnected")) {
+                    printInvalidObjects();
+                    isPartInvalidObject = false;
+                }
+                if (isPartInvalidObject) {
+                    lines.add(line);
+                    logger.info(String.valueOf(logLevel), YELLOW);
+                    return;
+                }
                 if (line.startsWith(INVALID_OBJECT_PREFIX)) {
                     logger.warn(line, YELLOW);
                 } else if (line.matches(INVALID_OBJECT_REGEX)) {
@@ -170,5 +189,21 @@ public class SqlScriptExecutor {
             logger.error("Error during command execution.", e);
             throw new ScriptExecException("Cannot find SQLcl, make sure SQLcl is available.", e);
         }
+    }
+
+    public void printInvalidObjects() {
+        if (CollectionUtils.isEmpty(lines) || lines.size() < 5) {
+            logger.info("Invalid objects not found");
+            return;
+        }
+        for (String str : lines) {
+            if (str.startsWith(INVALID_OBJECT_PREFIX)) {
+                logger.warn(str, YELLOW);
+            } else if (str.matches(INVALID_OBJECT_REGEX)) {
+                logger.warn(str, YELLOW);
+            }
+        }
+        lines.clear();
+        logger.info("\n");
     }
 }
