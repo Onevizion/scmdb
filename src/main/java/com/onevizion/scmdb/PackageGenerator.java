@@ -53,7 +53,7 @@ public class PackageGenerator {
 
             List<String> changedFilesList = getChangedPackages();
             if (CollectionUtils.isEmpty(changedFilesList)) {
-                logger.info("There are no changes in the packages for generating the script.", YELLOW);
+                logger.info("Not found changes in packages");
             } else {
                 generateScripts(changedFilesList);
                 return;
@@ -61,13 +61,13 @@ public class PackageGenerator {
 
             RevCommit mergeCommit = getMergeCommit();
             if (mergeCommit == null) {
-                logger.info("Merge commit `master` into {} not found", YELLOW, repository.getBranch());
+                logger.info("Merge commit `master` into {} not found", repository.getBranch());
             } else {
                 updateScript(mergeCommit);
             }
 
         } catch (GitAPIException | IOException e) {
-            e.printStackTrace();
+            logger.error("Error with Git: ", e);
         } finally {
             git.close();
         }
@@ -85,12 +85,12 @@ public class PackageGenerator {
 
             for (String fileName : changedFilesList) {
                 if (fileName.contains("_spec.sql")) {
-                    packageName = getPackageName(fileName, true);
+                    packageName = getPackageNameFromFile(fileName, true);
                     scriptCommitName = createCommitScript(packageName);
                     scriptRollbackName = createRollbackScript(packageName);
                     wasSpec = true;
                 } else if (!wasSpec || !fileName.contains(packageName)) {
-                    packageName = getPackageName(fileName, false);
+                    packageName = getPackageNameFromFile(fileName, false);
                     scriptCommitName = createCommitScript(packageName);
                     scriptRollbackName = createRollbackScript(packageName);
                     wasSpec = false;
@@ -104,9 +104,10 @@ public class PackageGenerator {
             deleteStash();
             git.close();
         } catch (GitAPIException e) {
-            logger.info(e.getMessage(), RED);
-            applyStash();
-        } catch (IOException e) {
+            logger.error("There was an error with the git, in such a case Stash was automatically created", e);
+            throw new RuntimeException("Git error", e);
+        }
+        catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -127,7 +128,7 @@ public class PackageGenerator {
                 changedPackages = getPackagesWithConflicts(mergeCommit);
             }
             if (CollectionUtils.isEmpty(changedPackages)) {
-                logger.info("Conflicts nod found", YELLOW);
+                logger.info("Conflicts nod found");
                 return;
             }
 
@@ -157,32 +158,23 @@ public class PackageGenerator {
             git = Git.open(getRepositoryDirectory());
             repository = git.getRepository();
 
-            //TODO: пройтись и найти коммиты одной issue
-            List<RevCommit> commits = new ArrayList<>();
             RevCommit lastCommit = git.log().setMaxCount(1).call().iterator().next();
             RevCommit beforeCommit = null;
             RevWalk walk = new RevWalk(repository);
-//            RevCommit lastCommit = walk.parseCommit(repository.resolve("5183c11d"));
             walk.markStart(walk.parseCommit(lastCommit));
-            RevCommit commit;
             String issueId = lastCommit.getShortMessage().split(" ")[0];
-            for (Iterator<RevCommit> it = walk.iterator(); it.hasNext(); ) {
-                commit = it.next();
-                if (commit.getShortMessage().startsWith(issueId)) {
-                    commits.add(commit);
-                } else {
-                    beforeCommit = commit;
+            for (RevCommit revCommit : walk) {
+                if (!revCommit.getShortMessage().startsWith(issueId)) {
+                    beforeCommit = revCommit;
                     break;
                 }
             }
-            commits.stream().map(RevCommit::getShortMessage).forEach(System.out::println);
             walk.dispose();
 
-            //TODO: сравнить коммиты isuee с последним комитом до cherry-pik --> getChangedPackages
-            List<String> changedPackages = getChangedPackages(commits.get(0), beforeCommit);
+            List<String> changedPackages = getChangedPackages(lastCommit, beforeCommit);
 
             if (CollectionUtils.isEmpty(changedPackages)) {
-                logger.info("not found packages", RED);
+                logger.info("Not found changes in packages");
                 return;
             }
 
@@ -197,9 +189,9 @@ public class PackageGenerator {
             for(String localScript : localScripts) {
                 for(String packageName : changedPackages) {
                     if (packageName.contains("_spec")) {
-                        packageName = getPackageName(packageName, true);
+                        packageName = getPackageNameFromFile(packageName, true);
                     } else {
-                        packageName = getPackageName(packageName, false);
+                        packageName = getPackageNameFromFile(packageName, false);
                     }
                     if (localScript.endsWith(ROLLBACK_SUFFIX + ".sql") && scriptNameContainsPackage(localScript, packageName, true)) {
                         scriptPath = Path.of(appArguments.getScriptsDirectory() + File.separator + localScript);
@@ -245,22 +237,26 @@ public class PackageGenerator {
                 .collect(Collectors.toList());
     }
 
-    private List<String> getChangedPackages(RevCommit mergeCommit) throws IOException, GitAPIException {
+    private List<String> getChangedPackages(RevCommit mergeCommit) {
         RevCommit beforeMergeCommit = getBeforeMergeCommit(mergeCommit);
         return getChangedPackages(mergeCommit, beforeMergeCommit);
     }
 
-    private List<String> getChangedPackages(RevCommit lastCommit, RevCommit beforeCommit) throws IOException, GitAPIException {
-        AbstractTreeIterator newTreeIterator = getCanonicalTreeParser(lastCommit);
-        AbstractTreeIterator oldTreeIterator = getCanonicalTreeParser(beforeCommit);
-        List<DiffEntry> diff = git.diff().setNewTree(newTreeIterator).setOldTree(oldTreeIterator).call();
-        return diff.stream()
-                .filter(d -> d.getChangeType() == DiffEntry.ChangeType.MODIFY)
-                .map(DiffEntry::getNewPath)
-                .filter(newPath -> newPath.contains(PACKAGES_DDL_DIRECTORY_NAME))
-                .map(newPath -> newPath.split("/")[3])
-                .sorted(Comparator.reverseOrder())
-                .collect(Collectors.toList());
+    private List<String> getChangedPackages(RevCommit lastCommit, RevCommit beforeCommit) {
+        try {
+            AbstractTreeIterator newTreeIterator = getCanonicalTreeParser(lastCommit);
+            AbstractTreeIterator oldTreeIterator = getCanonicalTreeParser(beforeCommit);
+            List<DiffEntry> diff = git.diff().setNewTree(newTreeIterator).setOldTree(oldTreeIterator).call();
+            return diff.stream()
+                    .filter(d -> d.getChangeType() == DiffEntry.ChangeType.MODIFY)
+                    .map(DiffEntry::getNewPath)
+                    .filter(newPath -> newPath.contains(PACKAGES_DDL_DIRECTORY_NAME))
+                    .map(newPath -> newPath.split("/")[3])
+                    .sorted(Comparator.reverseOrder())
+                    .collect(Collectors.toList());
+        } catch (IOException | GitAPIException e) {
+            throw new RuntimeException("Git exception ", e);
+        }
     }
 
     private List<String> getPackagesWithConflicts(RevCommit mergeCommit) {
@@ -285,13 +281,13 @@ public class PackageGenerator {
                 .collect(Collectors.toList());
     }
 
-    private String createCommitScript(String packageName) throws IOException {
-        String scriptName = generateScriptName(getIssueName(), packageName);
-        return createCommitScript(packageName, scriptName);
+    private String createCommitScript(String packageName) {
+        String scriptName = generateScriptName(getIssueName(), packageName) + ".sql";
+        return updateCommitScript(packageName, scriptName);
     }
 
-    private String createCommitScript(String packageName, String scriptName) throws IOException {
-        Path script = Path.of(String.format("%s%s%s", appArguments.getScriptsDirectory(), File.separator, scriptName));
+    private String updateCommitScript(String packageName, String scriptName) {
+        Path script = Path.of(appArguments.getScriptsDirectory() + File.separator + scriptName);
         Path pathPKGSpec = Path.of(appArguments.getPackageDirectory() + File.separator + packageName
                 + PACKAGE_SPECIFICATION_SUFFIX + ".sql");
         Path pathPKG = Path.of(appArguments.getPackageDirectory() + File.separator + packageName + ".sql");
@@ -300,9 +296,13 @@ public class PackageGenerator {
             openOption = StandardOpenOption.TRUNCATE_EXISTING;
         }
 
-        Files.write(script, Files.readAllBytes(pathPKGSpec), openOption);
-        Files.write(script, "\n\n".getBytes(StandardCharsets.UTF_8), StandardOpenOption.APPEND);
-        Files.write(script, Files.readAllBytes(pathPKG), StandardOpenOption.APPEND);
+        try {
+            Files.write(script, Files.readAllBytes(pathPKGSpec), openOption);
+            Files.write(script, "\n\n".getBytes(StandardCharsets.UTF_8), StandardOpenOption.APPEND);
+            Files.write(script, Files.readAllBytes(pathPKG), StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            throw new RuntimeException("Can't write script to file [" + script.getFileName() + "]", e);
+        }
 
         if (openOption == StandardOpenOption.CREATE_NEW) {
             logger.info("Generated script file [{}]", GREEN, scriptName);
@@ -310,20 +310,7 @@ public class PackageGenerator {
             logger.info("Script file [{}] was changed", CYAN, scriptName);
         }
 
-        return scriptName + ".sql";
-    }
-
-    private void updateCommitScript(String packageName, String scriptName) throws IOException {
-        Path script = Path.of(appArguments.getScriptsDirectory() + File.separator + scriptName);
-        Path pathPKGSpec = Path.of(appArguments.getPackageDirectory() + File.separator + packageName
-                + PACKAGE_SPECIFICATION_SUFFIX + ".sql");
-        Path pathPKG = Path.of(appArguments.getPackageDirectory() + File.separator + packageName + ".sql");
-
-        Files.write(script, Files.readAllBytes(pathPKGSpec), StandardOpenOption.TRUNCATE_EXISTING);
-        Files.write(script, "\n\n".getBytes(StandardCharsets.UTF_8), StandardOpenOption.APPEND);
-        Files.write(script, Files.readAllBytes(pathPKG), StandardOpenOption.APPEND);
-
-        logger.info("Script file [{}] was changed", CYAN, scriptName);
+        return scriptName;
     }
 
     private String createRollbackScript(String packageName) throws IOException, GitAPIException {
@@ -368,7 +355,12 @@ public class PackageGenerator {
 
         String scriptSpecText;
         String scriptBodyText;
-        String currentBranch = repository.getBranch();
+        String currentBranch;
+        try {
+            currentBranch = repository.getBranch();
+        } catch (IOException e) {
+            throw new RuntimeException("Current git branch not found", e);
+        }
 
         git.checkout().setName("master").call();
 
@@ -377,9 +369,13 @@ public class PackageGenerator {
 
         git.checkout().setName(currentBranch).call();
 
-        Files.write(script, scriptSpecText.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
-        Files.write(script, "\n\n".getBytes(StandardCharsets.UTF_8), StandardOpenOption.APPEND);
-        Files.write(script, scriptBodyText.getBytes(StandardCharsets.UTF_8), StandardOpenOption.APPEND);
+        try {
+            Files.write(script, scriptSpecText.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
+            Files.write(script, "\n\n".getBytes(StandardCharsets.UTF_8), StandardOpenOption.APPEND);
+            Files.write(script, scriptBodyText.getBytes(StandardCharsets.UTF_8), StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            throw new RuntimeException("Can't write script to file [" + script.getFileName() + "]", e);
+        }
 
         logger.info("Script file [{}] was changed", CYAN, scriptName);
     }
@@ -409,11 +405,11 @@ public class PackageGenerator {
         return new File(Path.of(appArguments.getScriptsDirectory().getParent()).toFile().getParent());
     }
 
-    private String getPackageName(String fileName, boolean spec) {
+    private String getPackageNameFromFile(String fileName, boolean spec) {
         return spec ? fileName.substring(0, fileName.length() - 9) : fileName.substring(0, fileName.length() - 4);
     }
 
-    private String getPackageNameFromScriptName(String fileName) throws IOException {
+    private String getPackageNameFromScriptName(String fileName) {
         //XXXX_issueName_
         int length = 6 + getIssueName().length();
         return fileName.endsWith(ROLLBACK_SUFFIX + ".sql") ?
@@ -421,8 +417,12 @@ public class PackageGenerator {
                 fileName.substring(length, fileName.length() - 4);
     }
 
-    private String getIssueName() throws IOException {
-        return git.getRepository().getBranch().split("_")[0];
+    private String getIssueName() {
+        try {
+            return git.getRepository().getBranch().split("_")[0];
+        } catch (IOException e) {
+            throw new RuntimeException("Branch not found", e);
+        }
     }
 
     private void createStash() {
@@ -431,7 +431,7 @@ public class PackageGenerator {
             logger.info("Create Stash");
             git.stashApply().setStashRef(stash.getName()).call();
         } catch (GitAPIException e) {
-            logger.info(e.getMessage(), RED);
+            throw new RuntimeException("Can't create stash", e);
         }
     }
 
@@ -440,17 +440,7 @@ public class PackageGenerator {
             logger.info("Delete auto created Stash");
             git.stashDrop().setStashRef(0).call();
         } catch (GitAPIException e) {
-            logger.info(e.getMessage(), RED);
-        }
-    }
-
-    private void applyStash() {
-        try {
-            logger.info("Apply auto created Stash");
-            Collection<RevCommit> stashs = git.stashList().call();
-            git.stashApply().setStashRef(stashs.iterator().next().getName()).call();
-        } catch (GitAPIException e) {
-            logger.info(e.getMessage(), RED);
+            throw new RuntimeException("Can't delete stash", e);
         }
     }
 
@@ -466,7 +456,7 @@ public class PackageGenerator {
                 }
             }
         } catch (IOException | GitAPIException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Git branch not found", e);
         }
         return null;
     }
@@ -484,7 +474,7 @@ public class PackageGenerator {
                 }
             }
         } catch (GitAPIException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Git branch not found", e);
         }
         return null;
     }
