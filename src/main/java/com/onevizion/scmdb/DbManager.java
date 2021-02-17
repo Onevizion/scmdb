@@ -212,8 +212,13 @@ public class DbManager {
     }
 
     public void generatePackage() {
+        scriptsFacade.checkDbConnection();
         logger.info("Check packages");
-        packageGenerator.generatePackages();
+        if (appArguments.isBackport()) {
+            packageGenerator.generateBackportPackage();
+        } else {
+            packageGenerator.generatePackages();
+        }
     }
 
     private Set<DbObject> findChangedDbObjects(List<SqlScript> scripts) {

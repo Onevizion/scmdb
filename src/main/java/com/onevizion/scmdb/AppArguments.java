@@ -25,6 +25,7 @@ public class AppArguments {
     private boolean all = false;
     private boolean omitChanged = false;
     private boolean ignoreErrors = false;
+    private boolean backport = false;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
     private final static String PACKAGES_DIRECTORY_NAME = "packages";
@@ -47,6 +48,7 @@ public class AppArguments {
         OptionSpec execOption = parser.acceptsAll(asList("e", "exec"));
         OptionSpec genDdlOption = parser.acceptsAll(asList("d", "gen-ddl"));
         OptionSpec genPackageOption = parser.acceptsAll(asList("p", "gen-package"));
+        OptionSpec backportOption = parser.acceptsAll(asList("b", "backport"));
         OptionSpec allOption = parser.acceptsAll(asList("a", "all"));
         OptionSpec noColorOption = parser.acceptsAll(asList("n", "no-color"));
         OptionSpec omitChangedOption = parser.acceptsAll(asList("o", "omit-changed"));
@@ -89,6 +91,7 @@ public class AppArguments {
         genDdl = options.has(genDdlOption);
         genPackage = options.has(genPackageOption);
         all = options.has(allOption);
+        backport = options.has(backportOption);
         useColorLogging = !options.has(noColorOption);
         omitChanged = options.has(omitChangedOption);
         ignoreErrors = options.has(ignoreErrorsOption);
@@ -157,5 +160,9 @@ public class AppArguments {
 
     public File getPackageDirectory() {
         return packageDirectory;
+    }
+
+    public boolean isBackport() {
+        return backport;
     }
 }

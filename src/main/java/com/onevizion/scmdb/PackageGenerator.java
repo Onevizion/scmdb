@@ -1,6 +1,7 @@
 package com.onevizion.scmdb;
 
-import com.onevizion.scmdb.dao.DdlDao;
+import com.onevizion.scmdb.facade.DbScriptFacade;
+import com.onevizion.scmdb.vo.SqlScript;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.Git;
@@ -37,7 +38,7 @@ public class PackageGenerator {
     private Repository repository;
 
     @Autowired
-    private DdlDao ddlDao;
+    private DbScriptFacade scriptFacade;
 
     @Autowired
     private AppArguments appArguments;
@@ -112,7 +113,7 @@ public class PackageGenerator {
 
     public void updateScript(RevCommit mergeCommit) {
         try {
-            List<String> scriptFiles = getScriptNames();
+            List<String> scriptFiles = getScriptNames(getIssueName());
 
             if (CollectionUtils.isEmpty(scriptFiles)) {
                 logger.info("Scripts for packages not found", YELLOW);
@@ -131,8 +132,8 @@ public class PackageGenerator {
             }
 
             String packageName;
-            for(String pack : changedPackages) {
-                for(String script : scriptFiles) {
+            for (String pack : changedPackages) {
+                for (String script : scriptFiles) {
                     packageName = getPackageNameFromScriptName(script);
                     if (pack.contains(packageName)) {
                         if (script.endsWith(ROLLBACK_SUFFIX + ".sql")) {
@@ -151,9 +152,89 @@ public class PackageGenerator {
         }
     }
 
+    public void generateBackportPackage() {
+        try {
+            git = Git.open(getRepositoryDirectory());
+            repository = git.getRepository();
+
+            //TODO: пройтись и найти коммиты одной issue
+            List<RevCommit> commits = new ArrayList<>();
+            RevCommit lastCommit = git.log().setMaxCount(1).call().iterator().next();
+            RevCommit beforeCommit = null;
+            RevWalk walk = new RevWalk(repository);
+//            RevCommit lastCommit = walk.parseCommit(repository.resolve("5183c11d"));
+            walk.markStart(walk.parseCommit(lastCommit));
+            RevCommit commit;
+            String issueId = lastCommit.getShortMessage().split(" ")[0];
+            for (Iterator<RevCommit> it = walk.iterator(); it.hasNext(); ) {
+                commit = it.next();
+                if (commit.getShortMessage().startsWith(issueId)) {
+                    commits.add(commit);
+                } else {
+                    beforeCommit = commit;
+                    break;
+                }
+            }
+            commits.stream().map(RevCommit::getShortMessage).forEach(System.out::println);
+            walk.dispose();
+
+            //TODO: сравнить коммиты isuee с последним комитом до cherry-pik --> getChangedPackages
+            List<String> changedPackages = getChangedPackages(commits.get(0), beforeCommit);
+
+            if (CollectionUtils.isEmpty(changedPackages)) {
+                logger.info("not found packages", RED);
+                return;
+            }
+
+            logger.info("Found changed packages: " + changedPackages);
+            List<String> localScripts = getScriptNames(issueId);
+            logger.info("Found scripts: " + localScripts);
+
+            int index = 0;
+            Path scriptPath;
+            List<SqlScript> lastCommitScripts;
+
+            for(String localScript : localScripts) {
+                for(String packageName : changedPackages) {
+                    if (packageName.contains("_spec")) {
+                        packageName = getPackageName(packageName, true);
+                    } else {
+                        packageName = getPackageName(packageName, false);
+                    }
+                    if (localScript.endsWith(ROLLBACK_SUFFIX + ".sql") && scriptNameContainsPackage(localScript, packageName, true)) {
+                        scriptPath = Path.of(appArguments.getScriptsDirectory() + File.separator + localScript);
+                        lastCommitScripts = scriptFacade.findByPackageName(packageName);
+                        while (lastCommitScripts.get(index).getName().equals(localScript)) {
+                            index++;
+                        }
+                        Files.write(scriptPath, lastCommitScripts.get(index).getText().getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
+                        logger.info("Script file [{}] was changed based [{}]", CYAN, localScript, lastCommitScripts.get(index).getName());
+                        index = 0;
+                        break;
+                    } else if (scriptNameContainsPackage(localScript, packageName, false)) {
+                        updateCommitScript(packageName, localScript);
+                        break;
+                    }
+                }
+            }
+        } catch (GitAPIException | IOException e) {
+            e.printStackTrace();
+        } finally {
+            git.close();
+        }
+    }
+
+    private boolean scriptNameContainsPackage(String script, String packageName, boolean isRollback) {
+        int indexEnd = script.length();
+        indexEnd = isRollback ? indexEnd - 13 : indexEnd - 4;
+
+        String scr = script.substring(0, indexEnd);
+        return  scr.endsWith(packageName);
+    }
+
     private List<String> getChangedPackages() throws GitAPIException, IOException {
-        AbstractTreeIterator oldTree = new FileTreeIterator( git.getRepository() );
-        AbstractTreeIterator newTree = new DirCacheIterator( git.getRepository().readDirCache() );
+        AbstractTreeIterator oldTree = new FileTreeIterator(git.getRepository());
+        AbstractTreeIterator newTree = new DirCacheIterator(git.getRepository().readDirCache());
         List<DiffEntry> diff = git.diff().setNewTree(newTree).setOldTree(oldTree).call();
         return diff.stream()
                 .filter(d -> d.getChangeType() == DiffEntry.ChangeType.MODIFY || d.getChangeType() == DiffEntry.ChangeType.ADD)
@@ -166,12 +247,13 @@ public class PackageGenerator {
 
     private List<String> getChangedPackages(RevCommit mergeCommit) throws IOException, GitAPIException {
         RevCommit beforeMergeCommit = getBeforeMergeCommit(mergeCommit);
+        return getChangedPackages(mergeCommit, beforeMergeCommit);
+    }
 
-        AbstractTreeIterator newTreeIterator = getCanonicalTreeParser(mergeCommit);
-        AbstractTreeIterator oldTreeIterator = getCanonicalTreeParser(beforeMergeCommit);
-
+    private List<String> getChangedPackages(RevCommit lastCommit, RevCommit beforeCommit) throws IOException, GitAPIException {
+        AbstractTreeIterator newTreeIterator = getCanonicalTreeParser(lastCommit);
+        AbstractTreeIterator oldTreeIterator = getCanonicalTreeParser(beforeCommit);
         List<DiffEntry> diff = git.diff().setNewTree(newTreeIterator).setOldTree(oldTreeIterator).call();
-
         return diff.stream()
                 .filter(d -> d.getChangeType() == DiffEntry.ChangeType.MODIFY)
                 .map(DiffEntry::getNewPath)
@@ -194,19 +276,22 @@ public class PackageGenerator {
         return pakagesFile;
     }
 
-    private List<String> getScriptNames() throws IOException {
-        String issue = getIssueName();
+    private List<String> getScriptNames(String issueId) {
         List<File> files = (List<File>) FileUtils.listFiles(appArguments.getScriptsDirectory(), new String[]{"sql"}, false);
         return files.stream()
                 .map(File::getName)
-                .filter(name -> name.contains(issue))
+                .filter(name -> name.contains(issueId))
                 .sorted(Comparator.reverseOrder())
                 .collect(Collectors.toList());
     }
 
     private String createCommitScript(String packageName) throws IOException {
         String scriptName = generateScriptName(getIssueName(), packageName);
-        Path script = Path.of(String.format("%s%s%s.sql", appArguments.getScriptsDirectory(), File.separator, scriptName));
+        return createCommitScript(packageName, scriptName);
+    }
+
+    private String createCommitScript(String packageName, String scriptName) throws IOException {
+        Path script = Path.of(String.format("%s%s%s", appArguments.getScriptsDirectory(), File.separator, scriptName));
         Path pathPKGSpec = Path.of(appArguments.getPackageDirectory() + File.separator + packageName
                 + PACKAGE_SPECIFICATION_SUFFIX + ".sql");
         Path pathPKG = Path.of(appArguments.getPackageDirectory() + File.separator + packageName + ".sql");
@@ -392,7 +477,7 @@ public class PackageGenerator {
             boolean beforeMerge = false;
             for (RevCommit commit : commits) {
                 if (beforeMerge) {
-                    return  commit;
+                    return commit;
                 }
                 if (commit.getName().equals(mergeCommit.getName())) {
                     beforeMerge = true;

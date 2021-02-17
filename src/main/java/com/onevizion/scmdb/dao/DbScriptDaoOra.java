@@ -27,6 +27,7 @@ public class DbScriptDaoOra extends AbstractDaoOra {
     private static final String CREATE = "insert into db_script (name,file_hash,text,ts,output,type,status) values (:name,:fileHash,:text,:ts,:output,:type.id,:status.id)";
     private static final String DELETE = "delete from db_script where db_script_id = ?";
     private static final String READ_ALL = "select * from db_script";
+    private static final String FIND_BY_NAME_PACKAGE = "select * from db_script where name like '%%%s%%' and type = 0 order by name desc";
     private static final String READ_COUNT = "select count(*) from db_script";
 
     private RowMapper<SqlScript> rowMapper = (rs, rowNum) -> {
@@ -56,6 +57,10 @@ public class DbScriptDaoOra extends AbstractDaoOra {
 
     public Long readCount() {
         return jdbcTemplate.queryForObject(READ_COUNT, Long.class);
+    }
+
+    public List<SqlScript> findByPackageName(String name) {
+        return jdbcTemplate.query(String.format(FIND_BY_NAME_PACKAGE, name), rowMapper);
     }
 
     public void createAll(Collection<SqlScript> scripts) {

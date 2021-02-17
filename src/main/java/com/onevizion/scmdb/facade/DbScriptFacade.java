@@ -200,4 +200,15 @@ public class DbScriptFacade {
     public void checkDbConnection() {
         sqlScriptDaoOra.checkDbConnection();
     }
+
+    public List<SqlScript> findByPackageName(String name) {
+        if (name.equals("util")) {
+            return sqlScriptDaoOra.findByPackageName(name)
+                    .stream()
+                    .filter(scr -> scr.getName().matches("(\\d(_util\\.sql))"))
+                    .collect(Collectors.toList());
+        }
+
+        return sqlScriptDaoOra.findByPackageName(name);
+    }
 }
