@@ -107,12 +107,10 @@ end;
 set heading off
 select 'Invalid objects in [' || user || ']:'
 from dual;
-
 column object_type format a15
 column object_name format a30 wra
 column invalid_message format a15
 set tab off
-set heading off
 select
   substr(object_type, 1, 15) object_type,
   substr(object_name, 1, 30) object_name,
