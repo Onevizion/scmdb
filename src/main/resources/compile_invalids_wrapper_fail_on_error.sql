@@ -104,6 +104,7 @@ begin
 end;
 /
 
+set heading off
 select 'Invalid objects in [' || user || ']:'
 from dual;
 column object_type format a15
