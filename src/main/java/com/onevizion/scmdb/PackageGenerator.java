@@ -382,23 +382,33 @@ public class PackageGenerator {
 
     private String generateScriptName(String issueName, String packageName) {
         List<File> files = FileUtils.listFiles(appArguments.getScriptsDirectory(), new String[]{"sql"}, false)
-                .stream()
-                .filter(file -> file.getName().startsWith("9"))
-                .collect(Collectors.toList());
-        int num = 9000;
-        String script = String.format("_%s_%s", issueName, packageName);
+                    .stream()
+                    .limit(99)
+                    .collect(Collectors.toList());
+        int num = 1;
+        String scriptName = String.format("_%s_%s", issueName, packageName);
         String fileName;
-        for (File file : files) {
-            fileName = file.getName();
+        if (CollectionUtils.isEmpty(files) || !files.get(0).getName().startsWith("1_")) {
+            return num + scriptName;
+        }
+
+        for (int i = 0; i < files.size(); i++) {
+            fileName = files.get(i).getName();
             if (fileName.startsWith(String.valueOf(num))) {
-                if (fileName.contains(script)) {
+                if (fileName.contains(scriptName)) {
                     return fileName.substring(0, fileName.length() - 4);
                 } else {
                     num++;
+                    i++;
                 }
+            } else {
+                break;
             }
         }
-        return num + script;
+        if (num > 99) {
+            logger.info("The range for automatic script renaming has been exceeded.", CYAN);
+        }
+        return num + scriptName;
     }
 
     private File getRepositoryDirectory() {
@@ -410,8 +420,8 @@ public class PackageGenerator {
     }
 
     private String getPackageNameFromScriptName(String fileName) {
-        //XXXX_issueName_
-        int length = 6 + getIssueName().length();
+        //XX_issueName_
+        int length = (fileName.indexOf('_') + 2) + getIssueName().length();
         return fileName.endsWith(ROLLBACK_SUFFIX + ".sql") ?
                 fileName.substring(length, fileName.length() - (ROLLBACK_SUFFIX.length() + 4)) :
                 fileName.substring(length, fileName.length() - 4);
