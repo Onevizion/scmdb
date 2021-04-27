@@ -25,12 +25,6 @@
             <version>${spring.version}</version>
         </dependency>
 
-<!--        <dependency>-->
-<!--            <groupId>com.oracle.jdbc</groupId>-->
-<!--            <artifactId>ojdbc8</artifactId>-->
-<!--            <version>12.2.0.1</version>-->
-<!--        </dependency>-->
-
         <dependency>
             <groupId>com.oracle.database.jdbc</groupId>
             <artifactId>ojdbc8</artifactId>
