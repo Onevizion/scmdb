@@ -1,0 +1,31 @@
+name: Maven Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ github.event.inputs.source_branch_name }}
+
+    - name: Set up JDK
+      uses: actions/setup-java@v1
+      with:
+        java-version: 11
+
+    - name: Cache Maven packages
+      uses: actions/cache@v2
+      with:
+        path: ~/.m2/repository
+        key: m2repository
+        restore-keys: m2repository
+        
+    - name: Deploy
+      run: mvn -B deploy -Dmaven.test.skip=true -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/${{ github.repository }}
+      env:
+        GITHUB_TOKEN: ${{ github.token }}

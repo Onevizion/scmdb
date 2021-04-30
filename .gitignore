@@ -12,3 +12,4 @@ mobile-wf/gen
 mobile-wf/gen-external-apklibs
 .recommenders
 gui-test/test-output
+*.code-workspace
