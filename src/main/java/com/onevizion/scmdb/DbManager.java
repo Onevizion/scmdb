@@ -18,6 +18,7 @@ import static com.onevizion.scmdb.ColorLogger.Color.CYAN;
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.Scmdb.EXIT_CODE_SUCCESS;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
+import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
 import static com.onevizion.scmdb.vo.ScriptType.ROLLBACK;
 
 public class DbManager {
@@ -70,14 +71,9 @@ public class DbManager {
             return;
         }
 
-        List<SqlScript> newCommitScripts = newScripts.stream()
-                                                     .sorted()
-                                                     .filter(script -> script.getType() == ScriptType.COMMIT)
-                                                     .collect(Collectors.toList());
+        List<SqlScript> newCommitScripts = getSortedListScripts(newScripts, COMMIT);
 
-        List<SqlScript> newRollbackScripts = newScripts.stream()
-                                                       .filter(script -> script.getType() == ROLLBACK)
-                                                       .collect(Collectors.toList());
+        List<SqlScript> newRollbackScripts = getSortedListScripts(newScripts, ROLLBACK);
         scriptsFacade.batchCreate(newRollbackScripts);
 
         if (appArguments.isExecuteScripts()) {
@@ -102,11 +98,11 @@ public class DbManager {
 
     private void checkDeletedScripts() {
         Map<String, SqlScript> deletedScripts = scriptsFacade.getDeletedScriptsMap();
-        List<SqlScript> rollbacksToExec = deletedScripts.values().stream()
-                                                        .filter(script -> script.getType() == ROLLBACK)
+        List<SqlScript> rollbacksToExec = deletedScripts.values()
+                                                        .stream()
                                                         .filter(script -> deletedScripts.containsKey(script.getCommitName()))
-                                                        .sorted(Comparator.reverseOrder())
                                                         .collect(Collectors.toList());
+        rollbacksToExec = getSortedListScripts(rollbacksToExec, ROLLBACK);
         if (rollbacksToExec.isEmpty()) {
             scriptsFacade.deleteAll(deletedScripts.values());
             return;
@@ -257,5 +253,47 @@ public class DbManager {
 
         ddlGenerator.executeSettingTransformParams();
         ddlGenerator.generateDllsForAllDbObjects();
+    }
+
+    /**
+     * The method filters scripts by type, separates them into two parts (arr1 and arr2).
+     * The arr2 scripts are in the range 1..100, arr1 are all the others. If the type is ROOLBACK, then both parts are
+     * filtered in reverse order.
+     *
+     * Example 1 : Input  scripts = [1_script1.sql, 1_script1_rollback.sql, 8861_script2.sql, 8861_script2_rollback.sql]
+     *                    scriptType = COMMIT
+     *             Output List<SqlScript> = [8861_script2.sql, 1_script1.sql]
+     *
+     * Example 2 : Input  scripts = [1_script1.sql, 1_script1_rollback.sql, 8861_script2.sql, 8861_script2_rollback.sql]
+     *                    scriptType = ROLLBACK
+     *             Output List<SqlScript> = [1_script1_rollback.sql, 8861_script2_rollback.sql]
+     * @param scripts List of new scripts
+     * @param scriptType script type COMMIT/ROLLBACK
+     * @return list of scripts with the correct sequence of execution
+     */
+    private List<SqlScript> getSortedListScripts(List<SqlScript> scripts, ScriptType scriptType) {
+        scripts = scripts.stream()
+                         .filter(script -> script.getType() == scriptType)
+                         .collect(Collectors.toList());
+
+        List<SqlScript> arr1 = new ArrayList<>();
+        List<SqlScript> arr2 = new ArrayList<>();
+        for (SqlScript script : scripts) {
+            if (script.getName().matches("^\\d{4,}_.*")) {
+                arr1.add(script);
+            } else {
+                arr2.add(script);
+            }
+        }
+
+        if (scriptType == ROLLBACK) {
+            arr1.sort(Comparator.reverseOrder());
+            arr2.sort(Comparator.reverseOrder());
+            arr2.addAll(arr1);
+            return arr2;
+        } else {
+            arr1.addAll(arr2);
+            return arr1;
+        }
     }
 }
