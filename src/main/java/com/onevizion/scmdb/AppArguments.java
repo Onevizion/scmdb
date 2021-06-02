@@ -82,6 +82,10 @@ public class AppArguments {
         if (options.has(genPackageOption)) {
             packageDirectory = new File(scriptsDirectory.getParentFile().getAbsolutePath() + File.separator +
                   DDL_DIRECTORY_NAME + File.separator + PACKAGES_DIRECTORY_NAME);
+            if (!packageDirectory.exists() || !packageDirectory.isDirectory()) {
+                throw new IllegalArgumentException("Path [" + packageDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
+                        " Can't find packages directory");
+            }
         }
 
         if (options.has(execOption) && options.has(genDdlOption)) {

@@ -182,9 +182,8 @@ public class PackageGenerator {
             List<String> localScripts = getScriptNames(issueId);
             logger.info("Found scripts: " + localScripts);
 
-            int index = 0;
             Path scriptPath;
-            List<SqlScript> lastCommitScripts;
+            List<SqlScript> lastCommitScriptsFromDb;
 
             for(String localScript : localScripts) {
                 for(String packageName : changedPackages) {
@@ -195,13 +194,15 @@ public class PackageGenerator {
                     }
                     if (localScript.endsWith(ROLLBACK_SUFFIX + ".sql") && scriptNameContainsPackage(localScript, packageName, true)) {
                         scriptPath = Path.of(appArguments.getScriptsDirectory() + File.separator + localScript);
-                        lastCommitScripts = scriptFacade.findByPackageName(packageName);
-                        while (lastCommitScripts.get(index).getName().equals(localScript)) {
-                            index++;
+                        lastCommitScriptsFromDb = scriptFacade.getCommitScriptsByPackageName(packageName);
+
+                        for (SqlScript bdCommitScript : lastCommitScriptsFromDb) {
+                            if (!bdCommitScript.getName().equals(localScript)) {
+                                Files.write(scriptPath, bdCommitScript.getText().getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
+                                logger.info("Script file [{}] was changed based [{}]", CYAN, localScript, bdCommitScript.getName());
+                                break;
+                            }
                         }
-                        Files.write(scriptPath, lastCommitScripts.get(index).getText().getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
-                        logger.info("Script file [{}] was changed based [{}]", CYAN, localScript, lastCommitScripts.get(index).getName());
-                        index = 0;
                         break;
                     } else if (scriptNameContainsPackage(localScript, packageName, false)) {
                         updateCommitScript(packageName, localScript);
@@ -229,12 +230,12 @@ public class PackageGenerator {
         AbstractTreeIterator newTree = new DirCacheIterator(git.getRepository().readDirCache());
         List<DiffEntry> diff = git.diff().setNewTree(newTree).setOldTree(oldTree).call();
         return diff.stream()
-                .filter(d -> d.getChangeType() == DiffEntry.ChangeType.MODIFY || d.getChangeType() == DiffEntry.ChangeType.ADD)
-                .map(DiffEntry::getNewPath)
-                .filter(newPath -> newPath.contains(PACKAGES_DDL_DIRECTORY_NAME))
-                .map(newPath -> newPath.split("/")[3])
-                .sorted(Comparator.reverseOrder())
-                .collect(Collectors.toList());
+                   .filter(d -> d.getChangeType() == DiffEntry.ChangeType.MODIFY || d.getChangeType() == DiffEntry.ChangeType.ADD)
+                   .map(DiffEntry::getNewPath)
+                   .filter(newPath -> newPath.contains(PACKAGES_DDL_DIRECTORY_NAME))
+                   .map(newPath -> newPath.split("/")[3])
+                   .sorted(Comparator.reverseOrder())
+                   .collect(Collectors.toList());
     }
 
     private List<String> getChangedPackages(RevCommit mergeCommit) {
@@ -248,12 +249,12 @@ public class PackageGenerator {
             AbstractTreeIterator oldTreeIterator = getCanonicalTreeParser(beforeCommit);
             List<DiffEntry> diff = git.diff().setNewTree(newTreeIterator).setOldTree(oldTreeIterator).call();
             return diff.stream()
-                    .filter(d -> d.getChangeType() == DiffEntry.ChangeType.MODIFY)
-                    .map(DiffEntry::getNewPath)
-                    .filter(newPath -> newPath.contains(PACKAGES_DDL_DIRECTORY_NAME))
-                    .map(newPath -> newPath.split("/")[3])
-                    .sorted(Comparator.reverseOrder())
-                    .collect(Collectors.toList());
+                       .filter(d -> d.getChangeType() == DiffEntry.ChangeType.MODIFY)
+                       .map(DiffEntry::getNewPath)
+                       .filter(newPath -> newPath.contains(PACKAGES_DDL_DIRECTORY_NAME))
+                       .map(newPath -> newPath.split("/")[3])
+                       .sorted(Comparator.reverseOrder())
+                       .collect(Collectors.toList());
         } catch (IOException | GitAPIException e) {
             throw new RuntimeException("Git exception ", e);
         }
@@ -275,10 +276,10 @@ public class PackageGenerator {
     private List<String> getScriptNames(String issueId) {
         List<File> files = (List<File>) FileUtils.listFiles(appArguments.getScriptsDirectory(), new String[]{"sql"}, false);
         return files.stream()
-                .map(File::getName)
-                .filter(name -> name.contains(issueId))
-                .sorted(Comparator.reverseOrder())
-                .collect(Collectors.toList());
+                    .map(File::getName)
+                    .filter(name -> name.contains(issueId))
+                    .sorted(Comparator.reverseOrder())
+                    .collect(Collectors.toList());
     }
 
     private String createCommitScript(String packageName) {
@@ -382,9 +383,9 @@ public class PackageGenerator {
 
     private String generateScriptName(String issueName, String packageName) {
         List<File> files = FileUtils.listFiles(appArguments.getScriptsDirectory(), new String[]{"sql"}, false)
-                    .stream()
-                    .limit(99)
-                    .collect(Collectors.toList());
+                                    .stream()
+                                    .limit(99)
+                                    .collect(Collectors.toList());
         int num = 1;
         String scriptName = String.format("_%s_%s", issueName, packageName);
         String fileName;
