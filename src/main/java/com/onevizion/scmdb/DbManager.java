@@ -44,7 +44,6 @@ public class DbManager {
 
     public void updateDb() {
         logger.info("SCMDB {}", getClass().getPackage().getImplementationVersion());
-        scriptExecutor.printVersion();
 
         scriptsFacade.checkDbConnection();
 
