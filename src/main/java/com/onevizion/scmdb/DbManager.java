@@ -27,6 +27,7 @@ public class DbManager {
     private static final String NO_SCRIPTS_TO_EXEC_MSG = "No scripts to execute in [{}]:";
     private static final String SCRIPTS_TO_EXEC_MSG = "\nScripts to be executed in [{}]:";
     private static final String ROLLBACKS_TO_SKIP_MSG = "\nRollbacks skipped in [{}]:";
+    private static final String SCRIPT_NUMBERING_IS_MORE_THAN_THREE_DIGITS_REGEX = "^\\d{4,}_.*";
 
     @Autowired
     private DbScriptFacade scriptsFacade;
@@ -71,9 +72,9 @@ public class DbManager {
             return;
         }
 
-        List<SqlScript> newCommitScripts = getSortedListScripts(newScripts, COMMIT);
+        List<SqlScript> newCommitScripts = sortScriptsInExecutionOrder(newScripts, COMMIT);
 
-        List<SqlScript> newRollbackScripts = getSortedListScripts(newScripts, ROLLBACK);
+        List<SqlScript> newRollbackScripts = sortScriptsInExecutionOrder(newScripts, ROLLBACK);
         scriptsFacade.batchCreate(newRollbackScripts);
 
         if (appArguments.isExecuteScripts()) {
@@ -102,7 +103,7 @@ public class DbManager {
                                                         .stream()
                                                         .filter(script -> deletedScripts.containsKey(script.getCommitName()))
                                                         .collect(Collectors.toList());
-        rollbacksToExec = getSortedListScripts(rollbacksToExec, ROLLBACK);
+        rollbacksToExec = sortScriptsInExecutionOrder(rollbacksToExec, ROLLBACK);
         if (rollbacksToExec.isEmpty()) {
             scriptsFacade.deleteAll(deletedScripts.values());
             return;
@@ -256,9 +257,12 @@ public class DbManager {
     }
 
     /**
-     * The method filters scripts by type, separates them into two parts (arr1 and arr2).
-     * The arr2 scripts are in the range 1..100, arr1 are all the others. If the type is ROOLBACK, then both parts are
-     * filtered in reverse order.
+     * The method filters scripts by type and sorts them in the correct execution order.
+     * Scripts are divided into two list with low priority and high priority, all scripts in the range 1..100
+     * fall into the list with low priority and must be executed last.
+     * As a result, the groups are assembled into a list in turn, starting with a high priority.
+     * If the type is ROOLBACK, then each group will be sorted in reverse order and as a result,
+     * the groups are collected in a list in turn, starting with the lowest priority.
      *
      * Example 1 : Input  scripts = [1_script1.sql, 1_script1_rollback.sql, 8861_script2.sql, 8861_script2_rollback.sql]
      *                    scriptType = COMMIT
@@ -267,33 +271,34 @@ public class DbManager {
      * Example 2 : Input  scripts = [1_script1.sql, 1_script1_rollback.sql, 8861_script2.sql, 8861_script2_rollback.sql]
      *                    scriptType = ROLLBACK
      *             Output List<SqlScript> = [1_script1_rollback.sql, 8861_script2_rollback.sql]
-     * @param scripts List of new scripts
-     * @param scriptType script type COMMIT/ROLLBACK
-     * @return list of scripts with the correct sequence of execution
+     *
+     * @param scripts list of scripts to sort
+     * @param scriptType script type
+     * @return list of scripts with the correct execution order
      */
-    private List<SqlScript> getSortedListScripts(List<SqlScript> scripts, ScriptType scriptType) {
+    private List<SqlScript> sortScriptsInExecutionOrder(List<SqlScript> scripts, ScriptType scriptType) {
         scripts = scripts.stream()
                          .filter(script -> script.getType() == scriptType)
                          .collect(Collectors.toList());
 
-        List<SqlScript> arr1 = new ArrayList<>();
-        List<SqlScript> arr2 = new ArrayList<>();
+        List<SqlScript> highPriorityList = new ArrayList<>();
+        List<SqlScript> lowPriorityList = new ArrayList<>();
         for (SqlScript script : scripts) {
-            if (script.getName().matches("^\\d{4,}_.*")) {
-                arr1.add(script);
+            if (script.getName().matches(SCRIPT_NUMBERING_IS_MORE_THAN_THREE_DIGITS_REGEX)) {
+                highPriorityList.add(script);
             } else {
-                arr2.add(script);
+                lowPriorityList.add(script);
             }
         }
 
         if (scriptType == ROLLBACK) {
-            arr1.sort(Comparator.reverseOrder());
-            arr2.sort(Comparator.reverseOrder());
-            arr2.addAll(arr1);
-            return arr2;
+            highPriorityList.sort(Comparator.reverseOrder());
+            lowPriorityList.sort(Comparator.reverseOrder());
+            lowPriorityList.addAll(highPriorityList);
+            return lowPriorityList;
         } else {
-            arr1.addAll(arr2);
-            return arr1;
+            highPriorityList.addAll(lowPriorityList);
+            return highPriorityList;
         }
     }
 }
