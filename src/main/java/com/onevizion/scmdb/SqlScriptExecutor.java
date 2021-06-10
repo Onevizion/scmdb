@@ -4,40 +4,36 @@ import com.onevizion.scmdb.exception.ScriptExecException;
 import com.onevizion.scmdb.vo.DbCnnCredentials;
 import com.onevizion.scmdb.vo.SchemaType;
 import com.onevizion.scmdb.vo.SqlScript;
-import joptsimple.internal.Strings;
-import org.apache.commons.exec.*;
+import oracle.dbtools.raptor.newscriptrunner.ScriptExecutor;
+import oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext;
 import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.Date;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
-import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
 import static com.onevizion.scmdb.Scmdb.EXIT_CODE_SUCCESS;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
 import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
 import static java.time.format.DateTimeFormatter.ISO_TIME;
+import static oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext.ERR_ENCOUNTERED;
 import static org.apache.commons.lang3.time.DurationFormatUtils.formatDurationHMS;
 
 public class SqlScriptExecutor {
-    private static final String SQL_CLIENT_COMMAND = "sql";
+    private static final String SQL_COMMAND = "@%s %s";
 
-    private static final String INVALID_OBJECT_PREFIX = "Invalid objects in";
-    private static final String INVALID_OBJECT_REGEX = "^(\\w+\\s){0,2}\\w+\\s+\\S+\\s+is invalid.\\s*";
-    private static final String ERROR_STARTING_AT_LINE = "Error starting at line :";
     private static final String CREATE_SQL = "create.sql";
     private static final int SCRIPT_EXIT_CODE_ERROR = 1;
-    private static final String ERROR_LAST_LINE_START = "*Action:";
-
-    private Executor executor;
-    private boolean isErrorMsgStarted = false;
-    private boolean scriptExecutedWithError = false;
+    private static final int SCRIPT_EXIT_CODE_SUCCESS = 0;
 
     @Autowired
     private AppArguments appArguments;
@@ -45,62 +41,35 @@ public class SqlScriptExecutor {
     @Autowired
     private ColorLogger logger;
 
-    public SqlScriptExecutor() {
-        executor = new DefaultExecutor();
-        executor.setStreamHandler(new PumpStreamHandler(new LogOutputStream() {
-            @Override
-            protected void processLine(String line, int logLevel) {
-                if (line.startsWith(INVALID_OBJECT_PREFIX)) {
-                    logger.warn(line, YELLOW);
-                } else if (line.matches(INVALID_OBJECT_REGEX)) {
-                    logger.warn(line, YELLOW);
-                } else if (line.startsWith(ERROR_STARTING_AT_LINE)) {
-                    scriptExecutedWithError = true;
-                    isErrorMsgStarted = true;
-                    logger.error(line);
-                } else if (line.startsWith(ERROR_LAST_LINE_START) || Strings.isNullOrEmpty(line)) {
-                    logger.error(line);
-                    isErrorMsgStarted = false;
-                } else if (isErrorMsgStarted) {
-                    logger.error(line);
-                } else {
-                    logger.info(line);
-                }
-            }
-        }, new LogOutputStream() {
-            @Override
-            protected void processLine(String line, int logLevel) {
-                logger.error(line);
-            }
-        }));
-    }
-
     public int execute(SqlScript script) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
                 cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
 
-        CommandLine commandLine = new CommandLine(SQL_CLIENT_COMMAND);
-        commandLine.addArgument("-L");
-        commandLine.addArgument(cnnCredentials.getConnectionString());
-
         File workingDir = script.getFile().getParentFile();
         File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType(), workingDir);
-        commandLine.addArgument("@" + wrapperScriptFile.getAbsolutePath());
-        commandLine.addArgument(script.getFile().getAbsolutePath());
 
-        executor.setWorkingDirectory(workingDir);
-        try {
+        try (Connection connection = DriverManager.getConnection(cnnCredentials.getOracleUrl(),
+                                                                 cnnCredentials.getSchemaName(),
+                                                                 cnnCredentials.getPassword())) {
+            connection.setAutoCommit(false);
+            ScriptExecutor executor = new ScriptExecutor(connection);
+            ScriptRunnerContext ctx = new ScriptRunnerContext();
+
+            ctx.setBaseConnection(connection);
+
+            executor.setScriptRunnerContext(ctx);
+            executor.setStmt(String.format(SQL_COMMAND, wrapperScriptFile.getAbsolutePath(), script.getFile().getAbsolutePath()));
+
             Instant start = Instant.now();
-            scriptExecutedWithError = false;
-            int exitCode = executor.execute(commandLine);
+            executor.run();
             String scriptExecutionTime = formatDurationHMS(Duration.between(start, Instant.now()).toMillis());
+
             logger.info("\n[{}] runtime: {}", GREEN, script.getName(), scriptExecutionTime);
-            return scriptExecutedWithError ? SCRIPT_EXIT_CODE_ERROR : exitCode;
-        } catch (ExecuteException e) {
-            return e.getExitValue();
-        } catch (IOException e) {
-            logger.error("Error during command execution.", e);
+
+            return (boolean) ctx.getProperty(ERR_ENCOUNTERED) ? SCRIPT_EXIT_CODE_ERROR : SCRIPT_EXIT_CODE_SUCCESS;
+        } catch (SQLException e) {
+            logger.error("Error during connection DB.", e);
             return SCRIPT_EXIT_CODE_ERROR;
         } finally {
             wrapperScriptFile.delete();
@@ -161,14 +130,4 @@ public class SqlScriptExecutor {
         }
     }
 
-    public void printVersion() {
-        CommandLine commandLine = new CommandLine(SQL_CLIENT_COMMAND);
-        commandLine.addArgument("-v");
-        try {
-            executor.execute(commandLine);
-        } catch (IOException e) {
-            logger.error("Error during command execution.", e);
-            throw new ScriptExecException("Cannot find SQLcl, make sure SQLcl is available.", e);
-        }
-    }
 }
