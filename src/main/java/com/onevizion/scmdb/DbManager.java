@@ -27,7 +27,7 @@ public class DbManager {
     private static final String NO_SCRIPTS_TO_EXEC_MSG = "No scripts to execute in [{}]:";
     private static final String SCRIPTS_TO_EXEC_MSG = "\nScripts to be executed in [{}]:";
     private static final String ROLLBACKS_TO_SKIP_MSG = "\nRollbacks skipped in [{}]:";
-    private static final String SCRIPT_NUMBERING_IS_MORE_THAN_THREE_DIGITS_REGEX = "^\\d{4,}_.*";
+    private static final String SCRIPT_NUMBERING_IS_MORE_THAN_TWO_DIGITS_REGEX = "^\\d{3,}_.*";
 
     @Autowired
     private DbScriptFacade scriptsFacade;
@@ -258,11 +258,9 @@ public class DbManager {
 
     /**
      * The method filters scripts by type and sorts them in the correct execution order.
-     * Scripts are divided into two list with low priority and high priority, all scripts in the range 1..100
-     * fall into the list with low priority and must be executed last.
-     * As a result, the groups are assembled into a list in turn, starting with a high priority.
-     * If the type is ROOLBACK, then each group will be sorted in reverse order and as a result,
-     * the groups are collected in a list in turn, starting with the lowest priority.
+     * Scripts will be sorted in ascending order of numbering, scripts in the range 1..99 will be added to the end of the list.
+     * If the type is ROLLBACK, then the scripts will be sorted in descending order of numbering,
+     * scripts in the range 99..1 will be added to the end of the list.
      *
      * Example 1 : Input  scripts = [1_script1.sql, 1_script1_rollback.sql, 8861_script2.sql, 8861_script2_rollback.sql]
      *                    scriptType = COMMIT
@@ -281,24 +279,26 @@ public class DbManager {
                          .filter(script -> script.getType() == scriptType)
                          .collect(Collectors.toList());
 
-        List<SqlScript> highPriorityList = new ArrayList<>();
-        List<SqlScript> lowPriorityList = new ArrayList<>();
+        List<SqlScript> commonScripts = new ArrayList<>();
+        List<SqlScript> scriptsLessThanHundred = new ArrayList<>();
         for (SqlScript script : scripts) {
-            if (script.getName().matches(SCRIPT_NUMBERING_IS_MORE_THAN_THREE_DIGITS_REGEX)) {
-                highPriorityList.add(script);
+            if (script.getName().matches(SCRIPT_NUMBERING_IS_MORE_THAN_TWO_DIGITS_REGEX)) {
+                commonScripts.add(script);
             } else {
-                lowPriorityList.add(script);
+                scriptsLessThanHundred.add(script);
             }
         }
 
         if (scriptType == ROLLBACK) {
-            highPriorityList.sort(Comparator.reverseOrder());
-            lowPriorityList.sort(Comparator.reverseOrder());
-            lowPriorityList.addAll(highPriorityList);
-            return lowPriorityList;
+            commonScripts.sort(Comparator.reverseOrder());
+            scriptsLessThanHundred.sort(Comparator.reverseOrder());
+            scriptsLessThanHundred.addAll(commonScripts);
+            return scriptsLessThanHundred;
         } else {
-            highPriorityList.addAll(lowPriorityList);
-            return highPriorityList;
+            commonScripts.sort(Comparator.naturalOrder());
+            scriptsLessThanHundred.sort(Comparator.naturalOrder());
+            commonScripts.addAll(scriptsLessThanHundred);
+            return commonScripts;
         }
     }
 }
