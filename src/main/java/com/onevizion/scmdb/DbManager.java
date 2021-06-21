@@ -42,6 +42,9 @@ public class DbManager {
     @Autowired
     private ColorLogger logger;
 
+    @Autowired
+    private PackageGenerator packageGenerator;
+
     public void updateDb() {
         logger.info("SCMDB {}", getClass().getPackage().getImplementationVersion());
         scriptExecutor.printVersion();
@@ -206,6 +209,16 @@ public class DbManager {
         Set<DbObject> changedDbObjects = findChangedDbObjects(scriptsToGenDdl);
         ddlGenerator.executeSettingTransformParams();
         ddlGenerator.generateDdls(changedDbObjects, false);
+    }
+
+    public void generatePackage() {
+        scriptsFacade.checkDbConnection();
+        logger.info("Check packages");
+        if (appArguments.isBackport()) {
+            packageGenerator.generateBackportPackage();
+        } else {
+            packageGenerator.generatePackages();
+        }
     }
 
     private Set<DbObject> findChangedDbObjects(List<SqlScript> scripts) {

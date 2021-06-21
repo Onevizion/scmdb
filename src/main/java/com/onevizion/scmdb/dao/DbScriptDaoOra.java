@@ -7,6 +7,7 @@ import com.onevizion.scmdb.vo.SqlScript;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.BeanPropertySqlParameterSource;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.SqlParameterSourceUtils;
 import org.springframework.stereotype.Repository;
 
@@ -28,6 +29,7 @@ public class DbScriptDaoOra extends AbstractDaoOra {
     private static final String DELETE = "delete from db_script where db_script_id = ?";
     private static final String READ_ALL = "select * from db_script";
     private static final String READ_COUNT = "select count(*) from db_script";
+    private static final String FIND_COMMIT_SCRIPTS_BY_NAME_CONTAINS_PACKAGE = "select * from db_script where name like '%'||:p_name||'%' and type = 0 order by name desc";
 
     private RowMapper<SqlScript> rowMapper = (rs, rowNum) -> {
         SqlScript script = new SqlScript();
@@ -56,6 +58,11 @@ public class DbScriptDaoOra extends AbstractDaoOra {
 
     public Long readCount() {
         return jdbcTemplate.queryForObject(READ_COUNT, Long.class);
+    }
+
+    public List<SqlScript> findCommitScriptsByPackageName(String name) {
+        MapSqlParameterSource params = new MapSqlParameterSource("p_name", name);
+        return namedParameterJdbcTemplate.query(FIND_COMMIT_SCRIPTS_BY_NAME_CONTAINS_PACKAGE, params, rowMapper);
     }
 
     public void createAll(Collection<SqlScript> scripts) {
