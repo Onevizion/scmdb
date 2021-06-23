@@ -282,10 +282,10 @@ public class DbManager {
         List<SqlScript> commonScripts = new ArrayList<>();
         List<SqlScript> scriptsLessThanHundred = new ArrayList<>();
         for (SqlScript script : scripts) {
-            if (script.getName().matches(SCRIPT_NUMBERING_IS_MORE_THAN_TWO_DIGITS_REGEX)) {
-                commonScripts.add(script);
-            } else {
+            if (!script.getName().matches(SCRIPT_NUMBERING_IS_MORE_THAN_TWO_DIGITS_REGEX)) {
                 scriptsLessThanHundred.add(script);
+            } else {
+                commonScripts.add(script);
             }
         }
 
