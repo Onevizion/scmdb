@@ -18,6 +18,7 @@ import static com.onevizion.scmdb.ColorLogger.Color.CYAN;
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.Scmdb.EXIT_CODE_SUCCESS;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
+import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
 import static com.onevizion.scmdb.vo.ScriptType.ROLLBACK;
 
 public class DbManager {
@@ -26,6 +27,7 @@ public class DbManager {
     private static final String NO_SCRIPTS_TO_EXEC_MSG = "No scripts to execute in [{}]:";
     private static final String SCRIPTS_TO_EXEC_MSG = "\nScripts to be executed in [{}]:";
     private static final String ROLLBACKS_TO_SKIP_MSG = "\nRollbacks skipped in [{}]:";
+    private static final String SCRIPT_NUMBERING_IS_MORE_THAN_TWO_DIGITS_REGEX = "^\\d{3,}_.*";
 
     @Autowired
     private DbScriptFacade scriptsFacade;
@@ -70,14 +72,9 @@ public class DbManager {
             return;
         }
 
-        List<SqlScript> newCommitScripts = newScripts.stream()
-                                                     .sorted()
-                                                     .filter(script -> script.getType() == ScriptType.COMMIT)
-                                                     .collect(Collectors.toList());
+        List<SqlScript> newCommitScripts = sortScriptsInExecutionOrder(newScripts, COMMIT);
 
-        List<SqlScript> newRollbackScripts = newScripts.stream()
-                                                       .filter(script -> script.getType() == ROLLBACK)
-                                                       .collect(Collectors.toList());
+        List<SqlScript> newRollbackScripts = sortScriptsInExecutionOrder(newScripts, ROLLBACK);
         scriptsFacade.batchCreate(newRollbackScripts);
 
         if (appArguments.isExecuteScripts()) {
@@ -102,11 +99,11 @@ public class DbManager {
 
     private void checkDeletedScripts() {
         Map<String, SqlScript> deletedScripts = scriptsFacade.getDeletedScriptsMap();
-        List<SqlScript> rollbacksToExec = deletedScripts.values().stream()
-                                                        .filter(script -> script.getType() == ROLLBACK)
+        List<SqlScript> rollbacksToExec = deletedScripts.values()
+                                                        .stream()
                                                         .filter(script -> deletedScripts.containsKey(script.getCommitName()))
-                                                        .sorted(Comparator.reverseOrder())
                                                         .collect(Collectors.toList());
+        rollbacksToExec = sortScriptsInExecutionOrder(rollbacksToExec, ROLLBACK);
         if (rollbacksToExec.isEmpty()) {
             scriptsFacade.deleteAll(deletedScripts.values());
             return;
@@ -257,5 +254,51 @@ public class DbManager {
 
         ddlGenerator.executeSettingTransformParams();
         ddlGenerator.generateDllsForAllDbObjects();
+    }
+
+    /**
+     * The method filters scripts by type and sorts them in the correct execution order.
+     * Scripts will be sorted in ascending order of numbering, scripts in the range 1..99 will be added to the end of the list.
+     * If the type is ROLLBACK, then the scripts will be sorted in descending order of numbering,
+     * scripts in the range 99..1 will be added to the end of the list.
+     *
+     * Example 1 : Input  scripts = [1_script1.sql, 1_script1_rollback.sql, 8861_script2.sql, 8861_script2_rollback.sql]
+     *                    scriptType = COMMIT
+     *             Output List<SqlScript> = [8861_script2.sql, 1_script1.sql]
+     *
+     * Example 2 : Input  scripts = [1_script1.sql, 1_script1_rollback.sql, 8861_script2.sql, 8861_script2_rollback.sql]
+     *                    scriptType = ROLLBACK
+     *             Output List<SqlScript> = [1_script1_rollback.sql, 8861_script2_rollback.sql]
+     *
+     * @param scripts list of scripts to sort
+     * @param scriptType script type
+     * @return list of scripts with the correct execution order
+     */
+    private List<SqlScript> sortScriptsInExecutionOrder(List<SqlScript> scripts, ScriptType scriptType) {
+        scripts = scripts.stream()
+                         .filter(script -> script.getType() == scriptType)
+                         .collect(Collectors.toList());
+
+        List<SqlScript> commonScripts = new ArrayList<>();
+        List<SqlScript> scriptsLessThanHundred = new ArrayList<>();
+        for (SqlScript script : scripts) {
+            if (!script.getName().matches(SCRIPT_NUMBERING_IS_MORE_THAN_TWO_DIGITS_REGEX)) {
+                scriptsLessThanHundred.add(script);
+            } else {
+                commonScripts.add(script);
+            }
+        }
+
+        if (scriptType == ROLLBACK) {
+            commonScripts.sort(Comparator.reverseOrder());
+            scriptsLessThanHundred.sort(Comparator.reverseOrder());
+            scriptsLessThanHundred.addAll(commonScripts);
+            return scriptsLessThanHundred;
+        } else {
+            commonScripts.sort(Comparator.naturalOrder());
+            scriptsLessThanHundred.sort(Comparator.naturalOrder());
+            commonScripts.addAll(scriptsLessThanHundred);
+            return commonScripts;
+        }
     }
 }
