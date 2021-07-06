@@ -34,7 +34,9 @@ public class Scmdb {
             ownerDs.setURL(ownerCredentials.getOracleUrl());
 
             DbManager dbManager = ctx.getBean(DbManager.class);
-            if (appArguments.isGenDdl()) {
+            if (appArguments.isGenPackage()) {
+                dbManager.generatePackage();
+            } else if (appArguments.isGenDdl()) {
                 if (appArguments.isAll()) {
                     dbManager.generateDdlForAllObjects();
                 } else {

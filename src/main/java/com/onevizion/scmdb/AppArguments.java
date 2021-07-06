@@ -16,15 +16,19 @@ import static java.util.Arrays.asList;
 public class AppArguments {
     private File scriptsDirectory;
     private File ddlsDirectory;
+    private File packageDirectory;
     private Map<SchemaType, DbCnnCredentials> credentials = new HashMap<>();
     private boolean genDdl;
     private boolean executeScripts;
+    private boolean genPackage;
     private boolean useColorLogging = true;
     private boolean all = false;
     private boolean omitChanged = false;
     private boolean ignoreErrors = false;
+    private boolean backport = false;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
+    private final static String PACKAGES_DIRECTORY_NAME = "packages";
 
     private AppArguments() {}
 
@@ -43,6 +47,8 @@ public class AppArguments {
 
         OptionSpec execOption = parser.acceptsAll(asList("e", "exec"));
         OptionSpec genDdlOption = parser.acceptsAll(asList("d", "gen-ddl"));
+        OptionSpec genPackageOption = parser.acceptsAll(asList("p", "gen-package"));
+        OptionSpec backportOption = parser.acceptsAll(asList("b", "backport"));
         OptionSpec allOption = parser.acceptsAll(asList("a", "all"));
         OptionSpec noColorOption = parser.acceptsAll(asList("n", "no-color"));
         OptionSpec omitChangedOption = parser.acceptsAll(asList("o", "omit-changed"));
@@ -73,13 +79,23 @@ public class AppArguments {
                         " Can't find ddl directory");
             }
         }
+        if (options.has(genPackageOption)) {
+            packageDirectory = new File(scriptsDirectory.getParentFile().getAbsolutePath() + File.separator +
+                  DDL_DIRECTORY_NAME + File.separator + PACKAGES_DIRECTORY_NAME);
+            if (!packageDirectory.exists() || !packageDirectory.isDirectory()) {
+                throw new IllegalArgumentException("Path [" + packageDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
+                        " Can't find packages directory");
+            }
+        }
 
         if (options.has(execOption) && options.has(genDdlOption)) {
             throw new IllegalArgumentException("You can't specify both --gen-ddl and --exec arguments. Choose one.");
         }
         executeScripts = options.has(execOption);
         genDdl = options.has(genDdlOption);
+        genPackage = options.has(genPackageOption);
         all = options.has(allOption);
+        backport = options.has(backportOption);
         useColorLogging = !options.has(noColorOption);
         omitChanged = options.has(omitChangedOption);
         ignoreErrors = options.has(ignoreErrorsOption);
@@ -140,5 +156,17 @@ public class AppArguments {
 
     public boolean isReadAllFilesContent() {
         return genDdl || !omitChanged;
+    }
+
+    public boolean isGenPackage() {
+        return genPackage;
+    }
+
+    public File getPackageDirectory() {
+        return packageDirectory;
+    }
+
+    public boolean isBackport() {
+        return backport;
     }
 }
