@@ -28,13 +28,13 @@
         <dependency>
             <groupId>com.oracle.database.jdbc</groupId>
             <artifactId>ojdbc8</artifactId>
-            <version>19.8.0.0</version>
+            <version>21.5.0.0</version>
         </dependency>
 
         <dependency>
             <groupId>com.oracle.database.jdbc</groupId>
             <artifactId>ucp</artifactId>
-            <version>19.8.0.0</version>
+            <version>21.5.0.0</version>
         </dependency>
 
         <dependency>
@@ -117,12 +117,6 @@
 
         <dependency>
             <groupId>com.oracle.jdbc</groupId>
-            <artifactId>xmlparserv2-sans-jaxp-services</artifactId>
-            <version>21.0.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.oracle.jdbc</groupId>
             <artifactId>orai18n-mapping</artifactId>
             <version>21.0.0</version>
         </dependency>
@@ -130,12 +124,19 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
-            <version>2.12.1</version>
+            <version>2.13.2</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.oracle.database.xml</groupId>
+            <artifactId>xmlparserv2_sans_jaxp_services</artifactId>
+            <version>21.5.0.0</version>
+        </dependency>
+
         <dependency>
             <groupId>com.oracle.jdbc</groupId>
             <artifactId>xdb6</artifactId>
-            <version>21.0.0</version>
+            <version>18.3.0.0</version>
         </dependency>
     </dependencies>
 
