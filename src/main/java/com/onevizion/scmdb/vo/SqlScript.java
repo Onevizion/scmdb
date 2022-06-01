@@ -180,6 +180,7 @@ public class SqlScript implements Comparable<SqlScript> {
     public int compareTo(SqlScript anotherScript) {
         return extractNumber(name) - extractNumber(anotherScript.getName());
     }
+
     private int extractNumber(String str) {
         String[] parts = str.split("_");
         if (parts.length >= 1 && NumberUtils.isDigits(parts[0])) {
