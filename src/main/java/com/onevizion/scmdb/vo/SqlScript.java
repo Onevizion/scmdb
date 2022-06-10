@@ -3,6 +3,7 @@ package com.onevizion.scmdb.vo;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -177,6 +178,15 @@ public class SqlScript implements Comparable<SqlScript> {
 
     @Override
     public int compareTo(SqlScript anotherScript) {
-        return name.compareTo(anotherScript.getName());
+        return extractNumber(name) - extractNumber(anotherScript.getName());
+    }
+
+    private int extractNumber(String str) {
+        String[] parts = str.split("_");
+        if (parts.length >= 1 && NumberUtils.isDigits(parts[0])) {
+            return Integer.parseInt(parts[0]);
+        } else {
+            return 0;
+        }
     }
 }
