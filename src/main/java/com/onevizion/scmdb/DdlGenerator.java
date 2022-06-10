@@ -12,12 +12,10 @@ import org.springframework.stereotype.Component;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.ColorLogger.Color.RED;
@@ -30,6 +28,7 @@ public class DdlGenerator {
     private static final String EDITIONABLE_MODIFIER = "EDITIONABLE ";
     private static final String NOEDITIONABLE_MODIFIER = "NONEDITIONABLE ";
     private static final String PK_CONSTRAINT_INDEX_POSTFIX = "\n  USING INDEX  ENABLE";
+    private static final String CONSTRAINT_PATTERN = "^\\s*CONSTRAINT\\s.*\\r*\\n*";
 
     @Autowired
     private DdlDao ddlDao;
@@ -87,6 +86,7 @@ public class DdlGenerator {
         ddl = ddl.replaceAll("\\n", "\r\n");
         ddl = ddl.replaceAll("\\t", "    ");
         ddl = ddl.replaceAll("\\r\\n\\s+REFERENCES\\s", " REFERENCES ");
+        ddl = sortConstraintInScript(ddl);
         ddl += generateTableCommentsDdl(table);
         ddl += generateIndexScripts(table);
         ddl += generateSequenceScripts(table);
@@ -183,6 +183,7 @@ public class DdlGenerator {
     private String generateIndexScripts(DbObject table) {
         logger.info("Adding indexes...");
         List<DbObject> indexes = ddlDao.extractTableDependentObjectsDdl(table.getName(), INDEX);
+        indexes.sort(Comparator.comparing(DbObject::getDdl));
         StringBuilder indexesDdl = new StringBuilder();
         for (int i = 0; i < indexes.size(); i++) {
             DbObject index = indexes.get(i);
@@ -196,6 +197,7 @@ public class DdlGenerator {
             ddl = ddl.replaceAll("\\s+;$", ";");
             indexesDdl.append(ddl);
         }
+        indexesDdl.append("\r\n");
         return indexesDdl.toString();
     }
 
@@ -227,6 +229,7 @@ public class DdlGenerator {
             }
             sequencesDdl.append(ddl);
         }
+        sequencesDdl.append("\r\n");
         return sequencesDdl.toString();
     }
 
@@ -382,5 +385,22 @@ public class DdlGenerator {
 
     public void generateDllsForAllDbObjects() {
         generateDdls(ddlDao.extractAllDbObjectsWithoutDdl(), true);
+    }
+
+    private String sortConstraintInScript(String ddlScript) {
+        Pattern pattern = Pattern.compile(CONSTRAINT_PATTERN, Pattern.MULTILINE);
+        Matcher matcher = pattern.matcher(ddlScript);
+        StringBuilder sortedDdl = new StringBuilder();
+        List<String> constraints = new ArrayList<>();
+        while (matcher.find()) {
+            constraints.add(matcher.group());
+            matcher.appendReplacement(sortedDdl, "");
+        }
+        matcher.appendTail(sortedDdl);
+        sortedDdl.setLength(sortedDdl.length() - 2);
+        Collections.sort(constraints);
+        constraints.forEach(sortedDdl::append);
+        sortedDdl.append(");");
+        return sortedDdl.toString();
     }
 }
