@@ -21,6 +21,7 @@ public class SqlScript implements Comparable<SqlScript> {
     private ScriptStatus status;
     private File file;
     private SchemaType schemaType = SchemaType.OWNER;
+    private int orderNumber;
 
     private static final String ROLLBACK_SUFFIX = "_rollback";
 
@@ -34,6 +35,7 @@ public class SqlScript implements Comparable<SqlScript> {
         script.setFile(scriptFile);
         script.setName(scriptFile.getName());
         script.setTs(new Date(scriptFile.lastModified()));
+        script.setOrderNumber(extractOrderNumber(script.getName()));
 
         if (FilenameUtils.getBaseName(script.getName()).endsWith(ROLLBACK_SUFFIX)) {
             script.setType(ScriptType.ROLLBACK);
@@ -158,6 +160,14 @@ public class SqlScript implements Comparable<SqlScript> {
         }
     }
 
+    public int getOrderNumber() {
+        return orderNumber;
+    }
+
+    public void setOrderNumber(int orderNumber) {
+        this.orderNumber = orderNumber;
+    }
+
     @Override
     public int hashCode() {
         return name.hashCode();
@@ -178,15 +188,15 @@ public class SqlScript implements Comparable<SqlScript> {
 
     @Override
     public int compareTo(SqlScript anotherScript) {
-        return extractNumber(name) - extractNumber(anotherScript.getName());
+        return orderNumber - anotherScript.getOrderNumber();
     }
 
-    private int extractNumber(String str) {
-        String[] parts = str.split("_");
+    public static int extractOrderNumber(String scriptName) {
+        String[] parts = scriptName.split("_");
         if (parts.length >= 1 && NumberUtils.isDigits(parts[0])) {
             return Integer.parseInt(parts[0]);
         } else {
-            return 0;
+            return -1;
         }
     }
 }
