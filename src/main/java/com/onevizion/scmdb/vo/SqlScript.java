@@ -77,6 +77,7 @@ public class SqlScript implements Comparable<SqlScript> {
 
     public void setName(String name) {
         this.name = name;
+        this.orderNumber = extractOrderNumber(name);
     }
 
     public String getFileHash() {
@@ -188,10 +189,10 @@ public class SqlScript implements Comparable<SqlScript> {
 
     @Override
     public int compareTo(SqlScript anotherScript) {
-        return orderNumber - anotherScript.getOrderNumber();
+        return Integer.compare(orderNumber, anotherScript.orderNumber);
     }
 
-    public static int extractOrderNumber(String scriptName) {
+    private static int extractOrderNumber(String scriptName) {
         String[] parts = scriptName.split("_");
         if (parts.length >= 1 && NumberUtils.isDigits(parts[0])) {
             return Integer.parseInt(parts[0]);

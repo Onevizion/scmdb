@@ -38,7 +38,6 @@ public class DbScriptDaoOra extends AbstractDaoOra {
         script.setTs(rs.getDate("ts"));
         script.setType(ScriptType.getById(rs.getLong("type")));
         script.setStatus(ScriptStatus.getById(rs.getLong("status")));
-        script.setOrderNumber(SqlScript.extractOrderNumber(script.getName()));
         return script;
     };
 
