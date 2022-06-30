@@ -9,11 +9,11 @@ import oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext;
 import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import javax.sql.DataSource;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
@@ -30,7 +30,6 @@ import static org.apache.commons.lang3.time.DurationFormatUtils.formatDurationHM
 
 public class SqlScriptExecutor {
     private static final String SQL_COMMAND = "@%s %s";
-
     private static final String CREATE_SQL = "create.sql";
     private static final int SCRIPT_EXIT_CODE_ERROR = 1;
     private static final int SCRIPT_EXIT_CODE_SUCCESS = 0;
@@ -41,25 +40,26 @@ public class SqlScriptExecutor {
     @Autowired
     private ColorLogger logger;
 
+    @Autowired
+    private DataSource dataSource;
+
     public int execute(SqlScript script) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
-                cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
+                    cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
 
         File workingDir = script.getFile().getParentFile();
         File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType(), workingDir);
 
-        try (Connection connection = DriverManager.getConnection(cnnCredentials.getOracleUrl(),
-                                                                 cnnCredentials.getSchemaName(),
-                                                                 cnnCredentials.getPassword())) {
+        try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             ScriptExecutor executor = new ScriptExecutor(connection);
             ScriptRunnerContext ctx = new ScriptRunnerContext();
 
             ctx.setBaseConnection(connection);
-
             executor.setScriptRunnerContext(ctx);
-            executor.setStmt(String.format(SQL_COMMAND, wrapperScriptFile.getAbsolutePath(), script.getFile().getAbsolutePath()));
+            executor.setStmt(String.format(SQL_COMMAND, wrapperScriptFile.getAbsolutePath(),
+                                           script.getFile().getAbsolutePath()));
 
             Instant start = Instant.now();
             executor.run();
