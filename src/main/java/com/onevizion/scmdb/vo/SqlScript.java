@@ -35,7 +35,6 @@ public class SqlScript implements Comparable<SqlScript> {
         script.setFile(scriptFile);
         script.setName(scriptFile.getName());
         script.setTs(new Date(scriptFile.lastModified()));
-        script.setOrderNumber(extractOrderNumber(script.getName()));
 
         if (FilenameUtils.getBaseName(script.getName()).endsWith(ROLLBACK_SUFFIX)) {
             script.setType(ScriptType.ROLLBACK);
@@ -189,7 +188,11 @@ public class SqlScript implements Comparable<SqlScript> {
 
     @Override
     public int compareTo(SqlScript anotherScript) {
-        return Integer.compare(orderNumber, anotherScript.orderNumber);
+        if (this.orderNumber < 1) {
+            return name.compareTo(anotherScript.name);
+        } else {
+            return Integer.compare(orderNumber, anotherScript.orderNumber);
+        }
     }
 
     private static int extractOrderNumber(String scriptName) {
@@ -197,6 +200,7 @@ public class SqlScript implements Comparable<SqlScript> {
         if (parts.length >= 1 && NumberUtils.isDigits(parts[0])) {
             return Integer.parseInt(parts[0]);
         } else {
+            //Negative order for deprecated a dev scripts, change after removing dev scripts support.
             return -1;
         }
     }
