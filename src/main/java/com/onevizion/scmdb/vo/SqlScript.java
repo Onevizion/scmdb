@@ -7,8 +7,12 @@ import org.apache.commons.lang3.math.NumberUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.Objects;
+
+import static java.util.Comparator.naturalOrder;
+import static java.util.Comparator.nullsFirst;
 
 public class SqlScript implements Comparable<SqlScript> {
     private Long id;
@@ -21,9 +25,13 @@ public class SqlScript implements Comparable<SqlScript> {
     private ScriptStatus status;
     private File file;
     private SchemaType schemaType = SchemaType.OWNER;
-    private int orderNumber;
+    private Integer orderNumber;
 
     private static final String ROLLBACK_SUFFIX = "_rollback";
+
+    private static final Comparator<SqlScript> ORDER_NUMBER_AND_NAME_COMPARATOR =
+            Comparator.comparing(SqlScript::getOrderNumber, nullsFirst(naturalOrder()))
+                      .thenComparing(SqlScript::getName);
 
     public static SqlScript create(File scriptFile) {
         return create(scriptFile, true);
@@ -160,11 +168,11 @@ public class SqlScript implements Comparable<SqlScript> {
         }
     }
 
-    public int getOrderNumber() {
+    public Integer getOrderNumber() {
         return orderNumber;
     }
 
-    public void setOrderNumber(int orderNumber) {
+    public void setOrderNumber(Integer orderNumber) {
         this.orderNumber = orderNumber;
     }
 
@@ -188,20 +196,16 @@ public class SqlScript implements Comparable<SqlScript> {
 
     @Override
     public int compareTo(SqlScript anotherScript) {
-        if (this.orderNumber < 1) {
-            return name.compareTo(anotherScript.name);
-        } else {
-            return Integer.compare(orderNumber, anotherScript.orderNumber);
-        }
+        return ORDER_NUMBER_AND_NAME_COMPARATOR.compare(this, anotherScript);
     }
 
-    private static int extractOrderNumber(String scriptName) {
+    private static Integer extractOrderNumber(String scriptName) {
         String[] parts = scriptName.split("_");
         if (parts.length >= 1 && NumberUtils.isDigits(parts[0])) {
-            return Integer.parseInt(parts[0]);
+            return Integer.valueOf(parts[0]);
         } else {
-            //Negative order for deprecated a dev scripts, change after removing dev scripts support.
-            return -1;
+            //NULL for deprecated a dev scripts, change after removing dev scripts support.
+            return null;
         }
     }
 }
