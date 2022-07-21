@@ -29,7 +29,7 @@ public class DbScriptDaoOra extends AbstractDaoOra {
     private static final String READ_ALL = "select * from db_script";
     private static final String READ_COUNT = "select count(*) from db_script";
 
-    private RowMapper<SqlScript> rowMapper = (rs, rowNum) -> {
+    private final RowMapper<SqlScript> rowMapper = (rs, rowNum) -> {
         SqlScript script = new SqlScript();
         script.setId(rs.getLong("db_script_id"));
         script.setName(rs.getString("name"));

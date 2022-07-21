@@ -3,11 +3,16 @@ package com.onevizion.scmdb.vo;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.Objects;
+
+import static java.util.Comparator.naturalOrder;
+import static java.util.Comparator.nullsFirst;
 
 public class SqlScript implements Comparable<SqlScript> {
     private Long id;
@@ -20,8 +25,13 @@ public class SqlScript implements Comparable<SqlScript> {
     private ScriptStatus status;
     private File file;
     private SchemaType schemaType = SchemaType.OWNER;
+    private Integer orderNumber;
 
     private static final String ROLLBACK_SUFFIX = "_rollback";
+
+    private static final Comparator<SqlScript> ORDER_NUMBER_AND_NAME_COMPARATOR =
+            Comparator.comparing(SqlScript::getOrderNumber, nullsFirst(naturalOrder()))
+                      .thenComparing(SqlScript::getName);
 
     public static SqlScript create(File scriptFile) {
         return create(scriptFile, true);
@@ -74,6 +84,7 @@ public class SqlScript implements Comparable<SqlScript> {
 
     public void setName(String name) {
         this.name = name;
+        this.orderNumber = extractOrderNumber(name);
     }
 
     public String getFileHash() {
@@ -157,6 +168,14 @@ public class SqlScript implements Comparable<SqlScript> {
         }
     }
 
+    public Integer getOrderNumber() {
+        return orderNumber;
+    }
+
+    public void setOrderNumber(Integer orderNumber) {
+        this.orderNumber = orderNumber;
+    }
+
     @Override
     public int hashCode() {
         return name.hashCode();
@@ -177,6 +196,16 @@ public class SqlScript implements Comparable<SqlScript> {
 
     @Override
     public int compareTo(SqlScript anotherScript) {
-        return name.compareTo(anotherScript.getName());
+        return ORDER_NUMBER_AND_NAME_COMPARATOR.compare(this, anotherScript);
+    }
+
+    private static Integer extractOrderNumber(String scriptName) {
+        String[] parts = scriptName.split("_");
+        if (parts.length >= 1 && NumberUtils.isDigits(parts[0])) {
+            return Integer.valueOf(parts[0]);
+        } else {
+            //NULL for deprecated a dev scripts, change after removing dev scripts support.
+            return null;
+        }
     }
 }
