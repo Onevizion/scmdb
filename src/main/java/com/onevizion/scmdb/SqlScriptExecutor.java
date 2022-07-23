@@ -4,23 +4,28 @@ import com.onevizion.scmdb.exception.ScriptExecException;
 import com.onevizion.scmdb.vo.DbCnnCredentials;
 import com.onevizion.scmdb.vo.SchemaType;
 import com.onevizion.scmdb.vo.SqlScript;
+import oracle.dbtools.db.DBUtil;
 import oracle.dbtools.raptor.newscriptrunner.ScriptExecutor;
 import oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext;
 import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.sql.DataSource;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.Date;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
+import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
 import static com.onevizion.scmdb.Scmdb.EXIT_CODE_SUCCESS;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
 import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
@@ -43,6 +48,15 @@ public class SqlScriptExecutor {
     @Autowired
     private DataSource dataSource;
 
+    @Autowired
+    private DataSource userDataSource;
+
+    @Autowired
+    private DataSource rptDataSource;
+
+    @Autowired
+    private DataSource pkgDataSource;
+
     public int execute(SqlScript script) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
@@ -51,7 +65,7 @@ public class SqlScriptExecutor {
         File workingDir = script.getFile().getParentFile();
         File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType(), workingDir);
 
-        try (Connection connection = dataSource.getConnection()) {
+        try (Connection connection = getConnection(script.getSchemaType(), cnnCredentials.getSchemaName())) {
             connection.setAutoCommit(false);
             ScriptExecutor executor = new ScriptExecutor(connection);
             ScriptRunnerContext ctx = new ScriptRunnerContext();
@@ -127,6 +141,20 @@ public class SqlScriptExecutor {
         if (exitCode != EXIT_CODE_SUCCESS) {
             logger.error("Please execute script \"src/main/resources/create.sql\" manually");
             throw new ScriptExecException("Can't create DB objects used by SCMDB.");
+        }
+    }
+
+    private Connection getConnection(SchemaType schemaType, String schemaName) {
+        try {
+            switch (schemaType) {
+                case USER: return userDataSource.getConnection();
+                case RPT: return rptDataSource.getConnection();
+                case PKG: return pkgDataSource.getConnection();
+                default: return dataSource.getConnection();
+            }
+        } catch (SQLException exception) {
+            throw new RuntimeException(MessageFormat.format("Error during connection to the schema [{}].", schemaName),
+                                       exception);
         }
     }
 
