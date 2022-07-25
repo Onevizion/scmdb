@@ -4,11 +4,15 @@ import ch.qos.logback.classic.Logger;
 import com.onevizion.scmdb.exception.ScmdbException;
 import com.onevizion.scmdb.facade.DbScriptFacade;
 import com.onevizion.scmdb.vo.DbCnnCredentials;
+import oracle.dbtools.db.DBUtil;
+import oracle.ucp.jdbc.PoolDataSource;
 import oracle.ucp.jdbc.PoolDataSourceImpl;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
-import static com.onevizion.scmdb.vo.SchemaType.OWNER;
+import java.util.logging.Level;
+
+import static com.onevizion.scmdb.vo.SchemaType.*;
 
 public class Scmdb {
     private static final Logger logger = (Logger) LoggerFactory.getLogger("STDOUT");
@@ -28,10 +32,20 @@ public class Scmdb {
             sqlScriptsFacade.init();
 
             PoolDataSourceImpl ownerDs = (PoolDataSourceImpl) ctx.getBean("dataSource");
-            DbCnnCredentials ownerCredentials = appArguments.getDbCredentials(OWNER);
-            ownerDs.setUser(ownerCredentials.getSchemaName());
-            ownerDs.setPassword(ownerCredentials.getPassword());
-            ownerDs.setURL(ownerCredentials.getOracleUrl());
+            appArguments.fillDataSourceCredentials(ownerDs, OWNER);
+
+            PoolDataSource userDataSource = (PoolDataSource) ctx.getBean("userDataSource");
+            appArguments.fillDataSourceCredentials(userDataSource, USER);
+
+            PoolDataSource rptDataSource = (PoolDataSource) ctx.getBean("rptDataSource");
+            appArguments.fillDataSourceCredentials(rptDataSource, RPT);
+
+            PoolDataSource pkgDataSourceDs = (PoolDataSource) ctx.getBean("pkgDataSource");
+            appArguments.fillDataSourceCredentials(pkgDataSourceDs, PKG);
+
+            //Off logger for oracle.dbtools.db.Oracle Util, if not, Java exception gets into the sql log
+            final java.util.logging.Logger dbUtilLogger = java.util.logging.Logger.getLogger(DBUtil.class.getName());
+            dbUtilLogger.setLevel(Level.OFF);
 
             DbManager dbManager = ctx.getBean(DbManager.class);
             if (appArguments.isGenDdl()) {

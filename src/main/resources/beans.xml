@@ -13,6 +13,24 @@
         <property name="initialPoolSize" value="2"/>
     </bean>
 
+    <bean id="rptDataSource" class="oracle.ucp.jdbc.PoolDataSourceImpl">
+        <property name="connectionFactoryClassName" value="oracle.jdbc.pool.OracleDataSource"/>
+        <property name="maxPoolSize" value="2"/>
+        <property name="initialPoolSize" value="2"/>
+    </bean>
+
+    <bean id="userDataSource" class="oracle.ucp.jdbc.PoolDataSourceImpl">
+        <property name="connectionFactoryClassName" value="oracle.jdbc.pool.OracleDataSource"/>
+        <property name="maxPoolSize" value="2"/>
+        <property name="initialPoolSize" value="2"/>
+    </bean>
+
+    <bean id="pkgDataSource" class="oracle.ucp.jdbc.PoolDataSourceImpl">
+        <property name="connectionFactoryClassName" value="oracle.jdbc.pool.OracleDataSource"/>
+        <property name="maxPoolSize" value="2"/>
+        <property name="initialPoolSize" value="2"/>
+    </bean>
+
     <bean id="jdbcTemplate"
           class="org.springframework.jdbc.core.JdbcTemplate">
         <constructor-arg ref="dataSource"/>
