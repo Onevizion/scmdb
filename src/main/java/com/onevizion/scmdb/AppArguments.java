@@ -5,8 +5,11 @@ import com.onevizion.scmdb.vo.SchemaType;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
+import oracle.ucp.jdbc.PoolDataSource;
 
 import java.io.File;
+import java.sql.SQLException;
+import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -83,6 +86,18 @@ public class AppArguments {
         useColorLogging = !options.has(noColorOption);
         omitChanged = options.has(omitChangedOption);
         ignoreErrors = options.has(ignoreErrorsOption);
+    }
+
+    public void fillDataSourceCredentials(PoolDataSource poolDataSource, SchemaType schemaType) {
+        DbCnnCredentials credentials = this.credentials.get(schemaType);
+        try {
+            poolDataSource.setUser(credentials.getSchemaName());
+            poolDataSource.setPassword(credentials.getPassword());
+            poolDataSource.setURL(credentials.getOracleUrl());
+        } catch (SQLException e) {
+            throw new RuntimeException(MessageFormat.format("Connection creation error for the schema {}",
+                                                            credentials.getSchemaName()), e);
+        }
     }
 
     private void createCredentials(SchemaType schemaType, OptionSet options, OptionSpec<String> schemaOption) {
