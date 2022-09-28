@@ -98,21 +98,9 @@
         </dependency>
 
         <dependency>
-            <groupId>oracle.dbtools</groupId>
-            <artifactId>dbtools-common</artifactId>
-            <version>21.1.0</version>
-        </dependency>
-
-        <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
             <version>30.1.1-jre</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.oracle.jdbc</groupId>
-            <artifactId>orai18n-mapping</artifactId>
-            <version>21.0.0</version>
         </dependency>
 
         <dependency>
@@ -128,9 +116,28 @@
         </dependency>
 
         <dependency>
-            <groupId>com.oracle.jdbc</groupId>
+            <groupId>com.oracle.database.xml</groupId>
             <artifactId>xdb6</artifactId>
             <version>18.3.0.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.oracle.database.xml</groupId>
+                    <artifactId>xmlparserv2</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!--  dependency from local-repo  -->
+        <dependency>
+            <groupId>com.oracle.jdbc</groupId>
+            <artifactId>orai18n-mapping</artifactId>
+            <version>21.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>oracle.dbtools</groupId>
+            <artifactId>dbtools-common</artifactId>
+            <version>21.1.0</version>
         </dependency>
     </dependencies>
 
@@ -201,24 +208,12 @@
 
     <repositories>
         <repository>
-            <id>maven.oracle.com</id>
-            <url>https://maven.oracle.com</url>
-            <layout>default</layout>
-            <releases>
-                <enabled>true</enabled>
-            </releases>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-        </repository>
-
-        <repository>
             <id>local-maven-repo</id>
             <url>file:///${project.basedir}/local-maven-repo</url>
         </repository>
     </repositories>
 
-	  <distributionManagement>
+    <distributionManagement>
         <snapshotRepository>
             <id>github-snapshots</id>
             <url>https://maven.pkg.github.com/Onevizion/scmdb</url>
@@ -228,6 +223,5 @@
             <url>https://maven.pkg.github.com/Onevizion/scmdb</url>
         </repository>
     </distributionManagement>
-
 
 </project>
