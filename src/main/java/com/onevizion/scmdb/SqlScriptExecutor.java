@@ -4,7 +4,6 @@ import com.onevizion.scmdb.exception.ScriptExecException;
 import com.onevizion.scmdb.vo.DbCnnCredentials;
 import com.onevizion.scmdb.vo.SchemaType;
 import com.onevizion.scmdb.vo.SqlScript;
-import oracle.dbtools.db.DBUtil;
 import oracle.dbtools.raptor.newscriptrunner.ScriptExecutor;
 import oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext;
 import org.apache.commons.io.FileUtils;
@@ -13,24 +12,21 @@ import org.springframework.beans.factory.annotation.Autowired;
 import javax.sql.DataSource;
 import java.io.*;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
-import java.util.Date;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.*;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
-import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
+import static com.onevizion.scmdb.Scmdb.EXIT_CODE_ERROR;
 import static com.onevizion.scmdb.Scmdb.EXIT_CODE_SUCCESS;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
 import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
 import static java.time.format.DateTimeFormatter.ISO_TIME;
-import static oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext.ERR_ENCOUNTERED;
+import static oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext.*;
 import static org.apache.commons.lang3.time.DurationFormatUtils.formatDurationHMS;
 
 public class SqlScriptExecutor {
@@ -38,6 +34,8 @@ public class SqlScriptExecutor {
     private static final String CREATE_SQL = "create.sql";
     private static final int SCRIPT_EXIT_CODE_ERROR = 1;
     private static final int SCRIPT_EXIT_CODE_SUCCESS = 0;
+    private static final Integer INVALID_OBJ_ERR_SQLCODE = 20001;
+    private static final String ORA_REGEXP = "ORA-[0-9]*:.*";
 
     @Autowired
     private AppArguments appArguments;
@@ -57,13 +55,13 @@ public class SqlScriptExecutor {
     @Autowired
     private DataSource pkgDataSource;
 
-    public int execute(SqlScript script) {
+    public int execute(SqlScript script, boolean throwInvalidObject) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
                     cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
 
         File workingDir = script.getFile().getParentFile();
-        File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType(), workingDir);
+        File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType(), workingDir, throwInvalidObject);
 
         try (Connection connection = getConnection(script.getSchemaType(), cnnCredentials.getSchemaName())) {
             connection.setAutoCommit(false);
@@ -81,7 +79,14 @@ public class SqlScriptExecutor {
 
             logger.info("\n[{}] runtime: {}", GREEN, script.getName(), scriptExecutionTime);
 
-            return (boolean) ctx.getProperty(ERR_ENCOUNTERED) ? SCRIPT_EXIT_CODE_ERROR : SCRIPT_EXIT_CODE_SUCCESS;
+            boolean isErrorExit = false;
+            if (throwInvalidObject && INVALID_OBJ_ERR_SQLCODE.equals(ctx.getProperty(ERR_SQLCODE))) {
+                checkInvalidObjectAndThrow(String.valueOf(ctx.getProperty(ERR_MESSAGE_SQLCODE)));
+            } else {
+                isErrorExit = (boolean) ctx.getProperty(ERR_ENCOUNTERED);
+            }
+
+            return isErrorExit ? SCRIPT_EXIT_CODE_ERROR : SCRIPT_EXIT_CODE_SUCCESS;
         } catch (SQLException e) {
             logger.error("Error during connection DB.", e);
             return SCRIPT_EXIT_CODE_ERROR;
@@ -90,12 +95,14 @@ public class SqlScriptExecutor {
         }
     }
 
-    private File getTmpWrapperScript(SchemaType schemaType, File workingDir) {
+    private File getTmpWrapperScript(SchemaType schemaType, File workingDir, boolean checkInvalidObject) {
         ClassLoader classLoader = getClass().getClassLoader();
         URL wrapperScript;
         if (schemaType.isCompileInvalids()) {
             if (appArguments.isIgnoreErrors()) {
                 wrapperScript = classLoader.getResource("compile_invalids_wrapper_not_fail_on_error.sql");
+            } else if (checkInvalidObject) {
+                wrapperScript = classLoader.getResource("compile_invalids_wrapper_with_throw_invalid_object_exception_fail_on_error.sql");
             } else {
                 wrapperScript = classLoader.getResource("compile_invalids_wrapper_fail_on_error.sql");
             }
@@ -136,7 +143,7 @@ public class SqlScriptExecutor {
         sqlScript.setType(COMMIT);
         sqlScript.setSchemaType(OWNER);
 
-        int exitCode = execute(sqlScript);
+        int exitCode = execute(sqlScript, false);
         tmpFile.delete();
         if (exitCode != EXIT_CODE_SUCCESS) {
             logger.error("Please execute script \"src/main/resources/create.sql\" manually");
@@ -155,6 +162,14 @@ public class SqlScriptExecutor {
         } catch (SQLException exception) {
             throw new RuntimeException(MessageFormat.format("Error during connection to the schema [{}].", schemaName),
                                        exception);
+        }
+    }
+
+    private void checkInvalidObjectAndThrow(String invalidObjMsg) {
+        if (invalidObjMsg != null && !invalidObjMsg.isEmpty()) {
+            String invalidObjectMessage = invalidObjMsg.replaceAll(ORA_REGEXP, "");
+            System.err.println(invalidObjectMessage);
+            System.exit(EXIT_CODE_ERROR);
         }
     }
 
