@@ -15,12 +15,13 @@ import java.io.IOException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.ColorLogger.Color.RED;
 import static com.onevizion.scmdb.vo.DbObjectType.*;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
+import static java.util.Comparator.naturalOrder;
+import static java.util.Comparator.nullsFirst;
 
 @Component
 public class DdlGenerator {
@@ -28,7 +29,14 @@ public class DdlGenerator {
     private static final String EDITIONABLE_MODIFIER = "EDITIONABLE ";
     private static final String NOEDITIONABLE_MODIFIER = "NONEDITIONABLE ";
     private static final String PK_CONSTRAINT_INDEX_POSTFIX = "\n  USING INDEX  ENABLE";
-    private static final String CONSTRAINT_PATTERN = "^\\s*CONSTRAINT\\s.*\\r*\\n*";
+    private static final Pattern CONSTRAINTS_BLOCK_PATTERN = Pattern.compile("(^\\s*CONSTRAINT[\\s\\S]*)(\\n\\);)", Pattern.MULTILINE);
+    private static final Pattern CONSTRAINT_NAME_PATTERN = Pattern.compile("CONSTRAINT\\s(\\S*)\\s", Pattern.MULTILINE);
+    private static final Pattern CONSTRAINT_NAME_PREFIX_CONSTRAINT_PATTERN = Pattern.compile("(^\\D*)(\\d+)", Pattern.MULTILINE);
+    private static final Pattern COMMENT_ON_TABLE_PATTERN = Pattern.compile("COMMENT ON TABLE.+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern COMMENT_ON_COLUMN_PATTERN = Pattern.compile("COMMENT ON COLUMN.+", Pattern.MULTILINE);
+
+    private static final Comparator<Object> CONSTRAINT_COMPARATOR = Comparator.comparing(o -> extractNamePrefixConstraint((String) o), nullsFirst(naturalOrder()))
+                                                                              .thenComparing(o -> extractNumberPrefixConstraint((String) o));
 
     @Autowired
     private DdlDao ddlDao;
@@ -86,7 +94,7 @@ public class DdlGenerator {
         ddl = ddl.replaceAll("\\n", "\r\n");
         ddl = ddl.replaceAll("\\t", "    ");
         ddl = ddl.replaceAll("\\r\\n\\s+REFERENCES\\s", " REFERENCES ");
-        ddl = sortConstraintInScript(ddl);
+        ddl = sortConstraintsInTableDdl(ddl);
         ddl += generateTableCommentsDdl(table);
         ddl += generateIndexScripts(table);
         ddl += generateSequenceScripts(table);
@@ -183,7 +191,6 @@ public class DdlGenerator {
     private String generateIndexScripts(DbObject table) {
         logger.info("Adding indexes...");
         List<DbObject> indexes = ddlDao.extractTableDependentObjectsDdl(table.getName(), INDEX);
-        indexes.sort(Comparator.comparing(DbObject::getDdl));
         StringBuilder indexesDdl = new StringBuilder();
         for (int i = 0; i < indexes.size(); i++) {
             DbObject index = indexes.get(i);
@@ -387,20 +394,40 @@ public class DdlGenerator {
         generateDdls(ddlDao.extractAllDbObjectsWithoutDdl(), true);
     }
 
-    private String sortConstraintInScript(String ddlScript) {
-        Pattern pattern = Pattern.compile(CONSTRAINT_PATTERN, Pattern.MULTILINE);
-        Matcher matcher = pattern.matcher(ddlScript);
-        StringBuilder sortedDdl = new StringBuilder();
-        List<String> constraints = new ArrayList<>();
-        while (matcher.find()) {
-            constraints.add(matcher.group());
-            matcher.appendReplacement(sortedDdl, "");
+    private String sortConstraintsInTableDdl(String sourceDdlScript) {
+        Matcher constraintsBlockMatcher = CONSTRAINTS_BLOCK_PATTERN.matcher(sourceDdlScript);
+        Map<String, String> constraintByName = new TreeMap<>(CONSTRAINT_COMPARATOR);
+        if (constraintsBlockMatcher.find()) {
+            String block = constraintsBlockMatcher.group(1);
+            String[] constraints = block.split(",\\s*\\n");
+            sourceDdlScript = sourceDdlScript.replace(block, "@");
+            for (String s : constraints) {
+                Matcher constraintNameMatcher = CONSTRAINT_NAME_PATTERN.matcher(s);
+                if (constraintNameMatcher.find()) {
+                    constraintByName.put(constraintNameMatcher.group(1), s.replaceAll("\r", ""));
+                }
+            }
         }
-        matcher.appendTail(sortedDdl);
-        sortedDdl.setLength(sortedDdl.length() - 2);
-        Collections.sort(constraints);
-        constraints.forEach(sortedDdl::append);
-        sortedDdl.append(");");
-        return sortedDdl.toString();
+
+        StringBuilder sortedConstraintBlockDdl = new StringBuilder();
+        Iterator<Map.Entry<String, String>> iterator = constraintByName.entrySet().iterator();
+        while (iterator.hasNext()) {
+            String constraintDdl = iterator.next().getValue();
+            if (iterator.hasNext()) {
+                constraintDdl = constraintDdl + ",\r\n";
+            }
+            sortedConstraintBlockDdl.append(constraintDdl);
+        }
+        sourceDdlScript = sourceDdlScript.replace("@", sortedConstraintBlockDdl.toString());
+        return sourceDdlScript;
     }
+    private static String extractNamePrefixConstraint(String s) {
+        Matcher matcher = CONSTRAINT_NAME_PREFIX_CONSTRAINT_PATTERN.matcher(s);
+        return matcher.find() ? matcher.group(1) : s;
+    }
+    private static int extractNumberPrefixConstraint(String s) {
+        Matcher matcher = CONSTRAINT_NAME_PREFIX_CONSTRAINT_PATTERN.matcher(s);
+        return matcher.find() ? Integer.parseInt(matcher.group(2)) : 0;
+    }
+
 }
