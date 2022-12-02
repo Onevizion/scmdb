@@ -166,24 +166,25 @@ public class DdlGenerator {
         logger.info("Adding comments...");
         List<DbObject> comments = ddlDao.extractTableDependentObjectsDdl(table.getName(), COMMENT);
         StringBuilder commentsDdl = new StringBuilder();
+        List<String> processedComments = new ArrayList<>();
         for (DbObject comment : comments) {
             String ddl = removeSchemaNameInDdl(comment.getDdl());
             ddl = ddl.trim();
-
-            Pattern pattern = Pattern.compile("COMMENT ON TABLE.+", Pattern.CASE_INSENSITIVE);
-            Matcher matcher = pattern.matcher(ddl);
-            if (matcher.find()) {
-                String commentStmt = matcher.group();
-                ddl = ddl.replaceFirst("COMMENT ON TABLE.+", "");
-                ddl = commentStmt + "\r\n" + ddl;
+            Matcher commentOnTableMatcher = COMMENT_ON_TABLE_PATTERN.matcher(ddl);
+            if (commentOnTableMatcher.find()) {
+                String commentStmt = commentOnTableMatcher.group();
+                commentsDdl.append("\r\n\r\n");
+                commentsDdl.append(commentStmt);
+                commentsDdl.append("\r\n");
             }
-
-            ddl = ddl.replaceAll("\\n", "");
-            ddl = ddl.replaceAll("\\s+COMMENT", "COMMENT");
-            ddl = ddl.replaceAll(";", ";\r\n");
-            ddl = ddl.trim();
-            ddl = "\r\n\r\n" + ddl;
-            commentsDdl.append(ddl);
+            Matcher commentOnColumnMatcher = COMMENT_ON_COLUMN_PATTERN.matcher(ddl);
+            while (commentOnColumnMatcher.find()) {
+                String commentStmt = commentOnColumnMatcher.group();
+                commentStmt = commentStmt.replaceAll("\\n", "");
+                processedComments.add(commentStmt);
+            }
+            Collections.sort(processedComments);
+            commentsDdl.append(String.join("\r\n", processedComments));
         }
         return commentsDdl.toString();
     }
