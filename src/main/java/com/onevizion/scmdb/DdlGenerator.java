@@ -2,6 +2,7 @@ package com.onevizion.scmdb;
 
 import com.onevizion.scmdb.dao.DdlDao;
 import com.onevizion.scmdb.vo.DbObject;
+import com.onevizion.scmdb.vo.DbObjectType;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOCase;
 import org.apache.commons.io.filefilter.WildcardFileFilter;
@@ -170,10 +171,10 @@ public class DdlGenerator {
         for (DbObject comment : comments) {
             String ddl = removeSchemaNameInDdl(comment.getDdl());
             ddl = ddl.trim();
+            commentsDdl.append("\r\n\r\n");
             Matcher commentOnTableMatcher = COMMENT_ON_TABLE_PATTERN.matcher(ddl);
             if (commentOnTableMatcher.find()) {
                 String commentStmt = commentOnTableMatcher.group();
-                commentsDdl.append("\r\n\r\n");
                 commentsDdl.append(commentStmt);
                 commentsDdl.append("\r\n");
             }
@@ -236,8 +237,8 @@ public class DdlGenerator {
                 ddl = ddl.replaceAll("\\s+;$", ";");
             }
             sequencesDdl.append(ddl);
+            sequencesDdl.append("\r\n");
         }
-        sequencesDdl.append("\r\n");
         return sequencesDdl.toString();
     }
 
@@ -422,10 +423,12 @@ public class DdlGenerator {
         sourceDdlScript = sourceDdlScript.replace("@", sortedConstraintBlockDdl.toString());
         return sourceDdlScript;
     }
+
     private static String extractNamePrefixConstraint(String s) {
         Matcher matcher = CONSTRAINT_NAME_PREFIX_CONSTRAINT_PATTERN.matcher(s);
         return matcher.find() ? matcher.group(1) : s;
     }
+
     private static int extractNumberPrefixConstraint(String s) {
         Matcher matcher = CONSTRAINT_NAME_PREFIX_CONSTRAINT_PATTERN.matcher(s);
         return matcher.find() ? Integer.parseInt(matcher.group(2)) : 0;
