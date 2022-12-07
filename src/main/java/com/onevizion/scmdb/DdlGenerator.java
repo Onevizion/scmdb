@@ -167,7 +167,6 @@ public class DdlGenerator {
         logger.info("Adding comments...");
         List<DbObject> comments = ddlDao.extractTableDependentObjectsDdl(table.getName(), COMMENT);
         StringBuilder commentsDdl = new StringBuilder();
-        List<String> processedComments = new ArrayList<>();
         for (DbObject comment : comments) {
             String ddl = removeSchemaNameInDdl(comment.getDdl());
             ddl = ddl.trim();
@@ -179,13 +178,14 @@ public class DdlGenerator {
                 commentsDdl.append("\r\n");
             }
             Matcher commentOnColumnMatcher = COMMENT_ON_COLUMN_PATTERN.matcher(ddl);
+            List<String> columnsComments = new ArrayList<>();
             while (commentOnColumnMatcher.find()) {
                 String commentStmt = commentOnColumnMatcher.group();
                 commentStmt = commentStmt.replaceAll("\\n", "");
-                processedComments.add(commentStmt);
+                columnsComments.add(commentStmt);
             }
-            Collections.sort(processedComments);
-            commentsDdl.append(String.join("\r\n", processedComments));
+            Collections.sort(columnsComments);
+            commentsDdl.append(String.join("\r\n", columnsComments));
         }
         return commentsDdl.toString();
     }
