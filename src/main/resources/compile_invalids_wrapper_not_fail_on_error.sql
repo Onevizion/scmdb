@@ -1,3 +1,4 @@
+whenever SQLERROR CONTINUE
 set PAGESIZE 0
 set VERIFY OFF
 
