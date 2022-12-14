@@ -2,7 +2,6 @@ package com.onevizion.scmdb;
 
 import com.onevizion.scmdb.dao.DdlDao;
 import com.onevizion.scmdb.vo.DbObject;
-import com.onevizion.scmdb.vo.DbObjectType;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOCase;
 import org.apache.commons.io.filefilter.WildcardFileFilter;
@@ -21,8 +20,6 @@ import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.ColorLogger.Color.RED;
 import static com.onevizion.scmdb.vo.DbObjectType.*;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
-import static java.util.Comparator.naturalOrder;
-import static java.util.Comparator.nullsFirst;
 
 @Component
 public class DdlGenerator {
@@ -30,14 +27,31 @@ public class DdlGenerator {
     private static final String EDITIONABLE_MODIFIER = "EDITIONABLE ";
     private static final String NOEDITIONABLE_MODIFIER = "NONEDITIONABLE ";
     private static final String PK_CONSTRAINT_INDEX_POSTFIX = "\n  USING INDEX  ENABLE";
-    private static final Pattern CONSTRAINTS_BLOCK_PATTERN = Pattern.compile("(^\\s*CONSTRAINT[\\s\\S]*)(\\n\\);)", Pattern.MULTILINE);
+    private static final Pattern CONSTRAINTS_BLOCK_PATTERN = Pattern.compile("(^\\s*CONSTRAINT[\\s\\S]*)(\\n\\s*\\);)", Pattern.MULTILINE);
     private static final Pattern CONSTRAINT_NAME_PATTERN = Pattern.compile("CONSTRAINT\\s(\\S*)\\s", Pattern.MULTILINE);
-    private static final Pattern CONSTRAINT_NAME_PREFIX_CONSTRAINT_PATTERN = Pattern.compile("(^\\D*)(\\d+)", Pattern.MULTILINE);
     private static final Pattern COMMENT_ON_TABLE_PATTERN = Pattern.compile("COMMENT ON TABLE.+", Pattern.CASE_INSENSITIVE);
-    private static final Pattern COMMENT_ON_COLUMN_PATTERN = Pattern.compile("COMMENT ON COLUMN.+", Pattern.MULTILINE);
+    private static final Pattern COMMENT_COLUMN_NAME_PATTERN = Pattern.compile("COMMENT ON COLUMN.+\\.\"(.*)\" IS.*", Pattern.MULTILINE);
+    private static final Pattern COMMENT_ON_COLUMN_NAME_PATTERN = Pattern.compile("COMMENT ON COLUMN [\\s\\S]+\\.\"([\\s\\S]+)\"[\\s\\S]+", Pattern.MULTILINE);
 
-    private static final Comparator<Object> CONSTRAINT_COMPARATOR = Comparator.comparing(o -> extractNamePrefixConstraint((String) o), nullsFirst(naturalOrder()))
-                                                                              .thenComparing(o -> extractNumberPrefixConstraint((String) o));
+    private static final Comparator<String> CONSTRAINT_COMPARATOR = new Comparator<String>() {
+        public int compare(String column1, String column2) {
+            int result;
+            String name1WithoutNum = column1.replaceAll("\\d", "");
+            String name2WithoutNum = column2.replaceAll("\\d", "");
+
+            if (name1WithoutNum.equalsIgnoreCase(name2WithoutNum)) {
+                result = extractInt(column1) - extractInt(column2);
+            } else {
+                result = column1.compareTo(column2);
+            }
+            return result;
+        }
+
+        int extractInt(String s) {
+            String num = s.replaceAll("\\D", "");
+            return num.isEmpty() ? 0 : Integer.parseInt(num);
+        }
+    };
 
     @Autowired
     private DdlDao ddlDao;
@@ -165,27 +179,33 @@ public class DdlGenerator {
 
     private String generateTableCommentsDdl(DbObject table) {
         logger.info("Adding comments...");
-        List<DbObject> comments = ddlDao.extractTableDependentObjectsDdl(table.getName(), COMMENT);
+        List<DbObject> commentBlocks = ddlDao.extractTableDependentObjectsDdl(table.getName(), COMMENT);
         StringBuilder commentsDdl = new StringBuilder();
-        for (DbObject comment : comments) {
-            String ddl = removeSchemaNameInDdl(comment.getDdl());
+        for (DbObject commentBlock : commentBlocks) {
+            String ddl = removeSchemaNameInDdl(commentBlock.getDdl());
             ddl = ddl.trim();
-            commentsDdl.append("\r\n\r\n");
+            commentsDdl.append("\r\n");
             Matcher commentOnTableMatcher = COMMENT_ON_TABLE_PATTERN.matcher(ddl);
             if (commentOnTableMatcher.find()) {
                 String commentStmt = commentOnTableMatcher.group();
-                commentsDdl.append(commentStmt);
                 commentsDdl.append("\r\n");
+                commentsDdl.append(commentStmt);
             }
-            Matcher commentOnColumnMatcher = COMMENT_ON_COLUMN_PATTERN.matcher(ddl);
-            List<String> columnsComments = new ArrayList<>();
-            while (commentOnColumnMatcher.find()) {
-                String commentStmt = commentOnColumnMatcher.group();
-                commentStmt = commentStmt.replaceAll("\\n", "");
-                columnsComments.add(commentStmt);
+
+            String[] comments = ddl.split("(?<=';)");
+            Map<String, String> commentByColumnName = new TreeMap<>(CONSTRAINT_COMPARATOR);
+            for (String comment : comments) {
+                Matcher nameMatcher = COMMENT_COLUMN_NAME_PATTERN.matcher(comment);
+                if (nameMatcher.find()) {
+                    String commentStmt = comment.trim().replaceAll("\\n", "");
+                    commentByColumnName.put(nameMatcher.group(1), commentStmt);
+                }
             }
-            Collections.sort(columnsComments);
-            commentsDdl.append(String.join("\r\n", columnsComments));
+
+            if (!commentByColumnName.isEmpty()) {
+                commentsDdl.append("\r\n");
+                commentsDdl.append(String.join("\r\n", commentByColumnName.values()));
+            }
         }
         return commentsDdl.toString();
     }
@@ -236,7 +256,6 @@ public class DdlGenerator {
                 ddl = ddl.replaceAll("\\s+;$", ";");
             }
             sequencesDdl.append(ddl);
-            sequencesDdl.append("\r\n");
         }
         return sequencesDdl.toString();
     }
@@ -245,6 +264,9 @@ public class DdlGenerator {
         logger.info("Adding triggers...");
         List<DbObject> triggers = ddlDao.extractTableDependentObjectsDdl(table.getName(), TRIGGER);
         StringBuilder triggersDdl = new StringBuilder();
+        if (!triggers.isEmpty()) {
+            triggersDdl.append("\r\n");
+        }
         for (DbObject trigger : triggers) {
             String ddl = removeSchemaNameInDdl(trigger.getDdl());
             ddl = ddl.trim();
@@ -422,15 +444,4 @@ public class DdlGenerator {
         sourceDdlScript = sourceDdlScript.replace("@", sortedConstraintBlockDdl.toString());
         return sourceDdlScript;
     }
-
-    private static String extractNamePrefixConstraint(String s) {
-        Matcher matcher = CONSTRAINT_NAME_PREFIX_CONSTRAINT_PATTERN.matcher(s);
-        return matcher.find() ? matcher.group(1) : s;
-    }
-
-    private static int extractNumberPrefixConstraint(String s) {
-        Matcher matcher = CONSTRAINT_NAME_PREFIX_CONSTRAINT_PATTERN.matcher(s);
-        return matcher.find() ? Integer.parseInt(matcher.group(2)) : 0;
-    }
-
 }
