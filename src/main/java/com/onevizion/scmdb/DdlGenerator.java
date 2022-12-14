@@ -30,7 +30,8 @@ public class DdlGenerator {
     private static final Pattern CONSTRAINTS_BLOCK_PATTERN = Pattern.compile("(^\\s*CONSTRAINT[\\s\\S]*)(\\n\\s*\\);)", Pattern.MULTILINE);
     private static final Pattern CONSTRAINT_NAME_PATTERN = Pattern.compile("CONSTRAINT\\s(\\S*)\\s", Pattern.MULTILINE);
     private static final Pattern COMMENT_ON_TABLE_PATTERN = Pattern.compile("COMMENT ON TABLE.+", Pattern.CASE_INSENSITIVE);
-    private static final Pattern COMMENT_ON_COLUMN_PATTERN = Pattern.compile("COMMENT ON COLUMN.+\\.(.*) IS.*", Pattern.MULTILINE);
+    private static final Pattern COMMENT_COLUMN_NAME_PATTERN = Pattern.compile("COMMENT ON COLUMN.+\\.\"(.*)\" IS.*", Pattern.MULTILINE);
+    private static final Pattern COMMENT_ON_COLUMN_NAME_PATTERN = Pattern.compile("COMMENT ON COLUMN [\\s\\S]+\\.\"([\\s\\S]+)\"[\\s\\S]+", Pattern.MULTILINE);
 
     private static final Comparator<String> CONSTRAINT_COMPARATOR = new Comparator<String>() {
         public int compare(String column1, String column2) {
@@ -190,13 +191,17 @@ public class DdlGenerator {
                 commentsDdl.append("\r\n");
                 commentsDdl.append(commentStmt);
             }
-            Matcher commentOnColumnMatcher = COMMENT_ON_COLUMN_PATTERN.matcher(ddl);
+
+            String[] comments = ddl.split("(?<=';)");
             Map<String, String> commentByColumnName = new TreeMap<>(CONSTRAINT_COMPARATOR);
-            while (commentOnColumnMatcher.find()) {
-                String commentStmt = commentOnColumnMatcher.group();
-                commentStmt = commentStmt.replaceAll("\\n", "");
-                commentByColumnName.put(commentOnColumnMatcher.group(1), commentStmt);
+            for (String comment : comments) {
+                Matcher nameMatcher = COMMENT_COLUMN_NAME_PATTERN.matcher(comment);
+                if (nameMatcher.find()) {
+                    String commentStmt = comment.trim().replaceAll("\\n", "");
+                    commentByColumnName.put(nameMatcher.group(1), commentStmt);
+                }
             }
+
             if (!commentByColumnName.isEmpty()) {
                 commentsDdl.append("\r\n");
                 commentsDdl.append(String.join("\r\n", commentByColumnName.values()));
