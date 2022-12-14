@@ -2,7 +2,6 @@ package com.onevizion.scmdb;
 
 import com.onevizion.scmdb.dao.DdlDao;
 import com.onevizion.scmdb.vo.DbObject;
-import com.onevizion.scmdb.vo.DbObjectType;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOCase;
 import org.apache.commons.io.filefilter.WildcardFileFilter;
@@ -21,8 +20,6 @@ import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.ColorLogger.Color.RED;
 import static com.onevizion.scmdb.vo.DbObjectType.*;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
-import static java.util.Comparator.naturalOrder;
-import static java.util.Comparator.nullsFirst;
 
 @Component
 public class DdlGenerator {
@@ -32,13 +29,28 @@ public class DdlGenerator {
     private static final String PK_CONSTRAINT_INDEX_POSTFIX = "\n  USING INDEX  ENABLE";
     private static final Pattern CONSTRAINTS_BLOCK_PATTERN = Pattern.compile("(^\\s*CONSTRAINT[\\s\\S]*)(\\n\\s*\\);)", Pattern.MULTILINE);
     private static final Pattern CONSTRAINT_NAME_PATTERN = Pattern.compile("CONSTRAINT\\s(\\S*)\\s", Pattern.MULTILINE);
-    private static final Pattern CONSTRAINT_NAME_PREFIX_CONSTRAINT_PATTERN = Pattern.compile("(^\\D*)(\\d+)", Pattern.MULTILINE);
-//    private static final Pattern CONSTRAINT_NAME_PREFIX_CONSTRAINT_PATTERN = Pattern.compile("(^\\D*)(\\d+)?.*", Pattern.MULTILINE);
     private static final Pattern COMMENT_ON_TABLE_PATTERN = Pattern.compile("COMMENT ON TABLE.+", Pattern.CASE_INSENSITIVE);
     private static final Pattern COMMENT_ON_COLUMN_PATTERN = Pattern.compile("COMMENT ON COLUMN.+\\.(.*) IS.*", Pattern.MULTILINE);
 
-    private static final Comparator<Object> CONSTRAINT_COMPARATOR = Comparator.comparing(o -> extractNamePrefixConstraint((String) o), nullsFirst(naturalOrder()))
-                                                                              .thenComparing(o -> extractNumberPrefixConstraint((String) o));
+    private static final Comparator<String> CONSTRAINT_COMPARATOR = new Comparator<String>() {
+        public int compare(String column1, String column2) {
+            int result;
+            String name1WithoutNum = column1.replaceAll("\\d", "");
+            String name2WithoutNum = column2.replaceAll("\\d", "");
+
+            if (name1WithoutNum.equalsIgnoreCase(name2WithoutNum)) {
+                result = extractInt(column1) - extractInt(column2);
+            } else {
+                result = column1.compareTo(column2);
+            }
+            return result;
+        }
+
+        int extractInt(String s) {
+            String num = s.replaceAll("\\D", "");
+            return num.isEmpty() ? 0 : Integer.parseInt(num);
+        }
+    };
 
     @Autowired
     private DdlDao ddlDao;
@@ -179,7 +191,7 @@ public class DdlGenerator {
                 commentsDdl.append(commentStmt);
             }
             Matcher commentOnColumnMatcher = COMMENT_ON_COLUMN_PATTERN.matcher(ddl);
-            Map<String, String> commentByColumnName = new TreeMap<>();
+            Map<String, String> commentByColumnName = new TreeMap<>(CONSTRAINT_COMPARATOR);
             while (commentOnColumnMatcher.find()) {
                 String commentStmt = commentOnColumnMatcher.group();
                 commentStmt = commentStmt.replaceAll("\\n", "");
@@ -239,7 +251,6 @@ public class DdlGenerator {
                 ddl = ddl.replaceAll("\\s+;$", ";");
             }
             sequencesDdl.append(ddl);
-//            sequencesDdl.append("\r\n");
         }
         return sequencesDdl.toString();
     }
@@ -428,15 +439,4 @@ public class DdlGenerator {
         sourceDdlScript = sourceDdlScript.replace("@", sortedConstraintBlockDdl.toString());
         return sourceDdlScript;
     }
-
-    private static String extractNamePrefixConstraint(String s) {
-        Matcher matcher = CONSTRAINT_NAME_PREFIX_CONSTRAINT_PATTERN.matcher(s);
-        return matcher.find() ? matcher.group(1) : s;
-    }
-
-    private static int extractNumberPrefixConstraint(String s) {
-        Matcher matcher = CONSTRAINT_NAME_PREFIX_CONSTRAINT_PATTERN.matcher(s);
-        return matcher.find() ? Integer.parseInt(matcher.group(2)) : 0;
-    }
-
 }
