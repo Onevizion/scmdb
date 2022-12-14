@@ -33,8 +33,9 @@ public class DdlGenerator {
     private static final Pattern CONSTRAINTS_BLOCK_PATTERN = Pattern.compile("(^\\s*CONSTRAINT[\\s\\S]*)(\\n\\s*\\);)", Pattern.MULTILINE);
     private static final Pattern CONSTRAINT_NAME_PATTERN = Pattern.compile("CONSTRAINT\\s(\\S*)\\s", Pattern.MULTILINE);
     private static final Pattern CONSTRAINT_NAME_PREFIX_CONSTRAINT_PATTERN = Pattern.compile("(^\\D*)(\\d+)", Pattern.MULTILINE);
+//    private static final Pattern CONSTRAINT_NAME_PREFIX_CONSTRAINT_PATTERN = Pattern.compile("(^\\D*)(\\d+)?.*", Pattern.MULTILINE);
     private static final Pattern COMMENT_ON_TABLE_PATTERN = Pattern.compile("COMMENT ON TABLE.+", Pattern.CASE_INSENSITIVE);
-    private static final Pattern COMMENT_ON_COLUMN_PATTERN = Pattern.compile("COMMENT ON COLUMN.+", Pattern.MULTILINE);
+    private static final Pattern COMMENT_ON_COLUMN_PATTERN = Pattern.compile("COMMENT ON COLUMN.+\\.(.*) IS.*", Pattern.MULTILINE);
 
     private static final Comparator<Object> CONSTRAINT_COMPARATOR = Comparator.comparing(o -> extractNamePrefixConstraint((String) o), nullsFirst(naturalOrder()))
                                                                               .thenComparing(o -> extractNumberPrefixConstraint((String) o));
@@ -165,27 +166,29 @@ public class DdlGenerator {
 
     private String generateTableCommentsDdl(DbObject table) {
         logger.info("Adding comments...");
-        List<DbObject> comments = ddlDao.extractTableDependentObjectsDdl(table.getName(), COMMENT);
+        List<DbObject> commentBlocks = ddlDao.extractTableDependentObjectsDdl(table.getName(), COMMENT);
         StringBuilder commentsDdl = new StringBuilder();
-        for (DbObject comment : comments) {
-            String ddl = removeSchemaNameInDdl(comment.getDdl());
+        for (DbObject commentBlock : commentBlocks) {
+            String ddl = removeSchemaNameInDdl(commentBlock.getDdl());
             ddl = ddl.trim();
-            commentsDdl.append("\r\n\r\n");
+            commentsDdl.append("\r\n");
             Matcher commentOnTableMatcher = COMMENT_ON_TABLE_PATTERN.matcher(ddl);
             if (commentOnTableMatcher.find()) {
                 String commentStmt = commentOnTableMatcher.group();
-                commentsDdl.append(commentStmt);
                 commentsDdl.append("\r\n");
+                commentsDdl.append(commentStmt);
             }
             Matcher commentOnColumnMatcher = COMMENT_ON_COLUMN_PATTERN.matcher(ddl);
-            List<String> columnsComments = new ArrayList<>();
+            Map<String, String> commentByColumnName = new TreeMap<>();
             while (commentOnColumnMatcher.find()) {
                 String commentStmt = commentOnColumnMatcher.group();
                 commentStmt = commentStmt.replaceAll("\\n", "");
-                columnsComments.add(commentStmt);
+                commentByColumnName.put(commentOnColumnMatcher.group(1), commentStmt);
             }
-            Collections.sort(columnsComments);
-            commentsDdl.append(String.join("\r\n", columnsComments));
+            if (!commentByColumnName.isEmpty()) {
+                commentsDdl.append("\r\n");
+                commentsDdl.append(String.join("\r\n", commentByColumnName.values()));
+            }
         }
         return commentsDdl.toString();
     }
@@ -236,7 +239,7 @@ public class DdlGenerator {
                 ddl = ddl.replaceAll("\\s+;$", ";");
             }
             sequencesDdl.append(ddl);
-            sequencesDdl.append("\r\n");
+//            sequencesDdl.append("\r\n");
         }
         return sequencesDdl.toString();
     }
@@ -245,6 +248,9 @@ public class DdlGenerator {
         logger.info("Adding triggers...");
         List<DbObject> triggers = ddlDao.extractTableDependentObjectsDdl(table.getName(), TRIGGER);
         StringBuilder triggersDdl = new StringBuilder();
+        if (!triggers.isEmpty()) {
+            triggersDdl.append("\r\n");
+        }
         for (DbObject trigger : triggers) {
             String ddl = removeSchemaNameInDdl(trigger.getDdl());
             ddl = ddl.trim();
