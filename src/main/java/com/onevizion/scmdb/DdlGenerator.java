@@ -31,7 +31,6 @@ public class DdlGenerator {
     private static final Pattern CONSTRAINT_NAME_PATTERN = Pattern.compile("CONSTRAINT\\s(\\S*)\\s", Pattern.MULTILINE);
     private static final Pattern COMMENT_ON_TABLE_PATTERN = Pattern.compile("COMMENT ON TABLE.+", Pattern.CASE_INSENSITIVE);
     private static final Pattern COMMENT_COLUMN_NAME_PATTERN = Pattern.compile("COMMENT ON COLUMN.+\\.\"(.*)\" IS.*", Pattern.MULTILINE);
-    private static final Pattern COMMENT_ON_COLUMN_NAME_PATTERN = Pattern.compile("COMMENT ON COLUMN [\\s\\S]+\\.\"([\\s\\S]+)\"[\\s\\S]+", Pattern.MULTILINE);
 
     private static final Comparator<String> CONSTRAINT_COMPARATOR = new Comparator<String>() {
         public int compare(String column1, String column2) {
@@ -110,8 +109,8 @@ public class DdlGenerator {
         ddl = ddl.replaceAll("\\t", "    ");
         ddl = ddl.replaceAll("\\r\\n\\s+REFERENCES\\s", " REFERENCES ");
         ddl = sortConstraintsInTableDdl(ddl);
-        ddl += generateTableCommentsDdl(table);
         ddl += generateIndexScripts(table);
+        ddl += generateTableCommentsDdl(table);
         ddl += generateSequenceScripts(table);
         ddl += generateTriggerScripts(table);
         table.setDdl(ddl);
@@ -247,7 +246,7 @@ public class DdlGenerator {
             }
 
             ddl = ddl.trim();
-            ddl = "\r\n" + ddl;
+            ddl = "\r\n\r\n" + ddl;
             int index = ddl.lastIndexOf("\"");
             if (index != -1) {
                 ddl = ddl.substring(0, index + 1);
