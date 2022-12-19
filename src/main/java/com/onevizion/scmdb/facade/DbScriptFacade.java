@@ -35,22 +35,25 @@ public class DbScriptFacade {
 
     private File execDir;
     private List<SqlScript> scriptsInDir;
+    Map<String, SqlScript> dbScripts;
 
     public void init() {
         execDir = new File(appArguments.getScriptsDirectory().getAbsolutePath() + File.separator + EXEC_FOLDER_NAME);
         scriptsInDir = createScriptsFromFiles(appArguments.isGenDdl() || !appArguments.isOmitChanged());
     }
 
-    public List<SqlScript> getNewScripts() {
-        Map<String, SqlScript> savedScripts = sqlScriptDaoOra.readMap();
+    public void getDbScripts(boolean withText) {
+        dbScripts = sqlScriptDaoOra.readMap(withText);
+    }
 
+    public List<SqlScript> getNewScripts() {
         scriptsInDir.stream()
                     .filter(this::isDevScript)
                     .forEach(script -> logger.info("Dev script [" + script.getName() + "] was ignored"));
 
         List<SqlScript> newScripts = scriptsInDir.stream()
                                                  .filter(script -> !isDevScript(script))
-                                                 .filter(script -> !savedScripts.containsKey(script.getName()))
+                                                 .filter(script -> !dbScripts.containsKey(script.getName()))
                                                  .collect(Collectors.toList());
         if (!appArguments.isReadAllFilesContent()) {
             newScripts.forEach(SqlScript::loadContentFromFile);
@@ -105,7 +108,6 @@ public class DbScriptFacade {
 
     public List<SqlScript> getUpdatedScripts() {
         List<SqlScript> updatedScripts = new ArrayList<>();
-        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMap();
 
         for (SqlScript scriptInDir : scriptsInDir) {
             if (!dbScripts.containsKey(scriptInDir.getName())) {
@@ -130,7 +132,6 @@ public class DbScriptFacade {
     }
 
     public Map<String, SqlScript> getDeletedScriptsMap() {
-        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMap();
         Map<String, SqlScript> scriptsInDirMap = scriptsInDir.stream()
                                                              .collect(Collectors.toMap(SqlScript::getName, Function.identity()));
 
