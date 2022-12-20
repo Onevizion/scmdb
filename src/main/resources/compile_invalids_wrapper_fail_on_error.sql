@@ -117,4 +117,3 @@ select
   ' is invalid.' invalid_message
 from user_objects
 where status <> 'VALID' and object_name not like 'BIN$%';
-exit
