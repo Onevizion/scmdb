@@ -42,8 +42,8 @@ public class DbScriptFacade {
         scriptsInDir = createScriptsFromFiles(appArguments.isGenDdl() || !appArguments.isOmitChanged());
     }
 
-    public void getDbScripts(boolean withText) {
-        dbScripts = sqlScriptDaoOra.readMap(withText);
+    public void getDbScripts() {
+        dbScripts = sqlScriptDaoOra.readMap();
     }
 
     public List<SqlScript> getNewScripts() {
