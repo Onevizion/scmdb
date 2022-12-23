@@ -23,7 +23,9 @@ public class DdlDao extends AbstractDaoOra {
             "   or object_type = 'VIEW'\n" +
             "   or object_type = 'PACKAGE'\n" +
             "   or object_type = 'PACKAGE BODY'\n" +
-            "   or object_type = 'TRIGGER'\n";
+            "   or object_type = 'TRIGGER'\n" +
+            "   or object_type = 'TYPE'\n" +
+            "   or object_type = 'TYPE BODY'\n";
 
     private final static RowMapper<DbObject> rowMapper = (rs, rowNum) -> {
         DbObject dbObject = new DbObject();

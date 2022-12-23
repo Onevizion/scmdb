@@ -13,7 +13,9 @@ public enum DbObjectType {
     COMMENT("comment", asList("comment on table", "comment on column")),
     INDEX("index", asList("create index", "create unique index", "drop index")),
     SEQUENCE("sequence", asList("create sequence", "drop sequence")),
-    TRIGGER("trigger", asList("create trigger", "replace trigger", "drop trigger", "alter trigger"));
+    TRIGGER("trigger", asList("create trigger", "replace trigger", "drop trigger", "alter trigger")),
+    TYPE_BODY("type body", asList("create type body", "replace type body", "drop type body")),
+    TYPE_SPEC("type", asList("create type", "alter type", "replace type", "drop type", "type "));
 
     private String name;
     private List<String> changeKeywords;
