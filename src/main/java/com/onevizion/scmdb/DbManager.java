@@ -28,6 +28,7 @@ public class DbManager {
     private static final String SCRIPTS_TO_EXEC_MSG = "\nScripts to be executed in [{}]:";
     private static final String ROLLBACKS_TO_SKIP_MSG = "\nRollbacks skipped in [{}]:";
     private static final String SCRIPT_NUMBERING_IS_MORE_THAN_TWO_DIGITS_REGEX = "^\\d{3,}_.*";
+    private static final String SCHEMAS_COMPILING_ERROR_MESSAGE = "Execute manually _user, _rpt, _pkg, _perfstat schemas compile.";
 
     @Autowired
     private DbScriptFacade scriptsFacade;
@@ -88,6 +89,7 @@ public class DbManager {
                     throw new ScriptExecException(MessageFormat.format(SCRIPT_EXECUTION_ERROR_MESSAGE, script.getName()));
                 }
             });
+            compileSchemas();
         } else {
             logger.info("You should execute following script files to update your database:");
             scriptsFacade.copyScriptsToExecDir(newCommitScripts);
@@ -157,6 +159,7 @@ public class DbManager {
                 deletedScripts.keySet().remove(rollback.getCommitName());
             }
         }
+        compileSchemas();
     }
 
     private void checkUpdatedScripts() {
@@ -253,6 +256,13 @@ public class DbManager {
 
         ddlGenerator.executeSettingTransformParams();
         ddlGenerator.generateDllsForAllDbObjects();
+    }
+
+    private void compileSchemas() {
+        int exitCode = scriptExecutor.compileSchema();
+        if (exitCode != 0) {
+            throw new ScriptExecException(SCHEMAS_COMPILING_ERROR_MESSAGE);
+        }
     }
 
     /**
