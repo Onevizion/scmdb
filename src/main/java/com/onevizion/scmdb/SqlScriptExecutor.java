@@ -90,6 +90,37 @@ public class SqlScriptExecutor {
         }
     }
 
+    public int compileSchema() {
+        DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(OWNER);
+        logger.info("\nExecuting schemas compile. Start: {}", GREEN, ZonedDateTime.now().format(ISO_TIME));
+
+        File workingDir = appArguments.getScriptsDirectory();
+        File compileSchemaFile = getCompileSchemaScript(workingDir);
+
+        try (Connection connection = getConnection(OWNER, cnnCredentials.getSchemaName())) {
+            connection.setAutoCommit(false);
+            ScriptExecutor executor = new ScriptExecutor(connection);
+            ScriptRunnerContext ctx = new ScriptRunnerContext();
+
+            ctx.setBaseConnection(connection);
+            executor.setScriptRunnerContext(ctx);
+            executor.setStmt(String.format("@%s", compileSchemaFile.getAbsolutePath()));
+
+            Instant start = Instant.now();
+            executor.run();
+            String scriptExecutionTime = formatDurationHMS(Duration.between(start, Instant.now()).toMillis());
+
+            logger.info("\nCompiling schemas runtime: {}", GREEN, scriptExecutionTime);
+
+            return (boolean) ctx.getProperty(ERR_ENCOUNTERED) ? SCRIPT_EXIT_CODE_ERROR : SCRIPT_EXIT_CODE_SUCCESS;
+        } catch (SQLException e) {
+            logger.error("Error during connection DB.", e);
+            return SCRIPT_EXIT_CODE_ERROR;
+        } finally {
+            compileSchemaFile.delete();
+        }
+    }
+
     private File getTmpWrapperScript(SchemaType schemaType, File workingDir) {
         ClassLoader classLoader = getClass().getClassLoader();
         URL wrapperScript;
@@ -113,6 +144,27 @@ public class SqlScriptExecutor {
             FileUtils.copyURLToFile(wrapperScript, tmpFile);
         } catch (IOException e) {
             throw new RuntimeException("Can't copy tmp wrapper file.", e);
+        }
+
+        return tmpFile;
+    }
+
+    private File getCompileSchemaScript(File workingDir) {
+        ClassLoader classLoader = getClass().getClassLoader();
+        URL wrapperScript;
+
+        if (appArguments.isIgnoreErrors()) {
+            wrapperScript = classLoader.getResource("compile_schemas_not_fail_on_error.sql");
+        } else {
+            wrapperScript = classLoader.getResource("compile_schemas_fail_on_error.sql");
+        }
+
+        File tmpFile = new File(workingDir.getAbsolutePath() + File.separator + "compile_schemas.sql");
+
+        try {
+            FileUtils.copyURLToFile(wrapperScript, tmpFile);
+        } catch (IOException e) {
+            throw new RuntimeException("Can't copy compile_schemas file.", e);
         }
 
         return tmpFile;
