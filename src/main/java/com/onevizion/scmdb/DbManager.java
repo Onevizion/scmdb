@@ -81,7 +81,7 @@ public class DbManager {
             logger.info(SCRIPTS_TO_EXEC_MSG, appArguments.getDbCredentials(OWNER).getSchemaWithUrlBeforeDot());
             newCommitScripts.forEach(script -> logger.info(script.getName()));
             newCommitScripts.forEach(script -> {
-                int exitCode = scriptExecutor.execute(script);
+                int exitCode = scriptExecutor.execute(script, false);
                 script.setStatus(ScriptStatus.getByScriptExitCode(exitCode));
                 scriptsFacade.create(script);
 
@@ -89,7 +89,7 @@ public class DbManager {
                     throw new ScriptExecException(MessageFormat.format(SCRIPT_EXECUTION_ERROR_MESSAGE, script.getName()));
                 }
             });
-            compileSchemas();
+            scriptExecutor.executeCompileSchemas();
         } else {
             logger.info("You should execute following script files to update your database:");
             scriptsFacade.copyScriptsToExecDir(newCommitScripts);
@@ -150,7 +150,7 @@ public class DbManager {
                 scriptsFacade.delete(rollback.getId());
                 scriptsFacade.delete(commit.getId());
 
-                int exitCode = scriptExecutor.execute(rollback);
+                int exitCode = scriptExecutor.execute(rollback, false);
                 if (exitCode != 0) {
                     throw new ScriptExecException(MessageFormat.format(SCRIPT_EXECUTION_ERROR_MESSAGE, rollback.getName()));
                 }
@@ -159,7 +159,7 @@ public class DbManager {
                 deletedScripts.keySet().remove(rollback.getCommitName());
             }
         }
-        compileSchemas();
+        scriptExecutor.executeCompileSchemas();
     }
 
     private void checkUpdatedScripts() {
@@ -256,13 +256,6 @@ public class DbManager {
 
         ddlGenerator.executeSettingTransformParams();
         ddlGenerator.generateDllsForAllDbObjects();
-    }
-
-    private void compileSchemas() {
-        int exitCode = scriptExecutor.compileSchema();
-        if (exitCode != 0) {
-            throw new ScriptExecException(SCHEMAS_COMPILING_ERROR_MESSAGE);
-        }
     }
 
     /**
