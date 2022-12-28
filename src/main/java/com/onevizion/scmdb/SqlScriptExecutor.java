@@ -58,13 +58,13 @@ public class SqlScriptExecutor {
     @Autowired
     private DataSource pkgDataSource;
 
-    public int execute(SqlScript script, boolean needCompileSchemas) {
+    public int execute(SqlScript script, boolean isCompileSchemas) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
                     cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
 
         File workingDir = script.getFile().getParentFile();
-        File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType(), workingDir, needCompileSchemas);
+        File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType(), workingDir, isCompileSchemas);
 
         try (Connection connection = getConnection(script.getSchemaType(), cnnCredentials.getSchemaName())) {
             connection.setAutoCommit(false);
@@ -91,10 +91,10 @@ public class SqlScriptExecutor {
         }
     }
 
-    private File getTmpWrapperScript(SchemaType schemaType, File workingDir, boolean needCompileSchemas) {
+    private File getTmpWrapperScript(SchemaType schemaType, File workingDir, boolean isCompileSchemas) {
         ClassLoader classLoader = getClass().getClassLoader();
         URL wrapperScript;
-        if (schemaType.isCompileInvalids() && !needCompileSchemas) {
+        if (schemaType.isCompileInvalids() && !isCompileSchemas) {
             if (appArguments.isIgnoreErrors()) {
                 wrapperScript = classLoader.getResource("compile_invalids_wrapper_not_fail_on_error.sql");
             } else {
