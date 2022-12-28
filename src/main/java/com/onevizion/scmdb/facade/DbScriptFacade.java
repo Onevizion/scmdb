@@ -35,18 +35,14 @@ public class DbScriptFacade {
 
     private File execDir;
     private List<SqlScript> scriptsInDir;
-    Map<String, SqlScript> dbScripts;
 
     public void init() {
         execDir = new File(appArguments.getScriptsDirectory().getAbsolutePath() + File.separator + EXEC_FOLDER_NAME);
         scriptsInDir = createScriptsFromFiles(appArguments.isGenDdl() || !appArguments.isOmitChanged());
     }
 
-    public void getDbScripts() {
-        dbScripts = sqlScriptDaoOra.readMap();
-    }
-
     public List<SqlScript> getNewScripts() {
+        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.loadDbScriptsMapCached();
         scriptsInDir.stream()
                     .filter(this::isDevScript)
                     .forEach(script -> logger.info("Dev script [" + script.getName() + "] was ignored"));
@@ -75,6 +71,8 @@ public class DbScriptFacade {
     public void copyRollbackToExecDir(SqlScript rollback) {
         File rollBackFile = new File(execDir.getAbsolutePath() + File.separator + rollback.getName());
         rollback.setFile(rollBackFile);
+        String text = sqlScriptDaoOra.readScriptTextById(rollback.getId());
+        rollback.setText(text);
         try {
             logger.debug("Creating rollback script [{}]", rollBackFile.getAbsolutePath());
             FileUtils.writeStringToFile(rollBackFile, rollback.getText(), "UTF-8");
@@ -107,6 +105,7 @@ public class DbScriptFacade {
     }
 
     public List<SqlScript> getUpdatedScripts() {
+        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.loadDbScriptsMapCached();
         List<SqlScript> updatedScripts = new ArrayList<>();
 
         for (SqlScript scriptInDir : scriptsInDir) {
@@ -132,6 +131,7 @@ public class DbScriptFacade {
     }
 
     public Map<String, SqlScript> getDeletedScriptsMap() {
+        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.loadDbScriptsMapCached();
         Map<String, SqlScript> scriptsInDirMap = scriptsInDir.stream()
                                                              .collect(Collectors.toMap(SqlScript::getName, Function.identity()));
 
