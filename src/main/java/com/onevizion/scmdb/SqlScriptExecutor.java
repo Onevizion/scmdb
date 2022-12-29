@@ -124,17 +124,21 @@ public class SqlScriptExecutor {
     }
 
     public void createDbScriptTable() {
-        int exitCode = executeResourceScript(appArguments.getScriptsDirectory(), CREATE_SQL, false);
+        int exitCode = executeResourceScript(CREATE_SQL, false);
         if (exitCode != EXIT_CODE_SUCCESS) {
             throw new ScriptExecException("Can't create DB objects used by SCMDB.");
         }
     }
 
     public void executeCompileSchemas() {
-        int exitCode = executeResourceScript(appArguments.getScriptsDirectory(), COMPILE_SCHEMAS_SQL, true);
+        int exitCode = executeResourceScript(COMPILE_SCHEMAS_SQL, true);
         if (exitCode != EXIT_CODE_SUCCESS) {
             throw new ScriptExecException("Can't compile invalid objects in _user, _rpt, _pkg schemas.");
         }
+    }
+
+    private int executeResourceScript(String scriptFileName, boolean isCompileSchema) {
+        return executeResourceScript(appArguments.getScriptsDirectory(), scriptFileName, isCompileSchema);
     }
 
     private int executeResourceScript(File scriptsDirectory, String scriptFileName, boolean isCompileSchema) {
