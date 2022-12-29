@@ -28,7 +28,6 @@ public class DbManager {
     private static final String SCRIPTS_TO_EXEC_MSG = "\nScripts to be executed in [{}]:";
     private static final String ROLLBACKS_TO_SKIP_MSG = "\nRollbacks skipped in [{}]:";
     private static final String SCRIPT_NUMBERING_IS_MORE_THAN_TWO_DIGITS_REGEX = "^\\d{3,}_.*";
-    private static final String SCHEMAS_COMPILING_ERROR_MESSAGE = "Execute manually _user, _rpt, _pkg, _perfstat schemas compile.";
 
     @Autowired
     private DbScriptFacade scriptsFacade;
@@ -81,7 +80,7 @@ public class DbManager {
             logger.info(SCRIPTS_TO_EXEC_MSG, appArguments.getDbCredentials(OWNER).getSchemaWithUrlBeforeDot());
             newCommitScripts.forEach(script -> logger.info(script.getName()));
             newCommitScripts.forEach(script -> {
-                int exitCode = scriptExecutor.execute(script, false);
+                int exitCode = scriptExecutor.execute(script);
                 script.setStatus(ScriptStatus.getByScriptExitCode(exitCode));
                 scriptsFacade.create(script);
 
@@ -150,7 +149,7 @@ public class DbManager {
                 scriptsFacade.delete(rollback.getId());
                 scriptsFacade.delete(commit.getId());
 
-                int exitCode = scriptExecutor.execute(rollback, false);
+                int exitCode = scriptExecutor.execute(rollback);
                 if (exitCode != 0) {
                     throw new ScriptExecException(MessageFormat.format(SCRIPT_EXECUTION_ERROR_MESSAGE, rollback.getName()));
                 }

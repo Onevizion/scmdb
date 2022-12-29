@@ -58,7 +58,11 @@ public class SqlScriptExecutor {
     @Autowired
     private DataSource pkgDataSource;
 
-    public int execute(SqlScript script, boolean isCompileSchemas) {
+    public int execute(SqlScript script) {
+        return execute(script, false);
+    }
+
+    private int execute(SqlScript script, boolean isCompileSchemas) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
                     cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
@@ -120,41 +124,28 @@ public class SqlScriptExecutor {
     }
 
     public void createDbScriptTable() {
-        File scriptsDirectory = appArguments.getScriptsDirectory();
-        String tmpFileName = new Date().getTime() + CREATE_SQL;
-        String tmpFilePath = scriptsDirectory.getAbsolutePath() + File.separator + tmpFileName;
-        File tmpFile = new File(tmpFilePath);
-        URL resource = getClass().getClassLoader().getResource(CREATE_SQL);
-        try {
-            FileUtils.copyURLToFile(resource, tmpFile);
-        } catch (IOException e) {
-            throw new RuntimeException("Can't copy " + CREATE_SQL + " file.", e);
-        }
-
-        SqlScript sqlScript = new SqlScript();
-        sqlScript.setName(tmpFileName);
-        sqlScript.setFile(tmpFile);
-        sqlScript.setType(COMMIT);
-        sqlScript.setSchemaType(OWNER);
-
-        int exitCode = execute(sqlScript, false);
-        tmpFile.delete();
+        int exitCode = executeResourceScript(appArguments.getScriptsDirectory(), CREATE_SQL, false);
         if (exitCode != EXIT_CODE_SUCCESS) {
-            logger.error("Please execute script \"src/main/resources/create.sql\" manually");
             throw new ScriptExecException("Can't create DB objects used by SCMDB.");
         }
     }
 
     public void executeCompileSchemas() {
-        File scriptsDirectory = appArguments.getScriptsDirectory();
-        String tmpFileName = new Date().getTime() + COMPILE_SCHEMAS_SQL;
+        int exitCode = executeResourceScript(appArguments.getScriptsDirectory(), COMPILE_SCHEMAS_SQL, true);
+        if (exitCode != EXIT_CODE_SUCCESS) {
+            throw new ScriptExecException("Can't compile invalid objects in _user, _rpt, _pkg schemas.");
+        }
+    }
+
+    private int executeResourceScript(File scriptsDirectory, String scriptFileName, boolean isCompileSchema) {
+        String tmpFileName = new Date().getTime() + scriptFileName;
         String tmpFilePath = scriptsDirectory.getAbsolutePath() + File.separator + tmpFileName;
         File tmpFile = new File(tmpFilePath);
-        URL resource = getClass().getClassLoader().getResource(COMPILE_SCHEMAS_SQL);
+        URL resource = getClass().getClassLoader().getResource(scriptFileName);
         try {
             FileUtils.copyURLToFile(resource, tmpFile);
         } catch (IOException e) {
-            throw new RuntimeException("Can't copy " + COMPILE_SCHEMAS_SQL + " file.", e);
+            throw new RuntimeException("Can't copy " + scriptFileName + " file.", e);
         }
 
         SqlScript sqlScript = new SqlScript();
@@ -163,12 +154,13 @@ public class SqlScriptExecutor {
         sqlScript.setType(COMMIT);
         sqlScript.setSchemaType(OWNER);
 
-        int exitCode = execute(sqlScript, true);
-        tmpFile.delete();
+        int exitCode = execute(sqlScript, isCompileSchema);
         if (exitCode != EXIT_CODE_SUCCESS) {
-            logger.error("Please execute script \"src/main/resources/" + COMPILE_SCHEMAS_SQL + "\" manually");
-            throw new ScriptExecException("Can't create DB objects used by SCMDB.");
+            logger.error("Please execute script \"" + tmpFilePath + "\" manually");
         }
+        tmpFile.delete();
+
+        return exitCode;
     }
 
     private Connection getConnection(SchemaType schemaType, String schemaName) {
