@@ -46,7 +46,7 @@ public class DdlDao extends AbstractDaoOra {
 
     private final static String SELECT_DDL_TRIGGER_BY_TABLE_NAME = "select table_name, dbms_metadata.get_ddl('TRIGGER', trigger_name)" +
             " from user_triggers where table_name=upper(:tableName)" +
-            " and trigger_name not like 'Z_%' order by trigger_name";
+            " and trigger_name not like 'Z_%' order by nlssort(trigger_name, 'NLS_SORT = BINARY_CI')";
 
     private final static RowMapper<DbObject> rowMapper = (rs, rowNum) -> {
         DbObject dbObject = new DbObject();
