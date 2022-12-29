@@ -36,6 +36,7 @@ import static org.apache.commons.lang3.time.DurationFormatUtils.formatDurationHM
 public class SqlScriptExecutor {
     private static final String SQL_COMMAND = "@%s %s";
     private static final String CREATE_SQL = "create.sql";
+    private static final String COMPILE_SCHEMAS_SQL = "compile_schemas.sql";
     private static final int SCRIPT_EXIT_CODE_ERROR = 1;
     private static final int SCRIPT_EXIT_CODE_SUCCESS = 0;
 
@@ -57,13 +58,13 @@ public class SqlScriptExecutor {
     @Autowired
     private DataSource pkgDataSource;
 
-    public int execute(SqlScript script) {
+    public int execute(SqlScript script, boolean isCompileSchemas) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
                     cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
 
         File workingDir = script.getFile().getParentFile();
-        File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType(), workingDir);
+        File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType(), workingDir, isCompileSchemas);
 
         try (Connection connection = getConnection(script.getSchemaType(), cnnCredentials.getSchemaName())) {
             connection.setAutoCommit(false);
@@ -90,41 +91,10 @@ public class SqlScriptExecutor {
         }
     }
 
-    public int compileSchema() {
-        DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(OWNER);
-        logger.info("\nExecuting schemas compile. Start: {}", GREEN, ZonedDateTime.now().format(ISO_TIME));
-
-        File workingDir = appArguments.getScriptsDirectory();
-        File compileSchemaFile = getCompileSchemaScript(workingDir);
-
-        try (Connection connection = getConnection(OWNER, cnnCredentials.getSchemaName())) {
-            connection.setAutoCommit(false);
-            ScriptExecutor executor = new ScriptExecutor(connection);
-            ScriptRunnerContext ctx = new ScriptRunnerContext();
-
-            ctx.setBaseConnection(connection);
-            executor.setScriptRunnerContext(ctx);
-            executor.setStmt(String.format("@%s", compileSchemaFile.getAbsolutePath()));
-
-            Instant start = Instant.now();
-            executor.run();
-            String scriptExecutionTime = formatDurationHMS(Duration.between(start, Instant.now()).toMillis());
-
-            logger.info("\nCompiling schemas runtime: {}", GREEN, scriptExecutionTime);
-
-            return (boolean) ctx.getProperty(ERR_ENCOUNTERED) ? SCRIPT_EXIT_CODE_ERROR : SCRIPT_EXIT_CODE_SUCCESS;
-        } catch (SQLException e) {
-            logger.error("Error during connection DB.", e);
-            return SCRIPT_EXIT_CODE_ERROR;
-        } finally {
-            compileSchemaFile.delete();
-        }
-    }
-
-    private File getTmpWrapperScript(SchemaType schemaType, File workingDir) {
+    private File getTmpWrapperScript(SchemaType schemaType, File workingDir, boolean isCompileSchemas) {
         ClassLoader classLoader = getClass().getClassLoader();
         URL wrapperScript;
-        if (schemaType.isCompileInvalids()) {
+        if (schemaType.isCompileInvalids() && !isCompileSchemas) {
             if (appArguments.isIgnoreErrors()) {
                 wrapperScript = classLoader.getResource("compile_invalids_wrapper_not_fail_on_error.sql");
             } else {
@@ -149,27 +119,6 @@ public class SqlScriptExecutor {
         return tmpFile;
     }
 
-    private File getCompileSchemaScript(File workingDir) {
-        ClassLoader classLoader = getClass().getClassLoader();
-        URL wrapperScript;
-
-        if (appArguments.isIgnoreErrors()) {
-            wrapperScript = classLoader.getResource("compile_schemas_not_fail_on_error.sql");
-        } else {
-            wrapperScript = classLoader.getResource("compile_schemas_fail_on_error.sql");
-        }
-
-        File tmpFile = new File(workingDir.getAbsolutePath() + File.separator + "compile_schemas.sql");
-
-        try {
-            FileUtils.copyURLToFile(wrapperScript, tmpFile);
-        } catch (IOException e) {
-            throw new RuntimeException("Can't copy compile_schemas file.", e);
-        }
-
-        return tmpFile;
-    }
-
     public void createDbScriptTable() {
         File scriptsDirectory = appArguments.getScriptsDirectory();
         String tmpFileName = new Date().getTime() + CREATE_SQL;
@@ -188,10 +137,36 @@ public class SqlScriptExecutor {
         sqlScript.setType(COMMIT);
         sqlScript.setSchemaType(OWNER);
 
-        int exitCode = execute(sqlScript);
+        int exitCode = execute(sqlScript, false);
         tmpFile.delete();
         if (exitCode != EXIT_CODE_SUCCESS) {
             logger.error("Please execute script \"src/main/resources/create.sql\" manually");
+            throw new ScriptExecException("Can't create DB objects used by SCMDB.");
+        }
+    }
+
+    public void executeCompileSchemas() {
+        File scriptsDirectory = appArguments.getScriptsDirectory();
+        String tmpFileName = new Date().getTime() + COMPILE_SCHEMAS_SQL;
+        String tmpFilePath = scriptsDirectory.getAbsolutePath() + File.separator + tmpFileName;
+        File tmpFile = new File(tmpFilePath);
+        URL resource = getClass().getClassLoader().getResource(COMPILE_SCHEMAS_SQL);
+        try {
+            FileUtils.copyURLToFile(resource, tmpFile);
+        } catch (IOException e) {
+            throw new RuntimeException("Can't copy " + COMPILE_SCHEMAS_SQL + " file.", e);
+        }
+
+        SqlScript sqlScript = new SqlScript();
+        sqlScript.setName(tmpFileName);
+        sqlScript.setFile(tmpFile);
+        sqlScript.setType(COMMIT);
+        sqlScript.setSchemaType(OWNER);
+
+        int exitCode = execute(sqlScript, true);
+        tmpFile.delete();
+        if (exitCode != EXIT_CODE_SUCCESS) {
+            logger.error("Please execute script \"src/main/resources/" + COMPILE_SCHEMAS_SQL + "\" manually");
             throw new ScriptExecException("Can't create DB objects used by SCMDB.");
         }
     }
