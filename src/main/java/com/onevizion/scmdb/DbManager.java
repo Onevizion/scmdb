@@ -58,7 +58,6 @@ public class DbManager {
             logger.info(FIRST_RUN_MESSAGE);
         } else {
             scriptsFacade.cleanExecDir();
-            scriptsFacade.getDbScripts();
             checkUpdatedScripts();
             checkDeletedScripts();
             executeNewScripts();
@@ -192,7 +191,6 @@ public class DbManager {
 
         scriptsFacade.checkDbConnection();
 
-        scriptsFacade.getDbScripts();
         List<SqlScript> scripts = scriptsFacade.getNewScripts();
         scripts.addAll(scriptsFacade.getUpdatedScripts());
         List<SqlScript> scriptsToGenDdl = scripts.stream()
