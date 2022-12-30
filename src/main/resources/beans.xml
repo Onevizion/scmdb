@@ -49,7 +49,7 @@
           class="org.springframework.cache.support.SimpleCacheManager">
         <property name="caches">
             <set>
-                <bean class="org.springframework.cache.concurrent.ConcurrentMapCacheFactoryBean" name="dbScripts"/>
+                <bean class="org.springframework.cache.concurrent.ConcurrentMapCacheFactoryBean" name="dbScriptsMap"/>
             </set>
         </property>
     </bean>

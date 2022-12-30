@@ -42,7 +42,7 @@ public class DbScriptFacade {
     }
 
     public List<SqlScript> getNewScripts() {
-        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.loadDbScriptsMapCached();
+        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMapCached();
         scriptsInDir.stream()
                     .filter(this::isDevScript)
                     .forEach(script -> logger.info("Dev script [" + script.getName() + "] was ignored"));
@@ -71,8 +71,6 @@ public class DbScriptFacade {
     public void copyRollbackToExecDir(SqlScript rollback) {
         File rollBackFile = new File(execDir.getAbsolutePath() + File.separator + rollback.getName());
         rollback.setFile(rollBackFile);
-        String text = sqlScriptDaoOra.readScriptTextById(rollback.getId());
-        rollback.setText(text);
         try {
             logger.debug("Creating rollback script [{}]", rollBackFile.getAbsolutePath());
             FileUtils.writeStringToFile(rollBackFile, rollback.getText(), "UTF-8");
@@ -105,7 +103,7 @@ public class DbScriptFacade {
     }
 
     public List<SqlScript> getUpdatedScripts() {
-        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.loadDbScriptsMapCached();
+        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMapCached();
         List<SqlScript> updatedScripts = new ArrayList<>();
 
         for (SqlScript scriptInDir : scriptsInDir) {
@@ -131,7 +129,7 @@ public class DbScriptFacade {
     }
 
     public Map<String, SqlScript> getDeletedScriptsMap() {
-        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.loadDbScriptsMapCached();
+        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMapCached();
         Map<String, SqlScript> scriptsInDirMap = scriptsInDir.stream()
                                                              .collect(Collectors.toMap(SqlScript::getName, Function.identity()));
 
@@ -158,6 +156,17 @@ public class DbScriptFacade {
         sqlScriptDaoOra.deleteByIds(scripts.stream()
                                            .map(SqlScript::getId)
                                            .collect(Collectors.toList()));
+    }
+
+    public List <SqlScript> getDbScriptsWithText(List<SqlScript> scripts) {
+        Set<Long> ids = new HashSet<>();
+        scripts.stream().forEach(script -> ids.add(script.getId()));
+
+        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMapByIds(ids);
+        List<SqlScript> dbScriptsWithText = dbScripts.values().stream()
+                                                .collect(Collectors.toList());
+
+        return dbScriptsWithText;
     }
 
     public void create(SqlScript script) {
