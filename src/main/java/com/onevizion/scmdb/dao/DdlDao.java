@@ -24,10 +24,9 @@ public class DdlDao extends AbstractDaoOra {
             "   or object_type = 'PACKAGE'\n" +
             "   or object_type = 'PACKAGE BODY'\n" +
             "   or object_type = 'TRIGGER'\n" +
-            "   or (object_type = 'TYPE'\n" +
+            "   or ((object_type = 'TYPE' or object_type = 'TYPE BODY')\n" +
             "     and generated = 'N'\n" +
-            "     and object_name not like 'T$%')\n" +
-            "   or object_type = 'TYPE BODY'\n";
+            "     and object_name not like 'T$%')\n";
 
     private final static RowMapper<DbObject> rowMapper = (rs, rowNum) -> {
         DbObject dbObject = new DbObject();
