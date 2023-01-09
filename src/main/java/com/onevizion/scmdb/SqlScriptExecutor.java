@@ -10,18 +10,18 @@ import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.sql.DataSource;
-import java.io.*;
-import java.net.URISyntaxException;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
 import java.net.URL;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
-import java.util.*;
+import java.util.Date;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.Scmdb.EXIT_CODE_ERROR;
@@ -172,6 +172,7 @@ public class SqlScriptExecutor {
             ctx.setBaseConnection(connection);
             executor.setScriptRunnerContext(ctx);
 
+            //stream is specified to ignore the sql stack code
             BufferedOutputStream buf = new BufferedOutputStream(new ByteArrayOutputStream());
             executor.setOut(buf);
 
