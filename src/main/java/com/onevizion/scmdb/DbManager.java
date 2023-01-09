@@ -16,7 +16,6 @@ import java.util.stream.Collectors;
 
 import static com.onevizion.scmdb.ColorLogger.Color.CYAN;
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
-import static com.onevizion.scmdb.Scmdb.EXIT_CODE_ERROR;
 import static com.onevizion.scmdb.Scmdb.EXIT_CODE_SUCCESS;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
 import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
@@ -80,16 +79,16 @@ public class DbManager {
         if (appArguments.isExecuteScripts()) {
             logger.info(SCRIPTS_TO_EXEC_MSG, appArguments.getDbCredentials(OWNER).getSchemaWithUrlBeforeDot());
             newCommitScripts.forEach(script -> logger.info(script.getName()));
-            for (Iterator<SqlScript> iterator = newCommitScripts.iterator(); iterator.hasNext(); ) {
-                SqlScript script = iterator.next();
-                int exitCode = scriptExecutor.execute(script, !iterator.hasNext());
+            newCommitScripts.forEach(script -> {
+                int exitCode = scriptExecutor.execute(script);
                 script.setStatus(ScriptStatus.getByScriptExitCode(exitCode));
                 scriptsFacade.create(script);
 
                 if (script.getStatus() != ScriptStatus.EXECUTED && !appArguments.isIgnoreErrors()) {
                     throw new ScriptExecException(MessageFormat.format(SCRIPT_EXECUTION_ERROR_MESSAGE, script.getName()));
                 }
-            }
+            });
+            scriptExecutor.checkInvalidObjectAndThrow();
 
         } else {
             logger.info("You should execute following script files to update your database:");
@@ -151,7 +150,7 @@ public class DbManager {
                 scriptsFacade.delete(rollback.getId());
                 scriptsFacade.delete(commit.getId());
 
-                int exitCode = scriptExecutor.execute(rollback, false);
+                int exitCode = scriptExecutor.execute(rollback);
                 if (exitCode != 0) {
                     throw new ScriptExecException(MessageFormat.format(SCRIPT_EXECUTION_ERROR_MESSAGE, rollback.getName()));
                 }
@@ -160,6 +159,7 @@ public class DbManager {
                 deletedScripts.keySet().remove(rollback.getCommitName());
             }
         }
+        scriptExecutor.checkInvalidObjectAndThrow();
     }
 
     private void checkUpdatedScripts() {
