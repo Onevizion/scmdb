@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.Date;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -77,6 +78,7 @@ public class SqlScriptExecutor {
 
             Instant start = Instant.now();
             executor.run();
+
             String scriptExecutionTime = formatDurationHMS(Duration.between(start, Instant.now()).toMillis());
 
             logger.info("\n[{}] runtime: {}", GREEN, script.getName(), scriptExecutionTime);
