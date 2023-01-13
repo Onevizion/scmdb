@@ -17,8 +17,6 @@ import static java.util.Comparator.nullsFirst;
 public class SqlScript implements Comparable<SqlScript> {
     private Long id;
     private String name;
-    private String fileHash;
-    private String text;
     private Date ts;
     private String output;
     private ScriptType type;
@@ -26,12 +24,13 @@ public class SqlScript implements Comparable<SqlScript> {
     private File file;
     private SchemaType schemaType = SchemaType.OWNER;
     private Integer orderNumber;
+    private String proxyText = null;
 
     private static final String ROLLBACK_SUFFIX = "_rollback";
 
     private static final Comparator<SqlScript> ORDER_NUMBER_AND_NAME_COMPARATOR =
             Comparator.comparing(SqlScript::getOrderNumber, nullsFirst(naturalOrder()))
-                      .thenComparing(SqlScript::getName);
+                    .thenComparing(SqlScript::getName);
 
     public static SqlScript create(File scriptFile) {
         return create(scriptFile, true);
@@ -52,22 +51,7 @@ public class SqlScript implements Comparable<SqlScript> {
         script.setStatus(ScriptStatus.EXECUTED);
         script.setSchemaType(SchemaType.getByScriptFileName(scriptFile.getName()));
 
-        if (readFileContent) {
-            script.loadContentFromFile();
-        }
-
         return script;
-    }
-
-    public void loadContentFromFile() {
-        String fileContent;
-        try {
-            fileContent = FileUtils.readFileToString(file, "UTF-8");
-            text = fileContent;
-            fileHash = DigestUtils.sha1Hex(fileContent.replaceAll("\\r\\n", "\n"));
-        } catch (IOException e) {
-            throw new RuntimeException("Can't read file content [" + name + "]", e);
-        }
     }
 
     public Long getId() {
@@ -85,22 +69,6 @@ public class SqlScript implements Comparable<SqlScript> {
     public void setName(String name) {
         this.name = name;
         this.orderNumber = extractOrderNumber(name);
-    }
-
-    public String getFileHash() {
-        return fileHash;
-    }
-
-    public void setFileHash(String fileHash) {
-        this.fileHash = fileHash;
-    }
-
-    public String getText() {
-        return text;
-    }
-
-    public void setText(String text) {
-        this.text = text;
     }
 
     public Date getTs() {
@@ -141,6 +109,7 @@ public class SqlScript implements Comparable<SqlScript> {
 
     public void setFile(File file) {
         this.file = file;
+        this.proxyText = null;
     }
 
     public SchemaType getSchemaType() {
@@ -207,5 +176,20 @@ public class SqlScript implements Comparable<SqlScript> {
             //NULL for deprecated a dev scripts, change after removing dev scripts support.
             return null;
         }
+    }
+
+    public String getTextFromFile() {
+        try {
+            if (Objects.isNull(proxyText)) {
+                proxyText = FileUtils.readFileToString(file, "UTF-8");
+            }
+            return proxyText;
+        } catch (IOException e) {
+            throw new RuntimeException("Can't read file content [" + name + "]", e);
+        }
+    }
+
+    public static String getHashFromText(String text) {
+        return DigestUtils.sha1Hex(text.replaceAll("\\r\\n", "\n"));
     }
 }
