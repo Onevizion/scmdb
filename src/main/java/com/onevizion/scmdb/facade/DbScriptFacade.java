@@ -37,25 +37,21 @@ public class DbScriptFacade {
     private List<SqlScript> scriptsInDir;
 
     public void init() {
+
         execDir = new File(appArguments.getScriptsDirectory().getAbsolutePath() + File.separator + EXEC_FOLDER_NAME);
-        scriptsInDir = createScriptsFromFiles(appArguments.isGenDdl() || !appArguments.isOmitChanged());
+        scriptsInDir = createScriptsFromFiles(appArguments.isReadAllFilesContent());
     }
 
     public List<SqlScript> getNewScripts() {
-        Map<String, SqlScript> savedScripts = sqlScriptDaoOra.readMap();
-
+        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMapCached();
         scriptsInDir.stream()
-                    .filter(this::isDevScript)
-                    .forEach(script -> logger.info("Dev script [" + script.getName() + "] was ignored"));
+                .filter(this::isDevScript)
+                .forEach(script -> logger.info("Dev script [" + script.getName() + "] was ignored"));
 
-        List<SqlScript> newScripts = scriptsInDir.stream()
-                                                 .filter(script -> !isDevScript(script))
-                                                 .filter(script -> !savedScripts.containsKey(script.getName()))
-                                                 .collect(Collectors.toList());
-        if (!appArguments.isReadAllFilesContent()) {
-            newScripts.forEach(SqlScript::loadContentFromFile);
-        }
-        return newScripts;
+        return scriptsInDir.stream()
+                .filter(script -> !isDevScript(script))
+                .filter(script -> !dbScripts.containsKey(script.getName()))
+                .collect(Collectors.toList());
     }
 
     private boolean isDevScript(SqlScript script) {
@@ -63,18 +59,12 @@ public class DbScriptFacade {
         return parts.length <= 1 || !NumberUtils.isDigits(parts[0]);
     }
 
-    public void copyRollbacksToExecDir(List<SqlScript> rollbacks) {
-        for (SqlScript rollback : rollbacks) {
-            copyRollbackToExecDir(rollback);
-        }
-    }
-
-    public void copyRollbackToExecDir(SqlScript rollback) {
+    public void copyRollbackToExecDir(SqlScript rollback, String text) {
         File rollBackFile = new File(execDir.getAbsolutePath() + File.separator + rollback.getName());
         rollback.setFile(rollBackFile);
         try {
             logger.debug("Creating rollback script [{}]", rollBackFile.getAbsolutePath());
-            FileUtils.writeStringToFile(rollBackFile, rollback.getText(), "UTF-8");
+            FileUtils.writeStringToFile(rollBackFile, text, "UTF-8");
         } catch (IOException e) {
             logger.error("Can't create file [{}]", rollBackFile.getAbsolutePath(), e);
             throw new RuntimeException(e);
@@ -98,21 +88,25 @@ public class DbScriptFacade {
     private List<SqlScript> createScriptsFromFiles(boolean readAllScriptsContent) {
         List<File> scriptFiles = (List<File>) FileUtils.listFiles(appArguments.getScriptsDirectory(), new String[]{"sql"}, false);
         return scriptFiles.stream()
-                          .map(f -> SqlScript.create(f, readAllScriptsContent))
-                          .sorted()
-                          .collect(Collectors.toList());
+                .map(f -> SqlScript.create(f, readAllScriptsContent))
+                .sorted()
+                .collect(Collectors.toList());
     }
 
     public List<SqlScript> getUpdatedScripts() {
+        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMapCached();
         List<SqlScript> updatedScripts = new ArrayList<>();
-        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMap();
+        Map<Long, String> texts = getTextMapByScripts(new ArrayList<>(dbScripts.values()));
 
         for (SqlScript scriptInDir : scriptsInDir) {
             if (!dbScripts.containsKey(scriptInDir.getName())) {
                 continue;
             }
             SqlScript savedScript = dbScripts.get(scriptInDir.getName());
-            if (!scriptInDir.getFileHash().equals(savedScript.getFileHash())) {
+            String fileHash = SqlScript.getHashFromText(scriptInDir.getTextFromFile());
+            String textHash = SqlScript.getHashFromText(texts.get(savedScript.getId()));
+
+            if (!Objects.equals(fileHash, textHash)) {
                 scriptInDir.setId(savedScript.getId());
                 updatedScripts.add(scriptInDir);
             }
@@ -122,28 +116,28 @@ public class DbScriptFacade {
     }
 
     public void batchUpdate(List<SqlScript> updatedScripts) {
-        sqlScriptDaoOra.batchUpdate(updatedScripts);
+        sqlScriptDaoOra.batchUpdate(updatedScripts, appArguments.isReadAllFilesContent());
     }
 
     public void batchCreate(List<SqlScript> scripts) {
-        sqlScriptDaoOra.createAll(scripts);
+        sqlScriptDaoOra.createAll(scripts, appArguments.isReadAllFilesContent());
     }
 
     public Map<String, SqlScript> getDeletedScriptsMap() {
-        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMap();
+        Map<String, SqlScript> dbScripts = sqlScriptDaoOra.readMapCached();
         Map<String, SqlScript> scriptsInDirMap = scriptsInDir.stream()
-                                                             .collect(Collectors.toMap(SqlScript::getName, Function.identity()));
+                .collect(Collectors.toMap(SqlScript::getName, Function.identity()));
 
         Map<String, SqlScript> deletedScripts = dbScripts.values().stream()
-                                                         .filter(dbScript -> !scriptsInDirMap.containsKey(dbScript.getName()))
-                                                         .collect(Collectors.toMap(SqlScript::getName, Function.identity()));
+                .filter(dbScript -> !scriptsInDirMap.containsKey(dbScript.getName()))
+                .collect(Collectors.toMap(SqlScript::getName, Function.identity()));
 
         List<SqlScript> commitsDeletedWithoutRollbacks =
                 deletedScripts.values().stream()
-                              .filter(script -> script.getType() == COMMIT)
-                              .filter(script -> scriptsInDirMap.containsKey(script.getRollbackName()))
-                              .filter(script -> !deletedScripts.containsKey(script.getRollbackName()))
-                              .collect(Collectors.toList());
+                        .filter(script -> script.getType() == COMMIT)
+                        .filter(script -> scriptsInDirMap.containsKey(script.getRollbackName()))
+                        .filter(script -> !deletedScripts.containsKey(script.getRollbackName()))
+                        .collect(Collectors.toList());
         if (!commitsDeletedWithoutRollbacks.isEmpty()) {
             commitsDeletedWithoutRollbacks.forEach(script -> logger.error("Deleted script: [{}], rollback: [{}]",
                     script.getName(), script.getRollbackName()));
@@ -155,16 +149,20 @@ public class DbScriptFacade {
 
     public void deleteAll(Collection<SqlScript> scripts) {
         sqlScriptDaoOra.deleteByIds(scripts.stream()
-                                           .map(SqlScript::getId)
-                                           .collect(Collectors.toList()));
+                .map(SqlScript::getId)
+                .collect(Collectors.toList()));
+    }
+
+    public Map<Long, String> getTextMapByScripts(List<SqlScript> scripts) {
+        return sqlScriptDaoOra.readTextMapByIds(scripts.stream().map(SqlScript::getId).collect(Collectors.toSet()));
     }
 
     public void create(SqlScript script) {
-        sqlScriptDaoOra.create(script);
+        sqlScriptDaoOra.create(script, appArguments.isReadAllFilesContent());
     }
 
     public void createAllFromDirectory() {
-        sqlScriptDaoOra.createAll(createScriptsFromFiles(true));
+        sqlScriptDaoOra.createAll(createScriptsFromFiles(true), appArguments.isReadAllFilesContent());
     }
 
     public void delete(Long id) {
@@ -174,7 +172,7 @@ public class DbScriptFacade {
     public void copyScriptsToExecDir(List<SqlScript> scripts) {
         for (SqlScript script : scripts) {
             File srcFile = new File(appArguments.getScriptsDirectory()
-                                                .getAbsolutePath() + File.separator + script.getName());
+                    .getAbsolutePath() + File.separator + script.getName());
             File destFile = new File(execDir.getAbsolutePath() + File.separator + script.getName());
             try {
                 logger.debug("Copying new script [{}]", destFile.getAbsolutePath());

@@ -70,15 +70,15 @@ public class DbManager {
             logger.info(NO_SCRIPTS_TO_EXEC_MSG, appArguments.getDbCredentials(OWNER).getSchemaWithUrlBeforeDot());
             return;
         }
-
         List<SqlScript> newCommitScripts = sortScriptsInExecutionOrder(newScripts, COMMIT);
-
         List<SqlScript> newRollbackScripts = sortScriptsInExecutionOrder(newScripts, ROLLBACK);
+
         scriptsFacade.batchCreate(newRollbackScripts);
 
         if (appArguments.isExecuteScripts()) {
             logger.info(SCRIPTS_TO_EXEC_MSG, appArguments.getDbCredentials(OWNER).getSchemaWithUrlBeforeDot());
             newCommitScripts.forEach(script -> logger.info(script.getName()));
+
             newCommitScripts.forEach(script -> {
                 int exitCode = scriptExecutor.execute(script);
                 script.setStatus(ScriptStatus.getByScriptExitCode(exitCode));
@@ -99,9 +99,9 @@ public class DbManager {
     private void checkDeletedScripts() {
         Map<String, SqlScript> deletedScripts = scriptsFacade.getDeletedScriptsMap();
         List<SqlScript> rollbacksToExec = deletedScripts.values()
-                                                        .stream()
-                                                        .filter(script -> deletedScripts.containsKey(script.getCommitName()))
-                                                        .collect(Collectors.toList());
+                .stream()
+                .filter(script -> deletedScripts.containsKey(script.getCommitName()))
+                .collect(Collectors.toList());
         rollbacksToExec = sortScriptsInExecutionOrder(rollbacksToExec, ROLLBACK);
         if (rollbacksToExec.isEmpty()) {
             scriptsFacade.deleteAll(deletedScripts.values());
@@ -127,22 +127,26 @@ public class DbManager {
             executeRollbacks = userGrantsPermission();
         }
 
+        Map<Long, String> texts = scriptsFacade.getTextMapByScripts(rollbacksToExec);
+
         if (executeRollbacks) {
-            executeRollbacks(deletedScripts, rollbacksToExec);
+            executeRollbacks(deletedScripts, rollbacksToExec, texts);
         } else {
             logger.info("At first you should execute following rollbacks to revert changes of deleted scripts:");
-            scriptsFacade.copyRollbacksToExecDir(rollbacksToExec);
-            rollbacksToExec.forEach(script -> logger.info(script.getName(), GREEN));
+            rollbacksToExec.forEach(script -> {
+                scriptsFacade.copyRollbackToExecDir(script, texts.get(script.getId()));
+                logger.info(script.getName(), GREEN);
+            });
             scriptsFacade.deleteAll(deletedScripts.values());
 
             System.exit(EXIT_CODE_SUCCESS);
         }
     }
 
-    private void executeRollbacks(Map<String, SqlScript> deletedScripts, List<SqlScript> rollbacksToExec) {
+    private void executeRollbacks(Map<String, SqlScript> deletedScripts, List<SqlScript> rollbacksToExec, Map<Long, String> texts) {
         for (SqlScript rollback : rollbacksToExec) {
             if (deletedScripts.containsKey(rollback.getCommitName())) {
-                scriptsFacade.copyRollbackToExecDir(rollback);
+                scriptsFacade.copyRollbackToExecDir(rollback, texts.get(rollback.getId()));
 
                 SqlScript commit = deletedScripts.get(rollback.getCommitName());
                 scriptsFacade.delete(rollback.getId());
@@ -194,24 +198,19 @@ public class DbManager {
         List<SqlScript> scripts = scriptsFacade.getNewScripts();
         scripts.addAll(scriptsFacade.getUpdatedScripts());
         List<SqlScript> scriptsToGenDdl = scripts.stream()
-                                                 .sorted()
-                                                 .filter(script -> script.getType() == ScriptType.COMMIT)
-                                                 .filter(script -> script.getSchemaType() == OWNER)
-                                                 .collect(Collectors.toList());
+                .sorted()
+                .filter(script -> script.getType() == ScriptType.COMMIT)
+                .filter(script -> script.getSchemaType() == OWNER)
+                .collect(Collectors.toList());
 
-        Set<DbObject> changedDbObjects = findChangedDbObjects(scriptsToGenDdl);
+        Map<Long, String> texts = scriptsFacade.getTextMapByScripts(scriptsToGenDdl);
+        Set<DbObject> changedDbObjects = scriptsToGenDdl.stream()
+                .map(script -> removeSpecialFromScriptText(texts.get(script.getId())))
+                .flatMap(scriptText -> findChangedDbObjectsInScriptText(scriptText).stream())
+                .collect(Collectors.toSet());
+
         ddlGenerator.executeSettingTransformParams();
         ddlGenerator.generateDdls(changedDbObjects, false);
-    }
-
-    private Set<DbObject> findChangedDbObjects(List<SqlScript> scripts) {
-        Set<DbObject> updatedDbObjects;
-
-        updatedDbObjects = scripts.stream()
-                                  .map(script -> removeSpecialFromScriptText(script.getText()))
-                                  .flatMap(scriptText -> findChangedDbObjectsInScriptText(scriptText).stream())
-                                  .collect(Collectors.toSet());
-        return updatedDbObjects;
     }
 
     private List<DbObject> findChangedDbObjectsInScriptText(String scriptText) {
@@ -260,23 +259,23 @@ public class DbManager {
      * Scripts will be sorted in ascending order of numbering, scripts in the range 1..99 will be added to the end of the list.
      * If the type is ROLLBACK, then the scripts will be sorted in descending order of numbering,
      * scripts in the range 99..1 will be added to the end of the list.
-     *
+     * <p>
      * Example 1 : Input  scripts = [1_script1.sql, 1_script1_rollback.sql, 8861_script2.sql, 8861_script2_rollback.sql]
-     *                    scriptType = COMMIT
-     *             Output List<SqlScript> = [8861_script2.sql, 1_script1.sql]
-     *
+     * scriptType = COMMIT
+     * Output List<SqlScript> = [8861_script2.sql, 1_script1.sql]
+     * <p>
      * Example 2 : Input  scripts = [1_script1.sql, 1_script1_rollback.sql, 8861_script2.sql, 8861_script2_rollback.sql]
-     *                    scriptType = ROLLBACK
-     *             Output List<SqlScript> = [1_script1_rollback.sql, 8861_script2_rollback.sql]
+     * scriptType = ROLLBACK
+     * Output List<SqlScript> = [1_script1_rollback.sql, 8861_script2_rollback.sql]
      *
-     * @param scripts list of scripts to sort
+     * @param scripts    list of scripts to sort
      * @param scriptType script type
      * @return list of scripts with the correct execution order
      */
     private List<SqlScript> sortScriptsInExecutionOrder(List<SqlScript> scripts, ScriptType scriptType) {
         scripts = scripts.stream()
-                         .filter(script -> script.getType() == scriptType)
-                         .collect(Collectors.toList());
+                .filter(script -> script.getType() == scriptType)
+                .collect(Collectors.toList());
 
         List<SqlScript> commonScripts = new ArrayList<>();
         List<SqlScript> scriptsLessThanHundred = new ArrayList<>();

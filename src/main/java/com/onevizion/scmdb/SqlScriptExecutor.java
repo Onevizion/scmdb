@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.Date;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -60,7 +61,7 @@ public class SqlScriptExecutor {
     public int execute(SqlScript script) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
-                    cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
+                cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
 
         File workingDir = script.getFile().getParentFile();
         File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType(), workingDir);
@@ -73,10 +74,11 @@ public class SqlScriptExecutor {
             ctx.setBaseConnection(connection);
             executor.setScriptRunnerContext(ctx);
             executor.setStmt(String.format(SQL_COMMAND, wrapperScriptFile.getAbsolutePath(),
-                                           script.getFile().getAbsolutePath()));
+                    script.getFile().getAbsolutePath()));
 
             Instant start = Instant.now();
             executor.run();
+
             String scriptExecutionTime = formatDurationHMS(Duration.between(start, Instant.now()).toMillis());
 
             logger.info("\n[{}] runtime: {}", GREEN, script.getName(), scriptExecutionTime);
@@ -154,7 +156,7 @@ public class SqlScriptExecutor {
             }
         } catch (SQLException exception) {
             throw new RuntimeException(MessageFormat.format("Error during connection to the schema [{}].", schemaName),
-                                       exception);
+                    exception);
         }
     }
 
