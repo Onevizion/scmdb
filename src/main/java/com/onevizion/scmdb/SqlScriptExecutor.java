@@ -65,7 +65,7 @@ public class SqlScriptExecutor {
     private int execute(SqlScript script, boolean isCompileSchemas) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
-                    cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
+                cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
 
         File workingDir = script.getFile().getParentFile();
         File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType(), workingDir, isCompileSchemas);
@@ -78,7 +78,7 @@ public class SqlScriptExecutor {
             ctx.setBaseConnection(connection);
             executor.setScriptRunnerContext(ctx);
             executor.setStmt(String.format(SQL_COMMAND, wrapperScriptFile.getAbsolutePath(),
-                                           script.getFile().getAbsolutePath()));
+                    script.getFile().getAbsolutePath()));
 
             Instant start = Instant.now();
             executor.run();
@@ -95,10 +95,10 @@ public class SqlScriptExecutor {
         }
     }
 
-    private File getTmpWrapperScript(SchemaType schemaType, File workingDir, boolean isCompileSchemas) {
+    private File getTmpWrapperScript(SchemaType schemaType, File workingDir, boolean isSkipInvalidsCompilation) {
         ClassLoader classLoader = getClass().getClassLoader();
         URL wrapperScript;
-        if (schemaType.isCompileInvalids() && !isCompileSchemas) {
+        if (schemaType.isCompileInvalids() && !isSkipInvalidsCompilation) {
             if (appArguments.isIgnoreErrors()) {
                 wrapperScript = classLoader.getResource("compile_invalids_wrapper_not_fail_on_error.sql");
             } else {
@@ -124,24 +124,15 @@ public class SqlScriptExecutor {
     }
 
     public void createDbScriptTable() {
-        int exitCode = executeResourceScript(CREATE_SQL, false);
-        if (exitCode != EXIT_CODE_SUCCESS) {
-            throw new ScriptExecException("Can't create DB objects used by SCMDB.");
-        }
+        executeResourceScript(CREATE_SQL, false, "Can't create DB objects used by SCMDB.");
     }
 
     public void executeCompileSchemas() {
-        int exitCode = executeResourceScript(COMPILE_SCHEMAS_SQL, true);
-        if (exitCode != EXIT_CODE_SUCCESS) {
-            throw new ScriptExecException("Can't compile invalid objects in _user, _rpt, _pkg schemas.");
-        }
+        executeResourceScript(COMPILE_SCHEMAS_SQL, true, "Can't compile invalid objects in _user, _rpt, _pkg schemas.");
     }
 
-    private int executeResourceScript(String scriptFileName, boolean isCompileSchema) {
-        return executeResourceScript(appArguments.getScriptsDirectory(), scriptFileName, isCompileSchema);
-    }
-
-    private int executeResourceScript(File scriptsDirectory, String scriptFileName, boolean isCompileSchema) {
+    private void executeResourceScript(String scriptFileName, boolean isCompileSchema, String errorMessage) {
+        File scriptsDirectory = appArguments.getScriptsDirectory();
         String tmpFileName = new Date().getTime() + scriptFileName;
         String tmpFilePath = scriptsDirectory.getAbsolutePath() + File.separator + tmpFileName;
         File tmpFile = new File(tmpFilePath);
@@ -163,21 +154,26 @@ public class SqlScriptExecutor {
             logger.error("Please execute script \"" + tmpFilePath + "\" manually");
         }
         tmpFile.delete();
-
-        return exitCode;
+        if (exitCode != EXIT_CODE_SUCCESS) {
+            throw new ScriptExecException(errorMessage);
+        }
     }
 
     private Connection getConnection(SchemaType schemaType, String schemaName) {
         try {
             switch (schemaType) {
-                case USER: return userDataSource.getConnection();
-                case RPT: return rptDataSource.getConnection();
-                case PKG: return pkgDataSource.getConnection();
-                default: return dataSource.getConnection();
+                case USER:
+                    return userDataSource.getConnection();
+                case RPT:
+                    return rptDataSource.getConnection();
+                case PKG:
+                    return pkgDataSource.getConnection();
+                default:
+                    return dataSource.getConnection();
             }
         } catch (SQLException exception) {
             throw new RuntimeException(MessageFormat.format("Error during connection to the schema [{}].", schemaName),
-                                       exception);
+                    exception);
         }
     }
 
