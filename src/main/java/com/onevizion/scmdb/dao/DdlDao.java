@@ -25,6 +25,29 @@ public class DdlDao extends AbstractDaoOra {
             "   or object_type = 'PACKAGE BODY'\n" +
             "   or object_type = 'TRIGGER'\n";
 
+    private final static String SELECT_DDL_COMMENTS_BY_TABLE_NAME = "select table_name, dbms_metadata.get_dependent_ddl('COMMENT', table_name) from" +
+            " ((select table_name from user_tab_comments" +
+            "     where comments is not null)" +
+            " union" +
+            "  (select table_name from user_col_comments" +
+            "     where comments is not null" +
+            "     group by table_name)) where table_name = upper(:tableName)";
+
+    private final static String SELECT_DDL_SEQUENCE_BY_TABLE_NAME = "select trgrs.table_name, dbms_metadata.get_ddl('SEQUENCE', depends.referenced_name)" +
+            " from user_dependencies depends, user_triggers trgrs" +
+            " where trgrs.trigger_name = depends.name and depends.type = 'TRIGGER'" +
+            " and depends.referenced_type = 'SEQUENCE' and trgrs.table_name = upper(:tableName)" +
+            " order by depends.referenced_name";
+
+    private final static String SELECT_DDL_INDEX_BY_TABLE_NAME = "select table_name, dbms_metadata.get_ddl('INDEX', index_name)" +
+            " from user_indexes where generated = 'N' and table_name=upper(:tableName) and index_name not like 'PK_%'" +
+            " order by table_name asc, uniqueness desc, regexp_substr(index_name, '^\\D*') nulls first, " +
+            "  to_number(regexp_substr(index_name, '\\d+'))";
+
+    private final static String SELECT_DDL_TRIGGER_BY_TABLE_NAME = "select table_name, dbms_metadata.get_ddl('TRIGGER', trigger_name)" +
+            " from user_triggers where table_name=upper(:tableName)" +
+            " and trigger_name not like 'Z_%' order by nlssort(trigger_name, 'NLS_SORT = BINARY_CI')";
+
     private final static RowMapper<DbObject> rowMapper = (rs, rowNum) -> {
         DbObject dbObject = new DbObject();
         dbObject.setName(rs.getString(1));
@@ -61,37 +84,17 @@ public class DdlDao extends AbstractDaoOra {
     }
 
     public List<DbObject> extractTableDependentObjectsDdl(String tableName, DbObjectType depObjType) {
-        MapSqlParameterSource namedParams = new MapSqlParameterSource();
-        namedParams.addValue("tableName", tableName);
-        namedParams.addValue("depObjType", depObjType.toString());
+        MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
 
         List<DbObject> dbObjects = null;
         if (depObjType == COMMENT) {
-            String sql = "select table_name, dbms_metadata.get_dependent_ddl('COMMENT', table_name) from" +
-                    " ((select table_name from user_tab_comments" +
-                    "     where comments is not null)" +
-                    " union" +
-                    "  (select table_name from user_col_comments" +
-                    "     where comments is not null" +
-                    "     group by table_name)) where table_name = upper(:tableName)";
-            dbObjects = namedParameterJdbcTemplate.query(sql, namedParams, rowMapper);
+            dbObjects = namedParameterJdbcTemplate.query(SELECT_DDL_COMMENTS_BY_TABLE_NAME, namedParams, rowMapper);
         } else if (depObjType == SEQUENCE) {
-            String sql = "select trgrs.table_name, dbms_metadata.get_ddl('SEQUENCE', depends.referenced_name)" +
-                    " from user_dependencies depends, user_triggers trgrs" +
-                    " where trgrs.trigger_name = depends.name and depends.type = 'TRIGGER'" +
-                    " and depends.referenced_type = 'SEQUENCE' and trgrs.table_name = upper(:tableName)" +
-                    " order by depends.referenced_name";
-            dbObjects = namedParameterJdbcTemplate.query(sql, namedParams, rowMapper);
+            dbObjects = namedParameterJdbcTemplate.query(SELECT_DDL_SEQUENCE_BY_TABLE_NAME, namedParams, rowMapper);
         } else if (depObjType == INDEX) {
-            String sql = "select table_name, dbms_metadata.get_ddl(upper(:depObjType), index_name)" +
-                    " from user_indexes where generated = 'N' and table_name=upper(:tableName) and index_name not like 'PK_%'" +
-                    " order by table_name asc, uniqueness desc, index_name asc";
-            dbObjects = namedParameterJdbcTemplate.query(sql, namedParams, rowMapper);
+            dbObjects = namedParameterJdbcTemplate.query(SELECT_DDL_INDEX_BY_TABLE_NAME, namedParams, rowMapper);
         } else if (depObjType == TRIGGER) {
-            String sql = "select table_name, dbms_metadata.get_ddl(upper(:depObjType), trigger_name)" +
-                    " from user_triggers where table_name=upper(:tableName)" +
-                    " and trigger_name not like 'Z_%' order by trigger_name";
-            dbObjects = namedParameterJdbcTemplate.query(sql, namedParams, rowMapper);
+            dbObjects = namedParameterJdbcTemplate.query(SELECT_DDL_TRIGGER_BY_TABLE_NAME, namedParams, rowMapper);
         }
 
         return dbObjects;
