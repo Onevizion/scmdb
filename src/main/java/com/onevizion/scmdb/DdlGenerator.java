@@ -23,7 +23,7 @@ import static com.onevizion.scmdb.vo.SchemaType.OWNER;
 
 @Component
 public class DdlGenerator {
-    private static final String PACKAGE_SPECIFICATION_DDL_FILE_POSTFIX = "_spec";
+    private static final String PACKAGE_OR_TYPE_SPEC_DDL_FILE_POSTFIX = "_spec";
     private static final String EDITIONABLE_MODIFIER = "EDITIONABLE ";
     private static final String NOEDITIONABLE_MODIFIER = "NONEDITIONABLE ";
     private static final String PK_CONSTRAINT_INDEX_POSTFIX = "\n  USING INDEX  ENABLE";
@@ -68,6 +68,7 @@ public class DdlGenerator {
     private static final String PACKAGES_DDL_DIRECTORY_NAME = "packages";
     private static final String TABLES_DDL_DIRECTORY_NAME = "tables";
     private static final String VIEWS_DDL_DIRECTORY_NAME = "views";
+    private static final String TYPES_DDL_DIRECTORY_NAME = "types";
 
     public void executeSettingTransformParams() {
         ddlDao.executeTransformParamStatements();
@@ -164,8 +165,8 @@ public class DdlGenerator {
         String directoryPath = appArguments.getDdlsDirectory().getAbsolutePath() + File.separator + ddlDirectoryName;
 
         String filePath = directoryPath + File.separator + dbObject.getName().toLowerCase();
-        if (dbObject.getType() == PACKAGE_SPEC) {
-            filePath += PACKAGE_SPECIFICATION_DDL_FILE_POSTFIX;
+        if (dbObject.getType() == PACKAGE_SPEC || dbObject.getType() == TYPE_SPEC) {
+            filePath += PACKAGE_OR_TYPE_SPEC_DDL_FILE_POSTFIX;
         }
         filePath += ".sql";
         File file = new File(filePath);
@@ -304,6 +305,26 @@ public class DdlGenerator {
         return commentsDdl.toString();
     }
 
+    private void generateTypeBodyScripts(DbObject typeBody) {
+        logger.info("Generating DDL for type body [{}]", GREEN, typeBody.getName());
+        String ddl = removeSchemaNameInDdl(typeBody.getDdl());
+        ddl = ddl.trim();
+        ddl = ddl.replaceFirst("\\s+/$", "\n/");
+        ddl = ddl.replaceAll("\\n", "\r\n");
+        typeBody.setDdl(ddl);
+        prepareAndWriteDdlToFile(typeBody, TYPES_DDL_DIRECTORY_NAME);
+    }
+
+    private void generateTypeSpecScripts(DbObject typeSpec) {
+        logger.info("Generating DDL for type spec [{}]", GREEN, typeSpec.getName());
+        String ddl = removeSchemaNameInDdl(typeSpec.getDdl());
+        ddl = ddl.trim();
+        ddl = ddl.replaceFirst("\\s+/$", "\n/");
+        ddl = ddl.replaceAll("\\n", "\r\n");
+        typeSpec.setDdl(ddl);
+        prepareAndWriteDdlToFile(typeSpec, TYPES_DDL_DIRECTORY_NAME);
+    }
+
     public void generateDdls(Collection<DbObject> dbObjects, boolean skipGenDdlForDepObject) {
         Set<DbObject> tables = new HashSet<>();
         for (DbObject dbObject : dbObjects) {
@@ -340,6 +361,10 @@ public class DdlGenerator {
                         generatePackageSpecScripts(dbObject);
                     } else if (dbObject.getType() == VIEW) {
                         generateViewScripts(dbObject);
+                    } else if (dbObject.getType() == TYPE_BODY) {
+                        generateTypeBodyScripts(dbObject);
+                    } else if (dbObject.getType() == TYPE_SPEC) {
+                        generateTypeSpecScripts(dbObject);
                     }
                 }
             }
@@ -367,7 +392,7 @@ public class DdlGenerator {
 
     private boolean checkAndDeleteRedundantDdl(DbObject dbObject) {
         String ddlsDirectoryPath = appArguments.getDdlsDirectory().getAbsolutePath();
-        boolean isDeletePackageSpecWithBody = false;
+        boolean isDeletePkgOrTypeSpecWithBody = false;
         File fileDir = null;
         String fileName = null;
         if (!ddlDao.isExist(dbObject.getName(), dbObject.getType())) {
@@ -377,21 +402,28 @@ public class DdlGenerator {
             } else if (dbObject.getType() == PACKAGE_SPEC) {
                 fileDir = new File(ddlsDirectoryPath + File.separator + PACKAGES_DDL_DIRECTORY_NAME);
                 fileName = dbObject.getName() + "_spec.sql";
-                isDeletePackageSpecWithBody = true;
+                isDeletePkgOrTypeSpecWithBody = true;
             } else if (dbObject.getType() == TABLE) {
                 fileDir = new File(ddlsDirectoryPath + File.separator + TABLES_DDL_DIRECTORY_NAME);
                 fileName = dbObject.getName() + ".sql";
             } else if (dbObject.getType() == VIEW) {
                 fileDir = new File(ddlsDirectoryPath + File.separator + VIEWS_DDL_DIRECTORY_NAME);
                 fileName = dbObject.getName() + ".sql";
+            } else if (dbObject.getType() == TYPE_BODY) {
+                fileDir = new File(appArguments.getDdlsDirectory() + TYPES_DDL_DIRECTORY_NAME);
+                fileName = dbObject.getName() + ".sql";
+            } else if (dbObject.getType() == TYPE_SPEC) {
+                fileDir = new File(ddlsDirectoryPath + File.separator + TYPES_DDL_DIRECTORY_NAME);
+                fileName = dbObject.getName() + "_spec.sql";
+                isDeletePkgOrTypeSpecWithBody = true;
             }
         }
 
         if (fileName != null) {
             deleteFilteredFiles(fileDir, fileName);
-            if (isDeletePackageSpecWithBody) {
-                String packBodyName = dbObject.getName() + ".sql";
-                deleteFilteredFiles(fileDir, packBodyName);
+            if (isDeletePkgOrTypeSpecWithBody) {
+                String bodyName = dbObject.getName() + ".sql";
+                deleteFilteredFiles(fileDir, bodyName);
             }
             return true;
         }

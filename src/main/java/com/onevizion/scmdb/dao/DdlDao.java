@@ -23,7 +23,10 @@ public class DdlDao extends AbstractDaoOra {
             "   or object_type = 'VIEW'\n" +
             "   or object_type = 'PACKAGE'\n" +
             "   or object_type = 'PACKAGE BODY'\n" +
-            "   or object_type = 'TRIGGER'\n";
+            "   or object_type = 'TRIGGER'\n" +
+            "   or ((object_type = 'TYPE' or object_type = 'TYPE BODY')\n" +
+            "     and generated = 'N'\n" +
+            "     and object_name not like 'T$%')\n";
 
     private final static String SELECT_DDL_COMMENTS_BY_TABLE_NAME = "select table_name, dbms_metadata.get_dependent_ddl('COMMENT', table_name) from" +
             " ((select table_name from user_tab_comments" +
