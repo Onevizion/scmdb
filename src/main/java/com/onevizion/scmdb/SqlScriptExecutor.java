@@ -4,16 +4,15 @@ import com.onevizion.scmdb.exception.ScriptExecException;
 import com.onevizion.scmdb.vo.DbCnnCredentials;
 import com.onevizion.scmdb.vo.SchemaType;
 import com.onevizion.scmdb.vo.SqlScript;
-import oracle.dbtools.db.DBUtil;
 import oracle.dbtools.raptor.newscriptrunner.ScriptExecutor;
 import oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext;
 import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.sql.DataSource;
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.text.MessageFormat;
@@ -21,11 +20,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.Date;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
-import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
 import static com.onevizion.scmdb.Scmdb.EXIT_CODE_SUCCESS;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
 import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
@@ -59,16 +55,16 @@ public class SqlScriptExecutor {
     private DataSource pkgDataSource;
 
     public int execute(SqlScript script) {
-        return execute(script, false);
+        File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType().isCompileInvalids(),
+                                                     appArguments.isIgnoreErrors(),
+                                                     script.getFile().getParentFile());
+        return execute(script, wrapperScriptFile);
     }
 
-    private int execute(SqlScript script, boolean isCompileSchemas) {
+    private int execute(SqlScript script, File wrapperScriptFile) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
                 cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
-
-        File workingDir = script.getFile().getParentFile();
-        File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType(), workingDir, isCompileSchemas);
 
         try (Connection connection = getConnection(script.getSchemaType(), cnnCredentials.getSchemaName())) {
             connection.setAutoCommit(false);
@@ -95,17 +91,17 @@ public class SqlScriptExecutor {
         }
     }
 
-    private File getTmpWrapperScript(SchemaType schemaType, File workingDir, boolean isSkipInvalidsCompilation) {
+    private File getTmpWrapperScript(boolean compileInvalids, boolean ignoreErrors, File workingDir) {
         ClassLoader classLoader = getClass().getClassLoader();
         URL wrapperScript;
-        if (schemaType.isCompileInvalids() && !isSkipInvalidsCompilation) {
-            if (appArguments.isIgnoreErrors()) {
+        if (compileInvalids) {
+            if (ignoreErrors) {
                 wrapperScript = classLoader.getResource("compile_invalids_wrapper_not_fail_on_error.sql");
             } else {
                 wrapperScript = classLoader.getResource("compile_invalids_wrapper_fail_on_error.sql");
             }
         } else {
-            if (appArguments.isIgnoreErrors()) {
+            if (ignoreErrors) {
                 wrapperScript = classLoader.getResource("script_wrapper_not_fail_on_error.sql");
             } else {
                 wrapperScript = classLoader.getResource("script_wrapper_fail_on_error.sql");
@@ -124,14 +120,14 @@ public class SqlScriptExecutor {
     }
 
     public void createDbScriptTable() {
-        executeResourceScript(CREATE_SQL, false, "Can't create DB objects used by SCMDB.");
+        executeResourceScript(CREATE_SQL, "Can't create DB objects used by SCMDB.");
     }
 
     public void executeCompileSchemas() {
-        executeResourceScript(COMPILE_SCHEMAS_SQL, true, "Can't compile invalid objects in _user, _rpt, _pkg schemas.");
+        executeResourceScript(COMPILE_SCHEMAS_SQL, "Can't compile invalid objects in _user, _rpt, _pkg schemas.");
     }
 
-    private void executeResourceScript(String scriptFileName, boolean isCompileSchema, String errorMessage) {
+    private void executeResourceScript(String scriptFileName, String errorMessage) {
         File scriptsDirectory = appArguments.getScriptsDirectory();
         String tmpFileName = new Date().getTime() + scriptFileName;
         String tmpFilePath = scriptsDirectory.getAbsolutePath() + File.separator + tmpFileName;
@@ -149,7 +145,8 @@ public class SqlScriptExecutor {
         sqlScript.setType(COMMIT);
         sqlScript.setSchemaType(OWNER);
 
-        int exitCode = execute(sqlScript, isCompileSchema);
+        File wrapperScriptFile = getTmpWrapperScript(false, false, sqlScript.getFile().getParentFile());
+        int exitCode = execute(sqlScript, wrapperScriptFile);
         if (exitCode != EXIT_CODE_SUCCESS) {
             logger.error("Please execute script \"" + tmpFilePath + "\" manually");
         }
