@@ -76,7 +76,17 @@ public class SqlScriptExecutor {
                                            script.getFile().getAbsolutePath()));
 
             Instant start = Instant.now();
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            PrintStream ps = new PrintStream(baos);
+            PrintStream old = System.out;
+            System.setOut(ps);
             executor.run();
+            System.out.flush();
+            System.setOut(old);
+            script.setOutput(baos.toString());
+            System.out.println(baos.toString());
+
             String scriptExecutionTime = formatDurationHMS(Duration.between(start, Instant.now()).toMillis());
 
             logger.info("\n[{}] runtime: {}", GREEN, script.getName(), scriptExecutionTime);
