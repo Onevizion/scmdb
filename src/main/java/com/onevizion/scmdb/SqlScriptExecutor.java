@@ -71,28 +71,29 @@ public class SqlScriptExecutor {
             ScriptRunnerContext ctx = new ScriptRunnerContext();
 
             ctx.setBaseConnection(connection);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            BufferedOutputStream bos = new BufferedOutputStream(baos);
+            ctx.setOutputStreamWrapper(bos);
             executor.setScriptRunnerContext(ctx);
             executor.setStmt(String.format(SQL_COMMAND, wrapperScriptFile.getAbsolutePath(),
-                                           script.getFile().getAbsolutePath()));
+                    script.getFile().getAbsolutePath()));
 
             Instant start = Instant.now();
-
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            PrintStream ps = new PrintStream(baos);
-            PrintStream old = System.out;
-            System.setOut(ps);
+            executor.setOut(ctx.getOutputStream());
             executor.run();
-            System.out.flush();
-            System.setOut(old);
             script.setOutput(baos.toString());
             System.out.println(baos.toString());
+            bos.flush();
+            bos.close();
+            baos.close();
+
 
             String scriptExecutionTime = formatDurationHMS(Duration.between(start, Instant.now()).toMillis());
 
             logger.info("\n[{}] runtime: {}", GREEN, script.getName(), scriptExecutionTime);
 
             return (boolean) ctx.getProperty(ERR_ENCOUNTERED) ? SCRIPT_EXIT_CODE_ERROR : SCRIPT_EXIT_CODE_SUCCESS;
-        } catch (SQLException e) {
+        } catch (SQLException | IOException e) {
             logger.error("Error during connection DB.", e);
             return SCRIPT_EXIT_CODE_ERROR;
         } finally {
