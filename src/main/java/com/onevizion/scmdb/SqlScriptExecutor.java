@@ -62,14 +62,12 @@ public class SqlScriptExecutor {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
                 cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
-        script.setOutput("execute");
 
         File workingDir = script.getFile().getParentFile();
         File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType(), workingDir);
 
         try (Connection connection = getConnection(script.getSchemaType(), cnnCredentials.getSchemaName());
-             ByteArrayOutputStream baos = new ByteArrayOutputStream();
-             BufferedOutputStream buff = new BufferedOutputStream(baos)) {
+             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
 
             connection.setAutoCommit(false);
             ScriptExecutor executor = new ScriptExecutor(connection);
@@ -77,7 +75,7 @@ public class SqlScriptExecutor {
 
             ctx.setBaseConnection(connection);
 
-            ctx.setOutputStreamWrapper(new BufferedOutputStream(new TeeOutputStream(System.out, buff)));
+            ctx.setOutputStreamWrapper(new BufferedOutputStream(new TeeOutputStream(System.out, baos)));
             executor.setScriptRunnerContext(ctx);
             executor.setStmt(String.format(SQL_COMMAND, wrapperScriptFile.getAbsolutePath(),
                     script.getFile().getAbsolutePath()));
@@ -85,7 +83,6 @@ public class SqlScriptExecutor {
             Instant start = Instant.now();
             executor.run();
             script.setOutput(baos.toString());
-            buff.flush();
 
             String scriptExecutionTime = formatDurationHMS(Duration.between(start, Instant.now()).toMillis());
 
@@ -96,7 +93,7 @@ public class SqlScriptExecutor {
             logger.error("Error during connection DB.", e);
             return SCRIPT_EXIT_CODE_ERROR;
         } catch (IOException e) {
-            logger.error("I/O Error.", e);
+            logger.error("Script OutputStream", e);
             return SCRIPT_EXIT_CODE_ERROR;
         } finally {
             wrapperScriptFile.delete();
