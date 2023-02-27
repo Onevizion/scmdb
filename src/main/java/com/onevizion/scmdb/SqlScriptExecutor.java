@@ -8,6 +8,7 @@ import oracle.dbtools.db.DBUtil;
 import oracle.dbtools.raptor.newscriptrunner.ScriptExecutor;
 import oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.output.TeeOutputStream;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.sql.DataSource;
@@ -60,41 +61,42 @@ public class SqlScriptExecutor {
     public int execute(SqlScript script) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
-                    cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
+                cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
+        script.setOutput("execute");
 
         File workingDir = script.getFile().getParentFile();
         File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType(), workingDir);
 
-        try (Connection connection = getConnection(script.getSchemaType(), cnnCredentials.getSchemaName())) {
+        try (Connection connection = getConnection(script.getSchemaType(), cnnCredentials.getSchemaName());
+             ByteArrayOutputStream baos = new ByteArrayOutputStream();
+             BufferedOutputStream buff = new BufferedOutputStream(baos)) {
+
             connection.setAutoCommit(false);
             ScriptExecutor executor = new ScriptExecutor(connection);
             ScriptRunnerContext ctx = new ScriptRunnerContext();
 
             ctx.setBaseConnection(connection);
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            BufferedOutputStream bos = new BufferedOutputStream(baos);
-            ctx.setOutputStreamWrapper(bos);
+
+            ctx.setOutputStreamWrapper(new BufferedOutputStream(new TeeOutputStream(System.out, buff)));
             executor.setScriptRunnerContext(ctx);
             executor.setStmt(String.format(SQL_COMMAND, wrapperScriptFile.getAbsolutePath(),
                     script.getFile().getAbsolutePath()));
 
             Instant start = Instant.now();
-            executor.setOut(ctx.getOutputStream());
             executor.run();
             script.setOutput(baos.toString());
-            System.out.println(baos.toString());
-            bos.flush();
-            bos.close();
-            baos.close();
-
+            buff.flush();
 
             String scriptExecutionTime = formatDurationHMS(Duration.between(start, Instant.now()).toMillis());
 
             logger.info("\n[{}] runtime: {}", GREEN, script.getName(), scriptExecutionTime);
 
             return (boolean) ctx.getProperty(ERR_ENCOUNTERED) ? SCRIPT_EXIT_CODE_ERROR : SCRIPT_EXIT_CODE_SUCCESS;
-        } catch (SQLException | IOException e) {
+        } catch (SQLException e) {
             logger.error("Error during connection DB.", e);
+            return SCRIPT_EXIT_CODE_ERROR;
+        } catch (IOException e) {
+            logger.error("I/O Error.", e);
             return SCRIPT_EXIT_CODE_ERROR;
         } finally {
             wrapperScriptFile.delete();
