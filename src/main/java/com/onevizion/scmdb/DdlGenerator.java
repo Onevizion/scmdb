@@ -223,7 +223,6 @@ public class DdlGenerator {
             } else {
                 ddl = "\r\n" + ddl;
             }
-            ddl = ddl.replaceAll("\\s+;$", ";");
             indexesDdl.append(ddl);
         }
         return indexesDdl.toString();
