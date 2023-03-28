@@ -88,6 +88,7 @@ public class DbManager {
                     throw new ScriptExecException(MessageFormat.format(SCRIPT_EXECUTION_ERROR_MESSAGE, script.getName()));
                 }
             });
+            scriptExecutor.executeCompileSchemas();
             scriptExecutor.checkInvalidObjectAndThrow();
 
         } else {
@@ -159,6 +160,7 @@ public class DbManager {
                 deletedScripts.keySet().remove(rollback.getCommitName());
             }
         }
+        scriptExecutor.executeCompileSchemas();
         scriptExecutor.checkInvalidObjectAndThrow();
     }
 
