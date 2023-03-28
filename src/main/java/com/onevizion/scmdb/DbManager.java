@@ -88,6 +88,7 @@ public class DbManager {
                     throw new ScriptExecException(MessageFormat.format(SCRIPT_EXECUTION_ERROR_MESSAGE, script.getName()));
                 }
             });
+            scriptExecutor.executeCompileSchemas();
         } else {
             logger.info("You should execute following script files to update your database:");
             scriptsFacade.copyScriptsToExecDir(newCommitScripts);
@@ -157,6 +158,7 @@ public class DbManager {
                 deletedScripts.keySet().remove(rollback.getCommitName());
             }
         }
+        scriptExecutor.executeCompileSchemas();
     }
 
     private void checkUpdatedScripts() {

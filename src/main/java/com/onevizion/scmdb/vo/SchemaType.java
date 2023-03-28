@@ -4,10 +4,10 @@ import org.apache.commons.io.FilenameUtils;
 
 public enum SchemaType {
     OWNER("", true),
-    USER("_user", true),
-    RPT("_rpt", true),
-    PKG("_pkg", true),
-    PERFSTAT("_perfstat", true);
+    USER("_user", false),
+    RPT("_rpt", false),
+    PKG("_pkg", false),
+    PERFSTAT("_perfstat", false);
 
     private final String schemaPostfix;
     private final boolean compileInvalids;
