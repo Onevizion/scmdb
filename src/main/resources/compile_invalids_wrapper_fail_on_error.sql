@@ -92,15 +92,6 @@ begin
 
   end loop;
 
-  select count(*) into v_cnt from all_users where username = '&_USER._USER';
-  if v_cnt = 1 then
-    dbms_utility.compile_schema('&_USER._USER', false);
-  end if;
-
-  select count(*) into v_cnt from all_users where username = '&_USER._RPT';
-  if v_cnt = 1 then
-    dbms_utility.compile_schema('&_USER._RPT', false);
-  end if;
 end;
 /
 
@@ -117,4 +108,3 @@ select
   ' is invalid.' invalid_message
 from user_objects
 where status <> 'VALID' and object_name not like 'BIN$%';
-exit

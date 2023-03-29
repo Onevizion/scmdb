@@ -88,7 +88,8 @@ public class DbManager {
                     throw new ScriptExecException(MessageFormat.format(SCRIPT_EXECUTION_ERROR_MESSAGE, script.getName()));
                 }
             });
-            scriptExecutor.checkInvalidObjectAndThrow();
+            scriptExecutor.executeCompileSchemas();
+            scriptExecutor.checkInvalidObjectOrExit();
 
         } else {
             logger.info("You should execute following script files to update your database:");
@@ -159,7 +160,8 @@ public class DbManager {
                 deletedScripts.keySet().remove(rollback.getCommitName());
             }
         }
-        scriptExecutor.checkInvalidObjectAndThrow();
+        scriptExecutor.executeCompileSchemas();
+        scriptExecutor.checkInvalidObjectOrExit();
     }
 
     private void checkUpdatedScripts() {
