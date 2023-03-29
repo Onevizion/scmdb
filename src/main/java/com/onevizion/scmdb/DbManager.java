@@ -89,7 +89,7 @@ public class DbManager {
                 }
             });
             scriptExecutor.executeCompileSchemas();
-            scriptExecutor.checkInvalidObjectAndThrow();
+            scriptExecutor.checkInvalidObjectOrExit();
 
         } else {
             logger.info("You should execute following script files to update your database:");
@@ -161,7 +161,7 @@ public class DbManager {
             }
         }
         scriptExecutor.executeCompileSchemas();
-        scriptExecutor.checkInvalidObjectAndThrow();
+        scriptExecutor.checkInvalidObjectOrExit();
     }
 
     private void checkUpdatedScripts() {

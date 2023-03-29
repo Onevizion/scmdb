@@ -138,7 +138,7 @@ public class SqlScriptExecutor {
         executeResourceScript(COMPILE_SCHEMAS_SQL, "Can't compile invalid objects in _user, _rpt, _pkg schemas.", false);
     }
 
-    public void checkInvalidObjectAndThrow() {
+    public void checkInvalidObjectOrExit() {
         executeResourceScript(THROW_IF_INVALID_OBJECTS_SQL, "Can't execute invalid objects check.", true);
     }
 
@@ -164,7 +164,7 @@ public class SqlScriptExecutor {
         ScriptRunnerContext context = execute(sqlScript, wrapperScriptFile, ignoreSqlLog);
         tmpFile.delete();
 
-        checkInvalidObjectAndThrow(context);
+        checkInvalidObjectOrExit(context);
         int exitCode = getExitCode(context);
         if (exitCode != EXIT_CODE_SUCCESS) {
             logger.error("Please execute script \"" + tmpFilePath + "\" manually");
@@ -197,7 +197,7 @@ public class SqlScriptExecutor {
      * and the application will end with code 1
      * @param context ScriptRunnerContext after executed script
      */
-    private void checkInvalidObjectAndThrow(ScriptRunnerContext context) {
+    private void checkInvalidObjectOrExit(ScriptRunnerContext context) {
         if (context != null && INVALID_OBJ_ERR_SQLCODE.equals(context.getProperty(ERR_SQLCODE))) {
             String invalidObjMsg = String.valueOf(context.getProperty(ERR_MESSAGE_SQLCODE));
             if (invalidObjMsg != null && !invalidObjMsg.isEmpty()) {
