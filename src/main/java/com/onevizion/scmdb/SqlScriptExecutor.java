@@ -10,8 +10,6 @@ import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.sql.DataSource;
-import java.io.File;
-import java.io.IOException;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -66,13 +64,14 @@ public class SqlScriptExecutor {
         File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType().isCompileInvalids(),
                                                      appArguments.isIgnoreErrors(),
                                                      script.getFile().getParentFile());
-        return execute(script, wrapperScriptFile);
+        ScriptRunnerContext context = execute(script, wrapperScriptFile, false);
+        return getExitCode(context);
     }
 
-    private int execute(SqlScript script, File wrapperScriptFile) {
+    private ScriptRunnerContext execute(SqlScript script, File wrapperScriptFile, boolean ignoreSqlLog) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
-                cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
+                    cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
 
         try (Connection connection = getConnection(script.getSchemaType(), cnnCredentials.getSchemaName())) {
             connection.setAutoCommit(false);
@@ -80,6 +79,10 @@ public class SqlScriptExecutor {
             ScriptRunnerContext ctx = new ScriptRunnerContext();
 
             ctx.setBaseConnection(connection);
+            if (ignoreSqlLog) {
+                //stream is specified to ignore the sql stack code, when throw exception
+                executor.setOut(new BufferedOutputStream(new ByteArrayOutputStream()));
+            }
             executor.setScriptRunnerContext(ctx);
             executor.setStmt(String.format(SQL_COMMAND, wrapperScriptFile.getAbsolutePath(),
                     script.getFile().getAbsolutePath()));
@@ -90,10 +93,10 @@ public class SqlScriptExecutor {
 
             logger.info("\n[{}] runtime: {}", GREEN, script.getName(), scriptExecutionTime);
 
-            return (boolean) ctx.getProperty(ERR_ENCOUNTERED) ? SCRIPT_EXIT_CODE_ERROR : SCRIPT_EXIT_CODE_SUCCESS;
+            return ctx;
         } catch (SQLException e) {
             logger.error("Error during connection DB.", e);
-            return SCRIPT_EXIT_CODE_ERROR;
+            return null;
         } finally {
             wrapperScriptFile.delete();
         }
@@ -128,14 +131,18 @@ public class SqlScriptExecutor {
     }
 
     public void createDbScriptTable() {
-        executeResourceScript(CREATE_SQL, "Can't create DB objects used by SCMDB.");
+        executeResourceScript(CREATE_SQL, "Can't create DB objects used by SCMDB.", false);
     }
 
     public void executeCompileSchemas() {
-        executeResourceScript(COMPILE_SCHEMAS_SQL, "Can't compile invalid objects in _user, _rpt, _pkg schemas.");
+        executeResourceScript(COMPILE_SCHEMAS_SQL, "Can't compile invalid objects in _user, _rpt, _pkg schemas.", false);
     }
 
-    private void executeResourceScript(String scriptFileName, String errorMessage) {
+    public void checkInvalidObjectAndThrow() {
+        executeResourceScript(THROW_IF_INVALID_OBJECTS_SQL, "Can't execute invalid objects check.", true);
+    }
+
+    private void executeResourceScript(String scriptFileName, String errorMessage, boolean ignoreSqlLog) {
         File scriptsDirectory = appArguments.getScriptsDirectory();
         String tmpFileName = new Date().getTime() + scriptFileName;
         String tmpFilePath = scriptsDirectory.getAbsolutePath() + File.separator + tmpFileName;
@@ -154,11 +161,14 @@ public class SqlScriptExecutor {
         sqlScript.setSchemaType(OWNER);
 
         File wrapperScriptFile = getTmpWrapperScript(false, false, sqlScript.getFile().getParentFile());
-        int exitCode = execute(sqlScript, wrapperScriptFile);
+        ScriptRunnerContext context = execute(sqlScript, wrapperScriptFile, ignoreSqlLog);
+        tmpFile.delete();
+
+        checkInvalidObjectAndThrow(context);
+        int exitCode = getExitCode(context);
         if (exitCode != EXIT_CODE_SUCCESS) {
             logger.error("Please execute script \"" + tmpFilePath + "\" manually");
         }
-        tmpFile.delete();
         if (exitCode != EXIT_CODE_SUCCESS) {
             throw new ScriptExecException(errorMessage);
         }
@@ -182,36 +192,25 @@ public class SqlScriptExecutor {
         }
     }
 
-    public void checkInvalidObjectAndThrow() {
-        DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(OWNER);
-        URL resource = getClass().getClassLoader().getResource(THROW_IF_INVALID_OBJECTS_SQL);
-
-        try (Connection connection = getConnection(OWNER, cnnCredentials.getSchemaName())) {
-            connection.setAutoCommit(false);
-            ScriptExecutor executor = new ScriptExecutor(connection);
-            ScriptRunnerContext ctx = new ScriptRunnerContext();
-
-            ctx.setBaseConnection(connection);
-            executor.setScriptRunnerContext(ctx);
-
-            //stream is specified to ignore the sql stack code
-            BufferedOutputStream buf = new BufferedOutputStream(new ByteArrayOutputStream());
-            executor.setOut(buf);
-
-            executor.setStmt("@" + resource.getPath());
-            executor.run();
-
-            if (INVALID_OBJ_ERR_SQLCODE.equals(ctx.getProperty(ERR_SQLCODE))) {
-                String invalidObjMsg = String.valueOf(ctx.getProperty(ERR_MESSAGE_SQLCODE));
-                if (invalidObjMsg != null && !invalidObjMsg.isEmpty()) {
-                    String invalidObjectMessage = invalidObjMsg.replaceAll(ORA_REGEXP, "");
-                    System.err.println(invalidObjectMessage);
-                    System.exit(EXIT_CODE_ERROR);
-                }
+    /**
+     * If there is a custom exit code 20001 in the context, a list of invalid objects found will be displayed
+     * and the application will end with code 1
+     * @param context ScriptRunnerContext after executed script
+     */
+    private void checkInvalidObjectAndThrow(ScriptRunnerContext context) {
+        if (context != null && INVALID_OBJ_ERR_SQLCODE.equals(context.getProperty(ERR_SQLCODE))) {
+            String invalidObjMsg = String.valueOf(context.getProperty(ERR_MESSAGE_SQLCODE));
+            if (invalidObjMsg != null && !invalidObjMsg.isEmpty()) {
+                String invalidObjectMessage = invalidObjMsg.replaceAll(ORA_REGEXP, "");
+                System.err.print(invalidObjectMessage);
+                System.exit(EXIT_CODE_ERROR);
             }
-        } catch (SQLException e) {
-            logger.error("Error during connection DB.", e);
         }
+    }
+
+    private int getExitCode(ScriptRunnerContext context) {
+        return context != null
+                && !(boolean) context.getProperty(ERR_ENCOUNTERED) ? SCRIPT_EXIT_CODE_SUCCESS : SCRIPT_EXIT_CODE_ERROR;
     }
 
 }
