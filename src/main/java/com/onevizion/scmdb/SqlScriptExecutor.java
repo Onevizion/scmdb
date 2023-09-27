@@ -11,6 +11,7 @@ import org.apache.commons.io.output.TeeOutputStream;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.sql.DataSource;
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -69,20 +70,20 @@ public class SqlScriptExecutor {
                 cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
 
         try (Connection connection = getConnection(script.getSchemaType(), cnnCredentials.getSchemaName());
-             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             connection.setAutoCommit(false);
             ScriptExecutor executor = new ScriptExecutor(connection);
             ScriptRunnerContext ctx = new ScriptRunnerContext();
 
             ctx.setBaseConnection(connection);
-            ctx.setOutputStreamWrapper(new BufferedOutputStream(new TeeOutputStream(System.out, baos)));
+            ctx.setOutputStreamWrapper(new BufferedOutputStream(new TeeOutputStream(System.out, outputStream)));
             executor.setScriptRunnerContext(ctx);
             executor.setStmt(String.format(SQL_COMMAND, wrapperScriptFile.getAbsolutePath(),
-                    script.getFile().getAbsolutePath()));
+                                           script.getFile().getAbsolutePath()));
 
             Instant start = Instant.now();
             executor.run();
-            script.setOutput(baos.toString());
+            script.setOutput(outputStream.toString());
 
             String scriptExecutionTime = formatDurationHMS(Duration.between(start, Instant.now()).toMillis());
 
@@ -92,9 +93,11 @@ public class SqlScriptExecutor {
         } catch (SQLException e) {
             logger.error("Error during connection DB.", e);
             return SCRIPT_EXIT_CODE_ERROR;
+
         } catch (IOException e) {
-            logger.error("Script OutputStream", e);
+            logger.error("Can't close OutputStream", e);
             return SCRIPT_EXIT_CODE_ERROR;
+
         } finally {
             wrapperScriptFile.delete();
         }
