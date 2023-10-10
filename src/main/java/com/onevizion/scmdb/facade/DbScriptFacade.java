@@ -21,6 +21,10 @@ import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
 @Component
 public class DbScriptFacade {
 
+    private static final int MAX_DEVELOPMENT_ORDER_NUMBER = 100;
+    private static final String EXEC_FOLDER_NAME = "EXECUTE_ME";
+    private static final String ERROR_MSG_COMMIT_DELETED_WITHOUT_ROLLBACK = "Following scripts were deleted but it's rollbacks are still here. Remove rollbacks scripts or restore deleted scripts and then run scmdb again.";
+
     @Autowired
     private DbScriptDaoOra sqlScriptDaoOra;
 
@@ -30,9 +34,6 @@ public class DbScriptFacade {
     @Autowired
     private ColorLogger logger;
 
-    private final static String EXEC_FOLDER_NAME = "EXECUTE_ME";
-    private final static String ERROR_MSG_COMMIT_DELETED_WITHOUT_ROLLBACK = "Following scripts were deleted but it's rollbacks are still here. Remove rollbacks scripts or restore deleted scripts and then run scmdb again.";
-
     private File execDir;
     private List<SqlScript> scriptsInDir;
 
@@ -41,21 +42,37 @@ public class DbScriptFacade {
         scriptsInDir = createScriptsFromFiles(appArguments.isGenDdl() || !appArguments.isOmitChanged());
     }
 
-    public List<SqlScript> getNewScripts() {
+    public List<SqlScript> getNotExecutedScripts() {
         Map<String, SqlScript> savedScripts = sqlScriptDaoOra.readMap();
-
-        scriptsInDir.stream()
-                    .filter(this::isDevScript)
-                    .forEach(script -> logger.info("Dev script [" + script.getName() + "] was ignored"));
-
-        List<SqlScript> newScripts = scriptsInDir.stream()
-                                                 .filter(script -> !isDevScript(script))
-                                                 .filter(script -> !savedScripts.containsKey(script.getName()))
-                                                 .collect(Collectors.toList());
+        List<SqlScript> newScripts = getLocalScripts().stream()
+                                                      .filter(script -> !savedScripts.containsKey(script.getName()))
+                                                      .collect(Collectors.toList());
         if (!appArguments.isReadAllFilesContent()) {
             newScripts.forEach(SqlScript::loadContentFromFile);
         }
         return newScripts;
+    }
+
+    public List<SqlScript> getDevelopmentScripts() {
+        List<SqlScript> newScripts = getLocalScripts().stream()
+                                                      .filter(s -> s.getOrderNumber() < MAX_DEVELOPMENT_ORDER_NUMBER)
+                                                      .collect(Collectors.toList());
+        if (!appArguments.isReadAllFilesContent()) {
+            newScripts.forEach(SqlScript::loadContentFromFile);
+        }
+        return newScripts;
+    }
+
+    private List<SqlScript> getLocalScripts() {
+        List<SqlScript> localScripts = new ArrayList<>();
+        for (SqlScript script : scriptsInDir) {
+            if (isDevScript(script)) {
+                logger.info("Dev script [" + script.getName() + "] was ignored");
+            } else {
+                localScripts.add(script);
+            }
+        }
+        return localScripts;
     }
 
     private boolean isDevScript(SqlScript script) {
