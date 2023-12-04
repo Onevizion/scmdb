@@ -128,12 +128,13 @@ public class DbManager {
             executeRollbacks = userGrantsPermission();
         }
 
+        List <SqlScript> rollbacksToExecWithText = scriptsFacade.getDbScriptsWithText(rollbacksToExec);
         if (executeRollbacks) {
-            executeRollbacks(deletedScripts, rollbacksToExec);
+            executeRollbacks(deletedScripts, rollbacksToExecWithText);
         } else {
             logger.info("At first you should execute following rollbacks to revert changes of deleted scripts:");
-            scriptsFacade.copyRollbacksToExecDir(rollbacksToExec);
-            rollbacksToExec.forEach(script -> logger.info(script.getName(), GREEN));
+            scriptsFacade.copyRollbacksToExecDir(rollbacksToExecWithText);
+            rollbacksToExecWithText.forEach(script -> logger.info(script.getName(), GREEN));
             scriptsFacade.deleteAll(deletedScripts.values());
 
             System.exit(EXIT_CODE_SUCCESS);
@@ -209,7 +210,9 @@ public class DbManager {
     private Set<DbObject> findChangedDbObjects(List<SqlScript> scripts) {
         Set<DbObject> updatedDbObjects;
 
-        updatedDbObjects = scripts.stream()
+        List <SqlScript> dbScriptsWithText = scriptsFacade.getDbScriptsWithText(scripts);
+
+        updatedDbObjects = dbScriptsWithText.stream()
                                   .map(script -> removeSpecialFromScriptText(script.getText()))
                                   .flatMap(scriptText -> findChangedDbObjectsInScriptText(scriptText).stream())
                                   .collect(Collectors.toSet());
