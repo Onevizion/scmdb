@@ -44,9 +44,9 @@ public class DbScriptFacade {
 
     public List<SqlScript> getNotExecutedScripts() {
         Map<String, SqlScript> savedScripts = sqlScriptDaoOra.readMap();
-        List<SqlScript> newScripts = getLocalScripts().stream()
-                                                      .filter(script -> !savedScripts.containsKey(script.getName()))
-                                                      .collect(Collectors.toList());
+        List<SqlScript> newScripts = scriptsInDir.stream()
+                                                 .filter(script -> !savedScripts.containsKey(script.getName()))
+                                                 .collect(Collectors.toList());
         if (!appArguments.isReadAllFilesContent()) {
             newScripts.forEach(SqlScript::loadContentFromFile);
         }
@@ -54,30 +54,22 @@ public class DbScriptFacade {
     }
 
     public List<SqlScript> getDevelopmentScripts() {
-        List<SqlScript> newScripts = getLocalScripts().stream()
-                                                      .filter(s -> s.getOrderNumber() < MAX_DEVELOPMENT_ORDER_NUMBER)
-                                                      .collect(Collectors.toList());
+        List<SqlScript> newScripts = scriptsInDir.stream()
+                                                 .filter(s -> s.getOrderNumber() < MAX_DEVELOPMENT_ORDER_NUMBER)
+                                                 .collect(Collectors.toList());
         if (!appArguments.isReadAllFilesContent()) {
             newScripts.forEach(SqlScript::loadContentFromFile);
         }
         return newScripts;
     }
 
-    private List<SqlScript> getLocalScripts() {
-        List<SqlScript> localScripts = new ArrayList<>();
-        for (SqlScript script : scriptsInDir) {
-            if (isDevScript(script)) {
-                logger.info("Dev script [" + script.getName() + "] was ignored");
-            } else {
-                localScripts.add(script);
-            }
-        }
-        return localScripts;
-    }
-
-    private boolean isDevScript(SqlScript script) {
+    private boolean isIgnoredScript(SqlScript script) {
         String[] parts = script.getName().split("_");
-        return parts.length <= 1 || !NumberUtils.isDigits(parts[0]);
+        boolean isDevScript = parts.length <= 1 || !NumberUtils.isDigits(parts[0]);
+        if (isDevScript) {
+            logger.info("Dev script [" + script.getName() + "] was ignored");
+        }
+        return isDevScript;
     }
 
     public void copyRollbacksToExecDir(List<SqlScript> rollbacks) {
@@ -116,6 +108,7 @@ public class DbScriptFacade {
         List<File> scriptFiles = (List<File>) FileUtils.listFiles(appArguments.getScriptsDirectory(), new String[]{"sql"}, false);
         return scriptFiles.stream()
                           .map(f -> SqlScript.create(f, readAllScriptsContent))
+                          .filter(s -> !isIgnoredScript(s))
                           .sorted()
                           .collect(Collectors.toList());
     }
