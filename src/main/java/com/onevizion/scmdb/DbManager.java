@@ -65,7 +65,7 @@ public class DbManager {
     }
 
     private void executeNewScripts() {
-        List<SqlScript> newScripts = scriptsFacade.getNewScripts();
+        List<SqlScript> newScripts = scriptsFacade.getNotExecutedScripts();
         if (newScripts.isEmpty()) {
             logger.info(NO_SCRIPTS_TO_EXEC_MSG, appArguments.getDbCredentials(OWNER).getSchemaWithUrlBeforeDot());
             return;
@@ -193,7 +193,7 @@ public class DbManager {
 
         scriptsFacade.checkDbConnection();
 
-        List<SqlScript> scripts = scriptsFacade.getNewScripts();
+        List<SqlScript> scripts = scriptsFacade.getDevelopmentScripts();
         scripts.addAll(scriptsFacade.getUpdatedScripts());
         List<SqlScript> scriptsToGenDdl = scripts.stream()
                                                  .sorted()
