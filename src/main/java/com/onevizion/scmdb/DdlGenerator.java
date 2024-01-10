@@ -27,8 +27,9 @@ public class DdlGenerator {
     private static final String EDITIONABLE_MODIFIER = "EDITIONABLE ";
     private static final String NOEDITIONABLE_MODIFIER = "NONEDITIONABLE ";
     private static final String PK_CONSTRAINT_INDEX_POSTFIX = "\n  USING INDEX  ENABLE";
-    private static final Pattern CONSTRAINTS_BLOCK_PATTERN = Pattern.compile("(^\\s*CONSTRAINT[\\s\\S]*)(\\n\\s*\\);)", Pattern.MULTILINE);
-    private static final Pattern CONSTRAINT_NAME_PATTERN = Pattern.compile("CONSTRAINT\\s(\\S*)\\s", Pattern.MULTILINE);
+    private static final Pattern CONSTRAINTS_BLOCK_PATTERN = Pattern.compile("(^\\s*(PRIMARY KEY|CONSTRAINT)[\\s\\S]*)(\\n\\s*((\\);)|(\\))))", Pattern.MULTILINE);
+    private static final Pattern CONSTRAINT_NAME_PATTERN = Pattern.compile("CONSTRAINT\\s(\\S*)\\s[^PRIMARY KEY]", Pattern.MULTILINE);
+    private static final Pattern PRIMARY_KEY_LINE_PATTERN = Pattern.compile("(PRIMARY KEY\\s(\\S*))", Pattern.MULTILINE);
     private static final Pattern COMMENT_ON_TABLE_PATTERN = Pattern.compile("COMMENT ON TABLE.+", Pattern.CASE_INSENSITIVE);
     private static final Pattern COMMENT_COLUMN_NAME_PATTERN = Pattern.compile("COMMENT ON COLUMN.+\\.\"(.*)\" IS.*", Pattern.MULTILINE);
 
@@ -223,7 +224,6 @@ public class DdlGenerator {
             } else {
                 ddl = "\r\n" + ddl;
             }
-            ddl = ddl.replaceAll("\\s+;$", ";");
             indexesDdl.append(ddl);
         }
         return indexesDdl.toString();
@@ -450,20 +450,45 @@ public class DdlGenerator {
 
     private String sortConstraintsInTableDdl(String sourceDdlScript) {
         Matcher constraintsBlockMatcher = CONSTRAINTS_BLOCK_PATTERN.matcher(sourceDdlScript);
-        Map<String, String> constraintByName = new TreeMap<>(CONSTRAINT_COMPARATOR);
         if (constraintsBlockMatcher.find()) {
             String block = constraintsBlockMatcher.group(1);
             String[] constraints = block.split(",\\s*\\n");
             sourceDdlScript = sourceDdlScript.replace(block, "@");
-            for (String s : constraints) {
-                Matcher constraintNameMatcher = CONSTRAINT_NAME_PATTERN.matcher(s);
+
+            String primaryKey = null;
+            Map<String, String> constraintByName = new TreeMap<>(CONSTRAINT_COMPARATOR);
+            for (String constraintLine : constraints) {
+                Matcher constraintNameMatcher = CONSTRAINT_NAME_PATTERN.matcher(constraintLine);
                 if (constraintNameMatcher.find()) {
-                    constraintByName.put(constraintNameMatcher.group(1), s.replaceAll("\r", ""));
+                    constraintByName.put(constraintNameMatcher.group(1), constraintLine.replaceAll("\r", ""));
+
+                } else if (primaryKey == null) {
+                    primaryKey = findPrimaryKey(constraintLine);
                 }
             }
+            String sortedConstraintBlockDdl = getSortedConstraintBlockDdl(primaryKey, constraintByName);
+            sourceDdlScript = sourceDdlScript.replace("@", sortedConstraintBlockDdl);
         }
+        return sourceDdlScript;
+    }
 
+    private String findPrimaryKey(String constraintLine) {
+        String primaryKey = null;
+        Matcher primaryKeyMatcher = PRIMARY_KEY_LINE_PATTERN.matcher(constraintLine);
+        if (primaryKeyMatcher.find()) {
+            primaryKey =  constraintLine.replaceAll("\r", "");
+        }
+        return primaryKey;
+    }
+
+    private String getSortedConstraintBlockDdl(String primaryKey, Map<String, String> constraintByName) {
         StringBuilder sortedConstraintBlockDdl = new StringBuilder();
+        if (StringUtils.isNotBlank(primaryKey)) {
+            sortedConstraintBlockDdl.append(primaryKey);
+            if (!constraintByName.isEmpty()) {
+                sortedConstraintBlockDdl.append(",\r\n");
+            }
+        }
         Iterator<Map.Entry<String, String>> iterator = constraintByName.entrySet().iterator();
         while (iterator.hasNext()) {
             String constraintDdl = iterator.next().getValue();
@@ -472,7 +497,6 @@ public class DdlGenerator {
             }
             sortedConstraintBlockDdl.append(constraintDdl);
         }
-        sourceDdlScript = sourceDdlScript.replace("@", sortedConstraintBlockDdl.toString());
-        return sourceDdlScript;
+        return sortedConstraintBlockDdl.toString();
     }
 }
