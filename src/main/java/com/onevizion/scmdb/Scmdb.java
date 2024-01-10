@@ -3,7 +3,6 @@ package com.onevizion.scmdb;
 import ch.qos.logback.classic.Logger;
 import com.onevizion.scmdb.exception.ScmdbException;
 import com.onevizion.scmdb.facade.DbScriptFacade;
-import com.onevizion.scmdb.vo.DbCnnCredentials;
 import oracle.dbtools.db.DBUtil;
 import oracle.ucp.jdbc.PoolDataSource;
 import oracle.ucp.jdbc.PoolDataSourceImpl;

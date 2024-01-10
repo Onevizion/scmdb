@@ -21,6 +21,10 @@ import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
 @Component
 public class DbScriptFacade {
 
+    private static final int MAX_DEVELOPMENT_ORDER_NUMBER = 100;
+    private static final String EXEC_FOLDER_NAME = "EXECUTE_ME";
+    private static final String ERROR_MSG_COMMIT_DELETED_WITHOUT_ROLLBACK = "Following scripts were deleted but it's rollbacks are still here. Remove rollbacks scripts or restore deleted scripts and then run scmdb again.";
+
     @Autowired
     private DbScriptDaoOra sqlScriptDaoOra;
 
@@ -30,9 +34,6 @@ public class DbScriptFacade {
     @Autowired
     private ColorLogger logger;
 
-    private final static String EXEC_FOLDER_NAME = "EXECUTE_ME";
-    private final static String ERROR_MSG_COMMIT_DELETED_WITHOUT_ROLLBACK = "Following scripts were deleted but it's rollbacks are still here. Remove rollbacks scripts or restore deleted scripts and then run scmdb again.";
-
     private File execDir;
     private List<SqlScript> scriptsInDir;
 
@@ -41,15 +42,9 @@ public class DbScriptFacade {
         scriptsInDir = createScriptsFromFiles(appArguments.isGenDdl() || !appArguments.isOmitChanged());
     }
 
-    public List<SqlScript> getNewScripts() {
+    public List<SqlScript> getNotExecutedScripts() {
         Map<String, SqlScript> savedScripts = sqlScriptDaoOra.readMap();
-
-        scriptsInDir.stream()
-                    .filter(this::isDevScript)
-                    .forEach(script -> logger.info("Dev script [" + script.getName() + "] was ignored"));
-
         List<SqlScript> newScripts = scriptsInDir.stream()
-                                                 .filter(script -> !isDevScript(script))
                                                  .filter(script -> !savedScripts.containsKey(script.getName()))
                                                  .collect(Collectors.toList());
         if (!appArguments.isReadAllFilesContent()) {
@@ -58,9 +53,23 @@ public class DbScriptFacade {
         return newScripts;
     }
 
-    private boolean isDevScript(SqlScript script) {
+    public List<SqlScript> getDevelopmentScripts() {
+        List<SqlScript> newScripts = scriptsInDir.stream()
+                                                 .filter(s -> s.getOrderNumber() < MAX_DEVELOPMENT_ORDER_NUMBER)
+                                                 .collect(Collectors.toList());
+        if (!appArguments.isReadAllFilesContent()) {
+            newScripts.forEach(SqlScript::loadContentFromFile);
+        }
+        return newScripts;
+    }
+
+    private boolean isIgnoredScript(SqlScript script) {
         String[] parts = script.getName().split("_");
-        return parts.length <= 1 || !NumberUtils.isDigits(parts[0]);
+        boolean isDevScript = parts.length <= 1 || !NumberUtils.isDigits(parts[0]);
+        if (isDevScript) {
+            logger.info("Dev script [" + script.getName() + "] was ignored");
+        }
+        return isDevScript;
     }
 
     public void copyRollbacksToExecDir(List<SqlScript> rollbacks) {
@@ -99,6 +108,7 @@ public class DbScriptFacade {
         List<File> scriptFiles = (List<File>) FileUtils.listFiles(appArguments.getScriptsDirectory(), new String[]{"sql"}, false);
         return scriptFiles.stream()
                           .map(f -> SqlScript.create(f, readAllScriptsContent))
+                          .filter(s -> !isIgnoredScript(s))
                           .sorted()
                           .collect(Collectors.toList());
     }

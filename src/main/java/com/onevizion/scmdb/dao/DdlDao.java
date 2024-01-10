@@ -13,6 +13,11 @@ import static com.onevizion.scmdb.vo.DbObjectType.*;
 
 @Component
 public class DdlDao extends AbstractDaoOra {
+
+    private final static String TABLE_NAME_COLUMN_NAME = "table_name";
+    private final static String DDL_COLUMN_NAME = "ddl";
+    private final static String COMPRESSION_COLUMN_NAME = "compression";
+    private final static String PREFIX_LENGTH_COLUMN_NAME = "prefix_length";
     private final static String FIND_ALL_DB_OBJECTS = "select object_name,\n" +
             "       object_type\n" +
             "from user_objects\n" +
@@ -42,7 +47,8 @@ public class DdlDao extends AbstractDaoOra {
             " and depends.referenced_type = 'SEQUENCE' and trgrs.table_name = upper(:tableName)" +
             " order by depends.referenced_name";
 
-    private final static String SELECT_DDL_INDEX_BY_TABLE_NAME = "select table_name, dbms_metadata.get_ddl('INDEX', index_name)" +
+    private final static String SELECT_DDL_INDEX_BY_TABLE_NAME = "select table_name, dbms_metadata.get_ddl('INDEX', index_name) as ddl," +
+            " case when (compression = 'ENABLED') then 1 else 0 end as compression, prefix_length" +
             " from user_indexes where generated = 'N' and table_name=upper(:tableName) and index_name not like 'PK_%'" +
             " order by table_name asc, uniqueness desc, regexp_substr(index_name, '^\\D*') nulls first, " +
             "  to_number(regexp_substr(index_name, '\\d+'))";
@@ -55,6 +61,20 @@ public class DdlDao extends AbstractDaoOra {
         DbObject dbObject = new DbObject();
         dbObject.setName(rs.getString(1));
         dbObject.setDdl(rs.getString(2));
+        return dbObject;
+    };
+
+    private final static RowMapper<DbObject> indexRowMapper = (rs, rowNum) -> {
+        DbObject dbObject = new DbObject();
+        dbObject.setName(rs.getString(TABLE_NAME_COLUMN_NAME));
+        String replacement;
+        if (rs.getBoolean(COMPRESSION_COLUMN_NAME)) {
+            int compressLength = rs.getInt(PREFIX_LENGTH_COLUMN_NAME);
+            replacement = String.format(" COMPRESS %d;", compressLength);
+        } else {
+            replacement = ";";
+        }
+        dbObject.setDdl(rs.getString(DDL_COLUMN_NAME).replaceAll("\\s+;$", replacement));
         return dbObject;
     };
 
@@ -95,7 +115,7 @@ public class DdlDao extends AbstractDaoOra {
         } else if (depObjType == SEQUENCE) {
             dbObjects = namedParameterJdbcTemplate.query(SELECT_DDL_SEQUENCE_BY_TABLE_NAME, namedParams, rowMapper);
         } else if (depObjType == INDEX) {
-            dbObjects = namedParameterJdbcTemplate.query(SELECT_DDL_INDEX_BY_TABLE_NAME, namedParams, rowMapper);
+            dbObjects = namedParameterJdbcTemplate.query(SELECT_DDL_INDEX_BY_TABLE_NAME, namedParams, indexRowMapper);
         } else if (depObjType == TRIGGER) {
             dbObjects = namedParameterJdbcTemplate.query(SELECT_DDL_TRIGGER_BY_TABLE_NAME, namedParams, rowMapper);
         }
