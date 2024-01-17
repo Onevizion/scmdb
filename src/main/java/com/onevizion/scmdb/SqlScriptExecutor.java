@@ -1,8 +1,11 @@
 package com.onevizion.scmdb;
 
+import com.onevizion.scmdb.exception.DbConnectionException;
+import com.onevizion.scmdb.exception.InvalidObjectException;
 import com.onevizion.scmdb.exception.ScriptExecException;
 import com.onevizion.scmdb.vo.DbCnnCredentials;
 import com.onevizion.scmdb.vo.SchemaType;
+import com.onevizion.scmdb.vo.ScriptStatus;
 import com.onevizion.scmdb.vo.SqlScript;
 import oracle.dbtools.raptor.newscriptrunner.ScriptExecutor;
 import oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext;
@@ -11,10 +14,7 @@ import org.apache.commons.io.output.TeeOutputStream;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.sql.DataSource;
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -25,9 +25,9 @@ import java.time.ZonedDateTime;
 import java.util.Date;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
-import static com.onevizion.scmdb.Scmdb.EXIT_CODE_ERROR;
-import static com.onevizion.scmdb.Scmdb.EXIT_CODE_SUCCESS;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
+import static com.onevizion.scmdb.vo.ScriptStatus.EXECUTED;
+import static com.onevizion.scmdb.vo.ScriptStatus.EXECUTED_WITH_ERRORS;
 import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
 import static java.time.format.DateTimeFormatter.ISO_TIME;
 import static oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext.*;
@@ -37,11 +37,10 @@ public class SqlScriptExecutor {
     private static final String SQL_COMMAND = "@%s %s";
     private static final String CREATE_SQL = "create.sql";
     private static final String COMPILE_SCHEMAS_SQL = "compile_schemas.sql";
-    private static final int SCRIPT_EXIT_CODE_ERROR = 1;
-    private static final int SCRIPT_EXIT_CODE_SUCCESS = 0;
     private static final Integer INVALID_OBJ_ERR_SQLCODE = 20001;
     private static final String ORA_REGEXP = "ORA-[0-9]*:.*";
     private static final String THROW_IF_INVALID_OBJECTS_SQL = "throw_if_invalid_objects.sql";
+    private static final String ERROR_CONNECTION_TO_THE_SCHEMA = "Error during connection to the schema [{0}].";
 
     @Autowired
     private AppArguments appArguments;
@@ -61,12 +60,12 @@ public class SqlScriptExecutor {
     @Autowired
     private DataSource pkgDataSource;
 
-    public int execute(SqlScript script) {
+    public ScriptStatus execute(SqlScript script) {
         File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType().isCompileInvalids(),
                                                      appArguments.isIgnoreErrors(),
                                                      script.getFile().getParentFile());
         ScriptRunnerContext context = execute(script, wrapperScriptFile, false);
-        return getExitCode(context);
+        return getScriptStatus(context);
     }
 
     private ScriptRunnerContext execute(SqlScript script, File wrapperScriptFile, boolean ignoreSqlLog) {
@@ -134,7 +133,7 @@ public class SqlScriptExecutor {
         try {
             FileUtils.copyURLToFile(wrapperScript, tmpFile);
         } catch (IOException e) {
-            throw new RuntimeException("Can't copy tmp wrapper file.", e);
+            throw new ScriptExecException("Can't copy tmp wrapper file.", e);
         }
 
         return tmpFile;
@@ -148,7 +147,7 @@ public class SqlScriptExecutor {
         executeResourceScript(COMPILE_SCHEMAS_SQL, "Can't compile invalid objects in _user, _rpt, _pkg schemas.", false);
     }
 
-    public void checkInvalidObjectOrExit() {
+    public void checkInvalidObjectOrThrow() {
         executeResourceScript(THROW_IF_INVALID_OBJECTS_SQL, "Can't execute invalid objects check.", true);
     }
 
@@ -160,8 +159,8 @@ public class SqlScriptExecutor {
         URL resource = getClass().getClassLoader().getResource(scriptFileName);
         try {
             FileUtils.copyURLToFile(resource, tmpFile);
-        } catch (IOException e) {
-            throw new RuntimeException("Can't copy " + scriptFileName + " file.", e);
+        } catch (IOException exception) {
+            throw new ScriptExecException("Can't copy " + scriptFileName + " file.", exception);
         }
 
         SqlScript sqlScript = new SqlScript();
@@ -174,12 +173,10 @@ public class SqlScriptExecutor {
         ScriptRunnerContext context = execute(sqlScript, wrapperScriptFile, ignoreSqlLog);
         tmpFile.delete();
 
-        checkInvalidObjectOrExit(context);
-        int exitCode = getExitCode(context);
-        if (exitCode != EXIT_CODE_SUCCESS) {
+        checkInvalidObjectOrThrow(context);
+        ScriptStatus scriptStatus = getScriptStatus(context);
+        if (scriptStatus == EXECUTED_WITH_ERRORS) {
             logger.error("Please execute script \"" + tmpFilePath + "\" manually");
-        }
-        if (exitCode != EXIT_CODE_SUCCESS) {
             throw new ScriptExecException(errorMessage);
         }
     }
@@ -197,30 +194,30 @@ public class SqlScriptExecutor {
                     return dataSource.getConnection();
             }
         } catch (SQLException exception) {
-            throw new RuntimeException(MessageFormat.format("Error during connection to the schema [{}].", schemaName),
-                    exception);
+            throw new DbConnectionException(MessageFormat.format(ERROR_CONNECTION_TO_THE_SCHEMA, schemaName), exception);
         }
     }
 
     /**
-     * If there is a custom exit code 20001 in the context, a list of invalid objects found will be displayed
-     * and the application will end with code 1
+     * The method checks the context for invalid objects.
+     * If the context contains custom exit code 20001, an InvalidObjectException will be thrown.
      * @param context ScriptRunnerContext after executed script
+     * @throws InvalidObjectException if db contains invalid object
      */
-    private void checkInvalidObjectOrExit(ScriptRunnerContext context) {
+    private void checkInvalidObjectOrThrow(ScriptRunnerContext context) {
         if (context != null && INVALID_OBJ_ERR_SQLCODE.equals(context.getProperty(ERR_SQLCODE))) {
             String invalidObjMsg = String.valueOf(context.getProperty(ERR_MESSAGE_SQLCODE));
             if (invalidObjMsg != null && !invalidObjMsg.isEmpty()) {
                 String invalidObjectMessage = invalidObjMsg.replaceAll(ORA_REGEXP, "");
-                System.err.print(invalidObjectMessage);
-                System.exit(EXIT_CODE_ERROR);
+                throw new InvalidObjectException(invalidObjectMessage);
             }
         }
     }
 
-    private int getExitCode(ScriptRunnerContext context) {
-        return context != null
-                && !(boolean) context.getProperty(ERR_ENCOUNTERED) ? SCRIPT_EXIT_CODE_SUCCESS : SCRIPT_EXIT_CODE_ERROR;
+    private ScriptStatus getScriptStatus(ScriptRunnerContext context) {
+        return context != null && !(boolean) context.getProperty(ERR_ENCOUNTERED)
+                ? EXECUTED
+                : EXECUTED_WITH_ERRORS;
     }
 
 }
