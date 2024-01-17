@@ -57,7 +57,7 @@ public class Scmdb {
                 dbManager.updateDb();
             }
         } catch (ScmdbException e) {
-            logger.error(e.getMessage());
+            System.err.print(e.getMessage());
             System.exit(EXIT_CODE_ERROR);
         } catch (Exception e) {
             logger.error("Scmdb internal error", e);
