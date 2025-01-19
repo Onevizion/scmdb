@@ -30,8 +30,8 @@ begin
 
                 exception
                     when e_expected_recomp_exception then
-                        v_attempt := v_attempt + 1;
-                        if instr(sqlerrm, c_utl_recomp_index_name) > 0 and v_attempt <= c_max_attempts then
+                        if instr(sqlerrm, c_utl_recomp_index_name) > 0 and v_attempt < c_max_attempts then
+                            v_attempt := v_attempt + 1;
                             dbms_lock.sleep(c_seconds_to_wait);
                         else
                             raise;
