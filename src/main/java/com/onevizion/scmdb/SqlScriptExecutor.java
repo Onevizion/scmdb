@@ -17,23 +17,16 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.Scmdb.EXIT_CODE_SUCCESS;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
-import static com.onevizion.scmdb.vo.SchemaType.PKG;
-import static com.onevizion.scmdb.vo.SchemaType.RPT;
-import static com.onevizion.scmdb.vo.SchemaType.USER;
 import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
 import static java.time.format.DateTimeFormatter.ISO_TIME;
 import static oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext.ERR_ENCOUNTERED;
@@ -65,14 +58,18 @@ public class SqlScriptExecutor {
     @Autowired
     private DataSource pkgDataSource;
 
-    public void showInvalidObjects() {
-        executeResourceScript(SHOW_INVALID_OBJECTS_SQL, "Can't check invalid objects.", false);
-    }
-
     private void executeResourceScript(String scriptFileName, String errorMessage) {
         executeResourceScript(scriptFileName, errorMessage, false);
     }
 
+    public void showInvalidObjects() {
+        try {
+            executeResourceScript(SHOW_INVALID_OBJECTS_SQL, "Can't check invalid objects.", false);
+        } catch (ScriptExecException e) {
+            // Log with WARNING color but don't rethrow - we don't want to fail the application
+            logger.warn("Unable to check invalid objects: {}", ColorLogger.Color.YELLOW, e.getMessage());
+        }
+    }
 
     public int execute(SqlScript script) {
         File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType().isCompileInvalids(),
