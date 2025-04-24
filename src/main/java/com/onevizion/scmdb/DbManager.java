@@ -62,6 +62,7 @@ public class DbManager {
             checkDeletedScripts();
             executeNewScripts();
         }
+        scriptExecutor.showInvalidObjects();
     }
 
     private void executeNewScripts() {

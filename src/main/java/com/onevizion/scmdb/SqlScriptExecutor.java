@@ -17,16 +17,23 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.Scmdb.EXIT_CODE_SUCCESS;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
+import static com.onevizion.scmdb.vo.SchemaType.PKG;
+import static com.onevizion.scmdb.vo.SchemaType.RPT;
+import static com.onevizion.scmdb.vo.SchemaType.USER;
 import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
 import static java.time.format.DateTimeFormatter.ISO_TIME;
 import static oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext.ERR_ENCOUNTERED;
@@ -36,6 +43,7 @@ public class SqlScriptExecutor {
     private static final String SQL_COMMAND = "@%s %s";
     private static final String CREATE_SQL = "create.sql";
     private static final String COMPILE_SCHEMAS_SQL = "compile_schemas.sql";
+    private static final String SHOW_INVALID_OBJECTS_SQL = "show_invalid_objects.sql";
     private static final int SCRIPT_EXIT_CODE_ERROR = 1;
     private static final int SCRIPT_EXIT_CODE_SUCCESS = 0;
 
@@ -56,6 +64,15 @@ public class SqlScriptExecutor {
 
     @Autowired
     private DataSource pkgDataSource;
+
+    public void showInvalidObjects() {
+        executeResourceScript(SHOW_INVALID_OBJECTS_SQL, "Can't check invalid objects.", false);
+    }
+
+    private void executeResourceScript(String scriptFileName, String errorMessage) {
+        executeResourceScript(scriptFileName, errorMessage, false);
+    }
+
 
     public int execute(SqlScript script) {
         File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType().isCompileInvalids(),
@@ -139,35 +156,6 @@ public class SqlScriptExecutor {
         executeResourceScript(COMPILE_SCHEMAS_SQL, "Can't compile invalid objects in _user, _rpt, _pkg schemas.");
     }
 
-    private void executeResourceScript(String scriptFileName, String errorMessage) {
-        File scriptsDirectory = appArguments.getScriptsDirectory();
-        String tmpFileName = new Date().getTime() + scriptFileName;
-        String tmpFilePath = scriptsDirectory.getAbsolutePath() + File.separator + tmpFileName;
-        File tmpFile = new File(tmpFilePath);
-        URL resource = getClass().getClassLoader().getResource(scriptFileName);
-        try {
-            FileUtils.copyURLToFile(resource, tmpFile);
-        } catch (IOException e) {
-            throw new RuntimeException("Can't copy " + scriptFileName + " file.", e);
-        }
-
-        SqlScript sqlScript = new SqlScript();
-        sqlScript.setName(tmpFileName);
-        sqlScript.setFile(tmpFile);
-        sqlScript.setType(COMMIT);
-        sqlScript.setSchemaType(OWNER);
-
-        File wrapperScriptFile = getTmpWrapperScript(false, false, sqlScript.getFile().getParentFile());
-        int exitCode = execute(sqlScript, wrapperScriptFile);
-        if (exitCode != EXIT_CODE_SUCCESS) {
-            logger.error("Please execute script \"" + tmpFilePath + "\" manually");
-        }
-        tmpFile.delete();
-        if (exitCode != EXIT_CODE_SUCCESS) {
-            throw new ScriptExecException(errorMessage);
-        }
-    }
-
     private Connection getConnection(SchemaType schemaType, String schemaName) {
         try {
             switch (schemaType) {
@@ -186,4 +174,33 @@ public class SqlScriptExecutor {
         }
     }
 
+    private void executeResourceScript(String scriptFileName, String errorMessage, boolean ignoreSqlLog) {
+        File scriptsDirectory = appArguments.getScriptsDirectory();
+        String tmpFileName = new Date().getTime() + scriptFileName;
+        String tmpFilePath = scriptsDirectory.getAbsolutePath() + File.separator + tmpFileName;
+        File tmpFile = new File(tmpFilePath);
+        URL resource = getClass().getClassLoader().getResource(scriptFileName);
+
+        try {
+            FileUtils.copyURLToFile(resource, tmpFile);
+        } catch (IOException e) {
+            throw new RuntimeException("Can't copy " + scriptFileName + " file.", e);
+        }
+
+        SqlScript sqlScript = new SqlScript();
+        sqlScript.setName(tmpFileName);
+        sqlScript.setFile(tmpFile);
+        sqlScript.setType(COMMIT);
+        sqlScript.setSchemaType(OWNER);
+
+        File wrapperScriptFile = getTmpWrapperScript(false, false, sqlScript.getFile().getParentFile());
+        int exitCode = execute(sqlScript, wrapperScriptFile);
+
+        tmpFile.delete();
+
+        if (exitCode != EXIT_CODE_SUCCESS && !scriptFileName.equals(SHOW_INVALID_OBJECTS_SQL)) {
+            logger.error("Please execute script \"" + tmpFilePath + "\" manually");
+            throw new ScriptExecException(errorMessage);
+        }
+    }
 }
