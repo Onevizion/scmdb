@@ -36,7 +36,7 @@ public class SqlScriptExecutor {
     private static final String SQL_COMMAND = "@%s %s";
     private static final String CREATE_SQL = "create.sql";
     private static final String COMPILE_SCHEMAS_SQL = "compile_schemas.sql";
-    private static final String SHOW_INVALID_OBJECTS_SQL = "show_invalid_objects.sql";
+    private static final String SHOW_INVALID_OBJECTS_SQL = "check_invalid_objects.sql";
     private static final int SCRIPT_EXIT_CODE_ERROR = 1;
     private static final int SCRIPT_EXIT_CODE_SUCCESS = 0;
 
