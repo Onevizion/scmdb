@@ -1,5 +1,6 @@
 package com.onevizion.scmdb;
 
+import com.onevizion.scmdb.exception.DbConnectionException;
 import com.onevizion.scmdb.exception.ScriptExecException;
 import com.onevizion.scmdb.vo.DbCnnCredentials;
 import com.onevizion.scmdb.vo.SchemaType;
@@ -155,18 +156,15 @@ public class SqlScriptExecutor {
 
     private Connection getConnection(SchemaType schemaType, String schemaName) {
         try {
-            switch (schemaType) {
-                case USER:
-                    return userDataSource.getConnection();
-                case RPT:
-                    return rptDataSource.getConnection();
-                case PKG:
-                    return pkgDataSource.getConnection();
-                default:
-                    return dataSource.getConnection();
-            }
+            return switch (schemaType) {
+                case USER -> userDataSource.getConnection();
+                case RPT -> rptDataSource.getConnection();
+                case PKG -> pkgDataSource.getConnection();
+                default -> dataSource.getConnection();
+            };
         } catch (SQLException exception) {
-            throw new RuntimeException(MessageFormat.format("Error during connection to the schema [{}].", schemaName),
+            throw new DbConnectionException(
+                    MessageFormat.format("Error during connection to the schema [{}].", schemaName),
                     exception);
         }
     }
