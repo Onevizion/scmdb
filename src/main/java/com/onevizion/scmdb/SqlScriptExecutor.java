@@ -160,7 +160,7 @@ public class SqlScriptExecutor {
                 case USER -> userDataSource.getConnection();
                 case RPT -> rptDataSource.getConnection();
                 case PKG -> pkgDataSource.getConnection();
-                default -> dataSource.getConnection();
+                case OWNER -> dataSource.getConnection();
             };
         } catch (SQLException exception) {
             throw new DbConnectionException(
