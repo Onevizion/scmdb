@@ -18,6 +18,7 @@ import static com.onevizion.scmdb.ColorLogger.Color.CYAN;
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.Scmdb.EXIT_CODE_SUCCESS;
 import static com.onevizion.scmdb.vo.SchemaType.OWNER;
+import static com.onevizion.scmdb.vo.ScriptStatus.EXECUTED_WITH_ERRORS;
 import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
 import static com.onevizion.scmdb.vo.ScriptType.ROLLBACK;
 
@@ -53,9 +54,11 @@ public class DbManager {
             scriptExecutor.createDbScriptTable();
             scriptsFacade.createAllFromDirectory();
             logger.info(FIRST_RUN_MESSAGE);
+
         } else if (scriptsFacade.isFirstRun()) {
             scriptsFacade.createAllFromDirectory();
             logger.info(FIRST_RUN_MESSAGE);
+
         } else {
             scriptsFacade.cleanExecDir();
             checkUpdatedScripts();
@@ -80,8 +83,8 @@ public class DbManager {
             logger.info(SCRIPTS_TO_EXEC_MSG, appArguments.getDbCredentials(OWNER).getSchemaWithUrlBeforeDot());
             newCommitScripts.forEach(script -> logger.info(script.getName()));
             newCommitScripts.forEach(script -> {
-                int exitCode = scriptExecutor.execute(script);
-                script.setStatus(ScriptStatus.getByScriptExitCode(exitCode));
+                ScriptStatus scriptStatus = scriptExecutor.execute(script);
+                script.setStatus(scriptStatus);
                 scriptsFacade.create(script);
 
                 if (script.getStatus() != ScriptStatus.EXECUTED && !appArguments.isIgnoreErrors()) {
@@ -89,6 +92,8 @@ public class DbManager {
                 }
             });
             scriptExecutor.executeCompileSchemas();
+            scriptExecutor.checkInvalidObjectOrThrow();
+
         } else {
             logger.info("You should execute following script files to update your database:");
             scriptsFacade.copyScriptsToExecDir(newCommitScripts);
@@ -149,8 +154,8 @@ public class DbManager {
                 scriptsFacade.delete(rollback.getId());
                 scriptsFacade.delete(commit.getId());
 
-                int exitCode = scriptExecutor.execute(rollback);
-                if (exitCode != 0) {
+                ScriptStatus scriptStatus = scriptExecutor.execute(rollback);
+                if (scriptStatus == EXECUTED_WITH_ERRORS) {
                     throw new ScriptExecException(MessageFormat.format(SCRIPT_EXECUTION_ERROR_MESSAGE, rollback.getName()));
                 }
 
@@ -159,6 +164,7 @@ public class DbManager {
             }
         }
         scriptExecutor.executeCompileSchemas();
+        scriptExecutor.checkInvalidObjectOrThrow();
     }
 
     private void checkUpdatedScripts() {
