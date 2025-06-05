@@ -68,7 +68,7 @@ public class SqlScriptExecutor {
             executeResourceScript(SHOW_INVALID_OBJECTS_SQL, "_rpt, _pkg, _user schema invalid objects are not visible from the owner schema.", false);
         } catch (ScriptExecException e) {
             // Log with WARNING color but don't rethrow - we don't want to fail the application
-            logger.warn("Unable to check invalid objects: {}", ColorLogger.Color.YELLOW, e.getMessage());
+            logger.warn("Unable to check invalid objects: [{}]", ColorLogger.Color.YELLOW, e.getMessage());
         }
     }
 
@@ -161,6 +161,7 @@ public class SqlScriptExecutor {
                 case RPT -> rptDataSource.getConnection();
                 case PKG -> pkgDataSource.getConnection();
                 case OWNER -> dataSource.getConnection();
+                case PERFSTAT -> throw new UnsupportedOperationException("PERFSTAT schema is not supported in this context.");
             };
         } catch (SQLException exception) {
             throw new DbConnectionException(
@@ -194,7 +195,7 @@ public class SqlScriptExecutor {
         tmpFile.delete();
 
         if (exitCode != EXIT_CODE_SUCCESS && !scriptFileName.equals(SHOW_INVALID_OBJECTS_SQL)) {
-            logger.error(MessageFormat.format("Please execute script [{}] manually.", tmpFilePath));
+            logger.error("Please execute script [{}] manually.", tmpFilePath);
             throw new ScriptExecException(errorMessage);
         }
     }
