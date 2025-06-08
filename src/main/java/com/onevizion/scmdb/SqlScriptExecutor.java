@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
@@ -165,7 +164,7 @@ public class SqlScriptExecutor {
             };
         } catch (SQLException exception) {
             throw new DbConnectionException(
-                    MessageFormat.format("Error during connection to the schema [{}].", schemaName),
+                    StringPlaceholderUtils.replace("Error during connection to the schema [{}].", schemaName),
                     exception);
         }
     }
