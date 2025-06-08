@@ -2,6 +2,8 @@ whenever SQLERROR CONTINUE
 set PAGESIZE 0
 set VERIFY OFF
 
+SET SERVEROUTPUT ON SIZE UNLIMITED
+
 @@ &1
 
 set serveroutput on
