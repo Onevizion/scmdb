@@ -49,6 +49,8 @@ public class DbManager {
 
         scriptsFacade.checkDbConnection();
 
+        scriptExecutor.showInvalidObjects();
+
         if (!scriptsFacade.isScriptTableExist()) {
             scriptExecutor.createDbScriptTable();
             scriptsFacade.createAllFromDirectory();
