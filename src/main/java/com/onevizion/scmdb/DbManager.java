@@ -49,6 +49,8 @@ public class DbManager {
 
         scriptsFacade.checkDbConnection();
 
+        scriptExecutor.showInvalidObjects();
+
         if (!scriptsFacade.isScriptTableExist()) {
             scriptExecutor.createDbScriptTable();
             scriptsFacade.createAllFromDirectory();
@@ -62,6 +64,7 @@ public class DbManager {
             checkDeletedScripts();
             executeNewScripts();
         }
+        scriptExecutor.showInvalidObjects();
     }
 
     private void executeNewScripts() {

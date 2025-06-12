@@ -1,5 +1,6 @@
 package com.onevizion.scmdb;
 
+import com.onevizion.scmdb.exception.DbConnectionException;
 import com.onevizion.scmdb.exception.ScriptExecException;
 import com.onevizion.scmdb.vo.DbCnnCredentials;
 import com.onevizion.scmdb.vo.SchemaType;
@@ -18,7 +19,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
@@ -36,6 +36,7 @@ public class SqlScriptExecutor {
     private static final String SQL_COMMAND = "@%s %s";
     private static final String CREATE_SQL = "create.sql";
     private static final String COMPILE_SCHEMAS_SQL = "compile_schemas.sql";
+    private static final String SHOW_INVALID_OBJECTS_SQL = "check_invalid_objects.sql";
     private static final int SCRIPT_EXIT_CODE_ERROR = 1;
     private static final int SCRIPT_EXIT_CODE_SUCCESS = 0;
 
@@ -56,6 +57,19 @@ public class SqlScriptExecutor {
 
     @Autowired
     private DataSource pkgDataSource;
+
+    private void executeResourceScript(String scriptFileName, String errorMessage) {
+        executeResourceScript(scriptFileName, errorMessage, false);
+    }
+
+    public void showInvalidObjects() {
+        try {
+            executeResourceScript(SHOW_INVALID_OBJECTS_SQL, "_rpt, _pkg, _user schema invalid objects are not visible from the owner schema.", false);
+        } catch (ScriptExecException e) {
+            // Log with WARNING color but don't rethrow - we don't want to fail the application
+            logger.warn("Unable to check invalid objects: [{}]", ColorLogger.Color.YELLOW, e.getMessage());
+        }
+    }
 
     public int execute(SqlScript script) {
         File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType().isCompileInvalids(),
@@ -139,12 +153,29 @@ public class SqlScriptExecutor {
         executeResourceScript(COMPILE_SCHEMAS_SQL, "Can't compile invalid objects in _user, _rpt, _pkg schemas.");
     }
 
-    private void executeResourceScript(String scriptFileName, String errorMessage) {
+    private Connection getConnection(SchemaType schemaType, String schemaName) {
+        try {
+            return switch (schemaType) {
+                case USER -> userDataSource.getConnection();
+                case RPT -> rptDataSource.getConnection();
+                case PKG -> pkgDataSource.getConnection();
+                case OWNER -> dataSource.getConnection();
+                case PERFSTAT -> throw new UnsupportedOperationException("PERFSTAT schema is not supported in this context.");
+            };
+        } catch (SQLException exception) {
+            throw new DbConnectionException(
+                    StringPlaceholderUtils.replace("Error during connection to the schema [{}].", schemaName),
+                    exception);
+        }
+    }
+
+    private void executeResourceScript(String scriptFileName, String errorMessage, boolean ignoreSqlLog) {
         File scriptsDirectory = appArguments.getScriptsDirectory();
         String tmpFileName = new Date().getTime() + scriptFileName;
         String tmpFilePath = scriptsDirectory.getAbsolutePath() + File.separator + tmpFileName;
         File tmpFile = new File(tmpFilePath);
         URL resource = getClass().getClassLoader().getResource(scriptFileName);
+
         try {
             FileUtils.copyURLToFile(resource, tmpFile);
         } catch (IOException e) {
@@ -159,31 +190,12 @@ public class SqlScriptExecutor {
 
         File wrapperScriptFile = getTmpWrapperScript(false, false, sqlScript.getFile().getParentFile());
         int exitCode = execute(sqlScript, wrapperScriptFile);
-        if (exitCode != EXIT_CODE_SUCCESS) {
-            logger.error("Please execute script \"" + tmpFilePath + "\" manually");
-        }
+
         tmpFile.delete();
-        if (exitCode != EXIT_CODE_SUCCESS) {
+
+        if (exitCode != EXIT_CODE_SUCCESS && !scriptFileName.equals(SHOW_INVALID_OBJECTS_SQL)) {
+            logger.error("Please execute script [{}] manually.", tmpFilePath);
             throw new ScriptExecException(errorMessage);
         }
     }
-
-    private Connection getConnection(SchemaType schemaType, String schemaName) {
-        try {
-            switch (schemaType) {
-                case USER:
-                    return userDataSource.getConnection();
-                case RPT:
-                    return rptDataSource.getConnection();
-                case PKG:
-                    return pkgDataSource.getConnection();
-                default:
-                    return dataSource.getConnection();
-            }
-        } catch (SQLException exception) {
-            throw new RuntimeException(MessageFormat.format("Error during connection to the schema [{}].", schemaName),
-                    exception);
-        }
-    }
-
 }
