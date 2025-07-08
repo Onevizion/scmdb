@@ -12,9 +12,9 @@ begin
            and object_name not like 'BIN$%'
            and (
              owner = user
-             or owner like '%\_USER' escape '\'
-             or owner like '%\_RPT' escape '\'
-             or owner like '%\_PKG' escape '\'
+             or owner like user || '\_USER' escape '\'
+             or owner like user || '\_RPT' escape '\'
+             or owner like user || '\_PKG' escape '\'
            )
          order by owner, object_type, object_name
       ) loop
@@ -24,6 +24,10 @@ begin
            dbms_output.put_line('WARNING: Invalid objects found in database:');
            dbms_output.put_line('==================================================');
            v_invalid_objects_found := TRUE;
+        else
+           dbms_output.put_line('==================================================');
+           dbms_output.put_line('No invalid objects found in _rpt, _pkg, _user schemas.');
+           dbms_output.put_line('==================================================');
         end if;
 
     dbms_output.put_line('  - ' || obj.owner || '.' || obj.object_name || ' (' || obj.object_type || ')');
