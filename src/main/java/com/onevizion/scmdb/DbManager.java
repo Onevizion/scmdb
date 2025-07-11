@@ -51,19 +51,30 @@ public class DbManager {
 
         scriptExecutor.showInvalidObjects();
 
-        if (!scriptsFacade.isScriptTableExist()) {
-            scriptExecutor.createDbScriptTable();
-            scriptsFacade.createAllFromDirectory();
-            logger.info(FIRST_RUN_MESSAGE);
-        } else if (scriptsFacade.isFirstRun()) {
-            scriptsFacade.createAllFromDirectory();
-            logger.info(FIRST_RUN_MESSAGE);
-        } else {
-            scriptsFacade.cleanExecDir();
-            checkUpdatedScripts();
-            checkDeletedScripts();
-            executeNewScripts();
+        if (appArguments.isForceDisableJobs()) {
+            scriptExecutor.disableJobs();
         }
+        
+        try {
+            if (!scriptsFacade.isScriptTableExist()) {
+                scriptExecutor.createDbScriptTable();
+                scriptsFacade.createAllFromDirectory();
+                logger.info(FIRST_RUN_MESSAGE);
+            } else if (scriptsFacade.isFirstRun()) {
+                scriptsFacade.createAllFromDirectory();
+                logger.info(FIRST_RUN_MESSAGE);
+            } else {
+                scriptsFacade.cleanExecDir();
+                checkUpdatedScripts();
+                checkDeletedScripts();
+                executeNewScripts();
+            }
+        } finally {
+            if (appArguments.isForceDisableJobs()) {
+                scriptExecutor.enableJobs();
+            }
+        }
+        
         scriptExecutor.showInvalidObjects();
     }
 

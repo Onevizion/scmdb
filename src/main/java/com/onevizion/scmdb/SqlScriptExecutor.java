@@ -37,6 +37,8 @@ public class SqlScriptExecutor {
     private static final String CREATE_SQL = "create.sql";
     private static final String COMPILE_SCHEMAS_SQL = "compile_schemas.sql";
     private static final String SHOW_INVALID_OBJECTS_SQL = "check_invalid_objects.sql";
+    private static final String DISABLE_JOBS_SQL = "disable_jobs.sql";
+    private static final String ENABLE_JOBS_SQL = "enable_jobs.sql";
     private static final int SCRIPT_EXIT_CODE_ERROR = 1;
     private static final int SCRIPT_EXIT_CODE_SUCCESS = 0;
 
@@ -151,6 +153,14 @@ public class SqlScriptExecutor {
 
     public void executeCompileSchemas() {
         executeResourceScript(COMPILE_SCHEMAS_SQL, "Can't compile invalid objects in _user, _rpt, _pkg schemas.");
+    }
+
+    public void disableJobs() {
+        executeResourceScript(DISABLE_JOBS_SQL, "Can't disable database jobs.");
+    }
+
+    public void enableJobs() {
+        executeResourceScript(ENABLE_JOBS_SQL, "Can't enable database jobs.");
     }
 
     private Connection getConnection(SchemaType schemaType, String schemaName) {

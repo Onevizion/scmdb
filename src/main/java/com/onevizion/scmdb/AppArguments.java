@@ -26,6 +26,7 @@ public class AppArguments {
     private boolean all = false;
     private boolean omitChanged = false;
     private boolean ignoreErrors = false;
+    private boolean forceDisableJobs = false;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
 
@@ -50,6 +51,7 @@ public class AppArguments {
         OptionSpec noColorOption = parser.acceptsAll(asList("n", "no-color"));
         OptionSpec omitChangedOption = parser.acceptsAll(asList("o", "omit-changed"));
         OptionSpec ignoreErrorsOption = parser.acceptsAll(asList("i", "ignore-errors"));
+        OptionSpec forceDisableJobsOption = parser.accepts("force-disable-jobs");
 
         OptionSet options = parser.parse(args);
 
@@ -86,6 +88,7 @@ public class AppArguments {
         useColorLogging = !options.has(noColorOption);
         omitChanged = options.has(omitChangedOption);
         ignoreErrors = options.has(ignoreErrorsOption);
+        forceDisableJobs = options.has(forceDisableJobsOption);
     }
 
     public void fillDataSourceCredentials(PoolDataSource poolDataSource, SchemaType schemaType) {
@@ -155,5 +158,9 @@ public class AppArguments {
 
     public boolean isReadAllFilesContent() {
         return genDdl || !omitChanged;
+    }
+
+    public boolean isForceDisableJobs() {
+        return forceDisableJobs;
     }
 }
