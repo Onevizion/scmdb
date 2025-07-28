@@ -52,7 +52,3 @@ DDL generation works by regexping new DB scripts for DB objects creation/modific
 **4. Execute new scripts with automatic job management** (disable jobs before execution, re-enable after completion):
 
 ```java -jar scmdb.jar --owner-schema=vqs_p01_epm/vepm@localhost:1521:orclpdb --scripts-dir=./db/scripts --exec --force-disable-jobs```
-
-**5. Generate DDL with job management for production safety:**
-
-```java -jar scmdb.jar --owner-schema=$ownerSchema --scripts-dir=db/scripts --gen-ddl --force-disable-jobs```

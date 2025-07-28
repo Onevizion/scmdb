@@ -51,7 +51,7 @@ public class DbManager {
 
         scriptExecutor.showInvalidObjects();
 
-        if (appArguments.isForceDisableJobs()) {
+        if (appArguments.isForceDisableJobs() && !appArguments.isGenDdl()) {
             scriptExecutor.disableJobs();
         }
         
@@ -70,7 +70,7 @@ public class DbManager {
                 executeNewScripts();
             }
         } finally {
-            if (appArguments.isForceDisableJobs()) {
+            if (appArguments.isForceDisableJobs() && !appArguments.isGenDdl()) {
                 scriptExecutor.enableJobs();
             }
         }
