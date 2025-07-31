@@ -19,7 +19,5 @@
 #
 # https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners#codeowners-syntax
 
-*                                                               @Simplycissimys
+*                                                               @kav-onevizion @asmoiseenko
 .*                                                              @asmoiseenko
-pom.xml                                                         @asmoiseenko @Simplycissimys
-*.sql                                                           @Simplycissimys @MihailKnyazev
