@@ -30,6 +30,7 @@ When passwords for all schemas are the same (may be common for local dev env), o
 * ```--omit-changed``` do not check for sciprt changes. Script modifications detection is based on hash code calc, omiting this procedure may improove perfomance
 * ```--ignore-errors``` do not stop on errors 
 * ```--no-color``` do not color output
+* ```--force-disable-jobs``` automatically disable database jobs before executing scripts and re-enable them afterward.
 
 ### Usage Scenarious
 **1. Execute new scripts in local dev env:**
@@ -47,3 +48,7 @@ DDL generation works by regexping new DB scripts for DB objects creation/modific
 **3. Execute DB scripts in production environment during new version deployment** (do not stop on errors, do not execute rollbacks):
 
 ```java -jar scmdb.jar --owner-schema=$ownerSchema --user-schema=$userSchema --rpt-schema=$rptSchema --pkg-schema=$pkgSchema --scripts-dir=db/scripts --no-color --exec --omit-changed --ignore-errors```
+
+**4. Execute new scripts with automatic job management** (disable jobs before execution, re-enable after completion):
+
+```java -jar scmdb.jar --owner-schema=vqs_p01_epm/vepm@localhost:1521:orclpdb --scripts-dir=./db/scripts --exec --force-disable-jobs```
