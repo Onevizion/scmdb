@@ -25,7 +25,7 @@ public class Scmdb {
             ClassPathXmlApplicationContext ctx = new ClassPathXmlApplicationContext("classpath:beans.xml");
 
             String buildInformation = ctx.getBean("buildInformation", String.class);
-            logger.info("SCMDB Build Information: {}", buildInformation);
+            logger.info("SCMDB Build Information: [{}]", buildInformation);
 
             AppArguments appArguments = ctx.getBean(AppArguments.class);
             appArguments.parse(args);
