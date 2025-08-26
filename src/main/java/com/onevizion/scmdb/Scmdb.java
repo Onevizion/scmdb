@@ -3,7 +3,6 @@ package com.onevizion.scmdb;
 import ch.qos.logback.classic.Logger;
 import com.onevizion.scmdb.exception.ScmdbException;
 import com.onevizion.scmdb.facade.DbScriptFacade;
-import com.onevizion.scmdb.vo.DbCnnCredentials;
 import oracle.dbtools.db.DBUtil;
 import oracle.ucp.jdbc.PoolDataSource;
 import oracle.ucp.jdbc.PoolDataSourceImpl;
@@ -24,6 +23,9 @@ public class Scmdb {
         try {
             logger.debug("Initialize spring beans");
             ClassPathXmlApplicationContext ctx = new ClassPathXmlApplicationContext("classpath:beans.xml");
+
+            String buildInformation = ctx.getBean("buildInformation", String.class);
+            logger.info("SCMDB Build Information: [{}]", buildInformation);
 
             AppArguments appArguments = ctx.getBean(AppArguments.class);
             appArguments.parse(args);
