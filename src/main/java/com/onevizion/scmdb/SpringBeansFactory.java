@@ -19,7 +19,7 @@ public class SpringBeansFactory {
 
     private static final String BUILD_DATE_ATTRIBUTE = "Build-Date";
     private static final String GIT_COMMIT_ID_ATTRIBUTE = "Git-Commit-Id";
-    private static final String BUILD_INFO_TEMPLATE = "{BuildDate} (Git: {GitCommitId})";
+    private static final String BUILD_INFO_TEMPLATE = "Build Date: {BuildDate} (Git Commit ID: {GitCommitId})";
     private static final String BUILD_INFO_UNKNOWN = "Unknown";
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
