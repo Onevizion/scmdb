@@ -27,6 +27,8 @@ public class AppArguments {
     private boolean omitChanged = false;
     private boolean ignoreErrors = false;
     private boolean forceDisableJobs = false;
+    private boolean backport = false;
+    private String ghToken;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
 
@@ -52,6 +54,8 @@ public class AppArguments {
         OptionSpec omitChangedOption = parser.acceptsAll(asList("o", "omit-changed"));
         OptionSpec ignoreErrorsOption = parser.acceptsAll(asList("i", "ignore-errors"));
         OptionSpec forceDisableJobsOption = parser.accepts("force-disable-jobs");
+        OptionSpec backportOption = parser.accepts("backport");
+        OptionSpec<String> ghTokenOption = parser.accepts("gh-token").withRequiredArg().ofType(String.class);
 
         OptionSet options = parser.parse(args);
 
@@ -70,7 +74,7 @@ public class AppArguments {
             throw new IllegalArgumentException("Path [" + scriptsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
                     " [--scripts-dir] should contains absolute path and points to scripts directory");
         }
-        if(options.has(genDdlOption)){
+        if(options.has(genDdlOption) || options.has(backportOption)){
             ddlsDirectory = new File(scriptsDirectory.getParentFile().getAbsolutePath() + File.separator +
                     DDL_DIRECTORY_NAME);
             if (!ddlsDirectory.exists() || !ddlsDirectory.isDirectory()) {
@@ -82,6 +86,11 @@ public class AppArguments {
         if (options.has(execOption) && options.has(genDdlOption)) {
             throw new IllegalArgumentException("You can't specify both --gen-ddl and --exec arguments. Choose one.");
         }
+
+        if (options.has(backportOption) && (options.has(execOption) || options.has(genDdlOption))) {
+            throw new IllegalArgumentException("--backport cannot be combined with --exec or --gen-ddl.");
+        }
+
         executeScripts = options.has(execOption);
         genDdl = options.has(genDdlOption);
         all = options.has(allOption);
@@ -89,6 +98,19 @@ public class AppArguments {
         omitChanged = options.has(omitChangedOption);
         ignoreErrors = options.has(ignoreErrorsOption);
         forceDisableJobs = options.has(forceDisableJobsOption);
+
+        backport = options.has(backportOption);
+        if (backport) {
+            String envToken = System.getenv("GITHUB_TOKEN");
+            if (envToken != null && !envToken.isBlank()) {
+                ghToken = envToken;
+            } else if (options.has(ghTokenOption)) {
+                ghToken = options.valueOf(ghTokenOption);
+            } else {
+                throw new IllegalArgumentException(
+                        "--gh-token or GITHUB_TOKEN environment variable is required when using --backport.");
+            }
+        }
     }
 
     public void fillDataSourceCredentials(PoolDataSource poolDataSource, SchemaType schemaType) {
@@ -157,10 +179,19 @@ public class AppArguments {
     }
 
     public boolean isReadAllFilesContent() {
-        return genDdl || !omitChanged;
+        return genDdl || backport || !omitChanged;
     }
 
     public boolean isForceDisableJobs() {
         return forceDisableJobs;
     }
+
+    public boolean isBackport() {
+        return backport;
+    }
+
+    public String getGhToken() {
+        return ghToken;
+    }
+
 }

@@ -15,6 +15,12 @@ Additionally scripts ending with _user.sql, _rpt.sql, _pkg.sql will be executed 
 ### Requirements
 scmdb uses Oracle's command line tool [SQLcl](https://www.oracle.com/database/technologies/appdev/sqlcl.html) to execute scripts and generate DDLs. SQLcl should be installed and accessible in standard path
 
+#### Additional requirements for --backport mode
+* **Python 3.10+** — install via `brew install python3` (macOS) or from [python.org](https://www.python.org/downloads/)
+* **requests** Python package — install via `pip3 install requests` (on macOS with Homebrew: `pip3 install --break-system-packages requests`)
+* **Git CLI** — must be installed and accessible in standard path
+* **GitHub token** — Personal Access Token with repo access to IKAMTeam/ov. Provide via `GITHUB_TOKEN` environment variable or `--gh-token` CLI argument
+
 ### Supported command line options:
 * ```--owner-schema=<user>/<password>@<db_address>:<db_port>:<db_name>```
 * ```--user-schema=<user>/<password>```
@@ -31,6 +37,8 @@ When passwords for all schemas are the same (may be common for local dev env), o
 * ```--ignore-errors``` do not stop on errors 
 * ```--no-color``` do not color output
 * ```--force-disable-jobs``` automatically disable database jobs before executing scripts and re-enable them afterward.
+* ```--backport``` run backport pipeline: cherry-pick PR commits, regenerate package scripts, execute them and generate DDL. Cannot be combined with ```--exec``` or ```--gen-ddl```. Requires GitHub token (see ```--gh-token```). PR number is prompted interactively.
+* ```--gh-token=<token>``` GitHub personal access token for the backport pipeline. Can also be provided via ```GITHUB_TOKEN``` environment variables (env variables take priority over CLI argument).
 
 ### Usage Scenarious
 **1. Execute new scripts in local dev env:**
@@ -52,3 +60,14 @@ DDL generation works by regexping new DB scripts for DB objects creation/modific
 **4. Execute new scripts with automatic job management** (disable jobs before execution, re-enable after completion):
 
 ```java -jar scmdb.jar --owner-schema=vqs_p01_epm/vepm@localhost:1521:orclpdb --scripts-dir=./db/scripts --exec --force-disable-jobs```
+
+**5. Backport a PR from master to the current branch** (cherry-pick commits, regenerate package scripts, execute and generate DDL):
+
+```java -jar scmdb.jar --owner-schema=vqs_p01_epm/vepm@localhost:1521:orclpdb --scripts-dir=./db/scripts --backport```
+
+GitHub token is resolved in the following order: `GITHUB_TOKEN` env variable, `--gh-token` CLI argument.
+The PR (Pull-Requedt) number will be prompted interactively after started. The pipeline will:
+1. Cherry-pick non-merge commits from the specified PR;
+2. Regenerate package scripts from DDL sources;
+3. Execute new scripts (same as `--exec`);
+4. Generate DDL for changed objects (same as `--gen-ddl`);
