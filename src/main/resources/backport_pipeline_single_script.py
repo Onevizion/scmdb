@@ -16,6 +16,9 @@ from typing import Any
 GITHUB_OWNER = "IKAMTeam"
 GITHUB_REPO = "ov"
 
+# Timeout for git operations in seconds
+GIT_TIMEOUT = 300  # 5 minutes
+
 def _log(p_msg: str) -> None:
     print(p_msg, file=sys.stderr)
 
@@ -98,8 +101,6 @@ def _filter_commits(p_commits: list[dict[str, Any]]) -> tuple[list[str], list[st
 
     return kept, skipped
 
-
-# Paths / file classification
 
 @dataclass(frozen=True)
 class RepoLayout:
@@ -218,7 +219,7 @@ def _detect_packages_from_files(p_packages_file_names: list[str]) -> set[str]:
 
 def _run_git(p_repo_root: str, p_args: list[str]) -> str:
     cmd = ["git", "-C", p_repo_root] + p_args
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=GIT_TIMEOUT)
     if res.returncode != 0:
         raise RuntimeError(f"Git command failed: {' '.join(cmd)}\n{res.stderr.strip()}")
     return res.stdout
@@ -238,7 +239,7 @@ def _cherry_pick_commits(p_repo_root: str, p_remote_branch_name: str, p_commit_i
             _run_git(p_repo_root, ["cherry-pick", sha])
     except Exception as e:
         try:
-            subprocess.run(["git", "-C", p_repo_root, "cherry-pick", "--abort"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["git", "-C", p_repo_root, "cherry-pick", "--abort"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=GIT_TIMEOUT)
         except Exception:
             pass
 
@@ -268,12 +269,13 @@ def _parse_script_file_name(p_script_file_name: str) -> tuple[str, str, str, boo
     clean_name = base_name[:-len(ROLLBACK_SUFFIX)] if is_rollback else base_name[:-4]
 
     parts = clean_name.split("_")
-    if len(parts) < 3:
+    if len(parts) < 2:
         raise ValueError(f"Cannot parse script name: {p_script_file_name}")
 
     script_number = parts[0]
-    branch_name = parts[1]
-    package_name = "_".join(parts[2:]).lower()
+    branch_name = parts[1]  # Can be branch name (e.g., 'master') or branch_name number (e.g., 'Admin-266038', 'DB-242327-182469')
+    # Package name is optional - scripts without package name are also valid
+    package_name = "_".join(parts[2:]).lower() if len(parts) > 2 else ""
 
     return script_number, branch_name, package_name, is_rollback
 
@@ -342,15 +344,20 @@ def _collect_scripts_for_packages(
         if (not p_is_rollback) and base_name.endswith(ROLLBACK_SUFFIX):
             continue
 
-        # Keep existing behavior: find first matching package name by substring.
-        matched_pkg = next((p for p in p_package_names if p in base_name.lower()), None)
-        if not matched_pkg:
+        # Parse script file name to get exact package name
+        try:
+            script_number_s, branch_name, package_name, _ = _parse_script_file_name(base_name)
+            script_number = int(script_number_s)
+        except (ValueError, IndexError):
             continue
 
-        script_number_s, branch_name, package_name, _ = _parse_script_file_name(base_name)
-        try:
-            script_number = int(script_number_s)
-        except ValueError:
+        # Skip scripts without package name - they are DDL scripts (tables, views, etc.)
+        # that will be executed by SCMDB as-is, not regenerated from package sources
+        if not package_name:
+            continue
+
+        # Check if parsed package name matches one of the expected packages
+        if package_name not in p_package_names:
             continue
 
         scripts[package_name] = (base_name, "", script_number, branch_name)
