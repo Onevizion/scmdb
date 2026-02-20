@@ -273,8 +273,7 @@ def _parse_script_file_name(p_script_file_name: str) -> tuple[str, str, str, boo
         raise ValueError(f"Cannot parse script name: {p_script_file_name}")
 
     script_number = parts[0]
-    branch_name = parts[1]  # Can be branch name (e.g., 'master') or branch_name number (e.g., 'Admin-266038', 'DB-242327-182469')
-    # Package name is optional - scripts without package name are also valid
+    branch_name = parts[1]
     package_name = "_".join(parts[2:]).lower() if len(parts) > 2 else ""
 
     return script_number, branch_name, package_name, is_rollback
