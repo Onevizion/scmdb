@@ -39,7 +39,9 @@ public class BackportRunner {
             }
 
             int exitCode = process.waitFor();
-            stderrThread.join(5000);
+            stderrThread.join();
+
+            logger.debug("Backport script exited with code: {}", exitCode);
 
             if (stdout.isEmpty()) {
                 String stderr = stderrBuilder.toString().trim();
@@ -51,7 +53,7 @@ public class BackportRunner {
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException("Failed to execute backport script: " + e.getMessage(), e);
         } finally {
-            tempScript.deleteOnExit();
+            tempScript.delete();
         }
     }
 

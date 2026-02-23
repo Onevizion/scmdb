@@ -66,7 +66,7 @@ DDL generation works by regexping new DB scripts for DB objects creation/modific
 ```java -jar scmdb.jar --owner-schema=vqs_p01_epm/vepm@localhost:1521:orclpdb --scripts-dir=./db/scripts --backport```
 
 GitHub token is resolved in the following order: `GITHUB_TOKEN` env variable, `--gh-token` CLI argument.
-The PR (Pull-Requedt) number will be prompted interactively after started. The pipeline will:
+The PR (Pull-Request) number will be prompted interactively after started. The pipeline will:
 1. Cherry-pick non-merge commits from the specified PR;
 2. Regenerate package scripts from DDL sources;
 3. Execute new scripts (same as `--exec`);
