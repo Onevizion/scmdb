@@ -7,7 +7,7 @@ declare
     v_owner_schema varchar2(128) := user;
 begin
     for rec_obj in (select owner, object_type, object_name
-                      from dba_objects
+                      from all_objects
                      where status = 'INVALID'
                        and object_name not like 'BIN$%'
                        and object_type <> 'SYNONYM' -- Will be resolved when accessing the object
