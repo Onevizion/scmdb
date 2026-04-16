@@ -443,11 +443,7 @@ def main(argv: list[str] | None = None) -> int:
         if skipped_commit_ids:
             _log(f"commits skipped by filter: {len(skipped_commit_ids)}")
 
-        # 1) Cherry-pick commits to current branch
-        if commit_ids:
-            _cherry_pick_commits(layout.repo_root, branch, commit_ids)
-
-        # 2) Determine packages from changed package files
+        # 1) Determine packages from changed package files
         package_names = _detect_packages_from_files(packages_file_names)
         if package_names:
             _log(f"packages detected from ddl/packages changes: {len(package_names)}")
@@ -456,17 +452,27 @@ def main(argv: list[str] | None = None) -> int:
         else:
             _log("packages detected from ddl/packages changes: 0")
 
-        # 3) Recreate scripts
+        # 2) Find rollback scripts that need to be regenerated
         rollback_candidates = _collect_scripts_for_packages(scripts_file_names, package_names, p_is_rollback=True)
         direct_candidates = _collect_scripts_for_packages(scripts_file_names, package_names, p_is_rollback=False)
 
-        # Generate + write rollback scripts
+        # 3) BEFORE cherry-pick: generate rollback scripts from current files and store in memory
+        rollback_scripts_in_memory: dict[str, tuple[str, str]] = {}
         for pkg, (_, _, script_number, branch_name) in rollback_candidates.items():
             out_name, out_text = _create_script_file(layout, pkg, script_number, branch_name, p_is_rollback=True)
+            rollback_scripts_in_memory[pkg] = (out_name, out_text)
+            _log(f"Rollback script prepared in memory: {out_name}")
+
+        # 4) Cherry-pick commits to current branch
+        if commit_ids:
+            _cherry_pick_commits(layout.repo_root, branch, commit_ids)
+
+        # 5) Write rollback scripts from memory (old package versions)
+        for pkg, (out_name, out_text) in rollback_scripts_in_memory.items():
             _write_script(layout, out_name, out_text)
             result["rollback_scripts_written"] += 1
 
-        # Generate + write direct scripts
+        # 6) Generate + write direct scripts from new files (after cherry-pick)
         for pkg, (_, _, script_number, branch_name) in direct_candidates.items():
             out_name, out_text = _create_script_file(layout, pkg, script_number, branch_name, p_is_rollback=False)
             _write_script(layout, out_name, out_text)
