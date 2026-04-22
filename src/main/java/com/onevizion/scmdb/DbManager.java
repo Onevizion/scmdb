@@ -1,8 +1,10 @@
 package com.onevizion.scmdb;
 
+import com.onevizion.scmdb.exception.ScmdbException;
 import com.onevizion.scmdb.exception.ScriptExecException;
 import com.onevizion.scmdb.facade.DbScriptFacade;
 import com.onevizion.scmdb.vo.*;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.BufferedReader;
@@ -78,6 +80,37 @@ public class DbManager {
         scriptExecutor.showInvalidObjects();
     }
 
+    public void runBackport(BackportRunner backportRunner) {
+        BackportResult result = backportRunner.run();
+
+        if (result.getWarnings() != null) {
+            for (String warning : result.getWarnings()) {
+                logger.warn("Backport warning: {}", ColorLogger.Color.YELLOW, warning);
+            }
+        }
+
+        if (StringUtils.isNotEmpty(result.getError())) {
+            throw new ScmdbException("Backport pipeline error: " + result.getError());
+        }
+
+        logger.info("Backport: {} scripts written, {} rollback scripts written",
+                GREEN, result.getScriptsWritten(), result.getRollbackScriptsWritten());
+
+        if (!result.isShouldRunScmdb()) {
+            logger.info("Backport: no SCMDB execution needed.");
+            return;
+        }
+
+        scriptsFacade.init();
+
+        updateDb();
+
+        generateDdlForNewOrChangedScripts();
+
+        logger.info("\nBackport completed successfully. Scripts written: {}, Rollback scripts written: {}",
+                GREEN, result.getScriptsWritten(), result.getRollbackScriptsWritten());
+    }
+
     private void executeNewScripts() {
         List<SqlScript> newScripts = scriptsFacade.getNotExecutedScripts();
         if (newScripts.isEmpty()) {
@@ -90,7 +123,7 @@ public class DbManager {
         List<SqlScript> newRollbackScripts = sortScriptsInExecutionOrder(newScripts, ROLLBACK);
         scriptsFacade.batchCreate(newRollbackScripts);
 
-        if (appArguments.isExecuteScripts()) {
+        if (appArguments.isExecuteScripts() || appArguments.isBackport()) {
             logger.info(SCRIPTS_TO_EXEC_MSG, appArguments.getDbCredentials(OWNER).getSchemaWithUrlBeforeDot());
             newCommitScripts.forEach(script -> logger.info(script.getName()));
             newCommitScripts.forEach(script -> {

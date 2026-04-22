@@ -39,7 +39,7 @@ public class DbScriptFacade {
 
     public void init() {
         execDir = new File(appArguments.getScriptsDirectory().getAbsolutePath() + File.separator + EXEC_FOLDER_NAME);
-        scriptsInDir = createScriptsFromFiles(appArguments.isGenDdl() || !appArguments.isOmitChanged());
+        scriptsInDir = createScriptsFromFiles(appArguments.isReadAllFilesContent());
     }
 
     public List<SqlScript> getNotExecutedScripts() {
