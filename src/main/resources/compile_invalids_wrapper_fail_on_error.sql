@@ -5,6 +5,22 @@ set VERIFY OFF
 SET SERVEROUTPUT ON SIZE UNLIMITED
 SET SQLBLANKLINES ON
 
+-- Enable modifications to locked package components if parameter &2 = 1
+-- Only applies to regular scripts in the OWNER schema (non-packages, non-scripts in _SCHEMA)
+-- Note: No need to explicitly disable after script execution. The session variable will be automatically reset when the session ends.
+begin
+    if '&2' = '1' then
+        begin
+            pkg_audit_comp.enable_locked_component_mods;
+        exception
+            when others then
+                dbms_output.put_line('WARNING: Package PKG_AUDIT_COMP is INVALID - unable to enable locked component modifications.');
+                dbms_output.put_line('Please handle component updates manually in the script or try to recompile the package.');
+        end;
+    end if;
+end;
+/
+
 @@ &1
 
 set serveroutput on
