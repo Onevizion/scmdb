@@ -97,10 +97,10 @@ public class SqlScriptExecutor {
             executor.setScriptRunnerContext(ctx);
 
             // Pass parameter: 1 = enable pkg_audit_comp (regular script), 0 = don't enable (package script)
-            String enablePkgAudit = (!isPackageScript && script.getSchemaType().isCompileInvalids()) ? "1" : "0";
+            String enableLockedCompsMod = (!isPackageScript && script.getSchemaType().isCompileInvalids()) ? "1" : "0";
             executor.setStmt(String.format(SQL_COMMAND, wrapperScriptFile.getAbsolutePath(),
                                            script.getFile().getAbsolutePath(),
-                                           enablePkgAudit));
+                                           enableLockedCompsMod));
 
             Instant start = Instant.now();
             executor.run();
