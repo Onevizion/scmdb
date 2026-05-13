@@ -5,11 +5,13 @@ set VERIFY OFF
 SET SERVEROUTPUT ON SIZE UNLIMITED
 SET SQLBLANKLINES ON
 
+DEFINE WRAPPER_ENABLE_LOCKED_COMPONENT_MODS = &2
+
 -- Enable modifications to locked package components if parameter &2 = 1
 -- Only applies to regular scripts in the OWNER schema (non-packages, non-scripts in _SCHEMA)
 -- Note: No need to explicitly disable after script execution. The session variable will be automatically reset when the session ends.
 begin
-    if '&2' = '1' then
+    if '&WRAPPER_ENABLE_LOCKED_COMPONENT_MODS' = '1' then
         begin
             pkg_audit_comp.enable_locked_component_mods;
         exception
@@ -21,6 +23,8 @@ begin
 end;
 /
 
+UNDEFINE 2
+
 @@ &1
 
 set serveroutput on
@@ -28,7 +32,6 @@ set FEEDBACK OFF
 declare
   v_invalid_cnt             number;
   v_invalid_cnt_prev        number;
-  v_cnt                     number;
   v_invalid_cnt_not_changed boolean := false;
   v_sql                     varchar2(2000);
 begin

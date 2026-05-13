@@ -74,7 +74,7 @@ public class SqlScriptExecutor {
     }
 
     public int execute(SqlScript script) {
-        boolean isPackageScript = isPackageScript(script);
+        boolean isPackageScript = script.getSchemaType().isCompileInvalids() && isPackageScript(script);
         File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType().isCompileInvalids(),
                                                      appArguments.isIgnoreErrors(),
                                                      script.getFile().getParentFile());

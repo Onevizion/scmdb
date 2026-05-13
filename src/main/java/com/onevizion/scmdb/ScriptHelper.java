@@ -11,10 +11,15 @@ import java.util.regex.Pattern;
 public class ScriptHelper {
 
     public static String removeSpecialFromScriptText(String scriptText) {
+        // Remove SQL single-line comments (-- ...)
         scriptText = scriptText.replaceAll("--.*\r*\n", "");
+        // Remove SQL multi-line comments (/* ... */)
         scriptText = scriptText.replaceAll("/\\*([\\s\\S]*?)\\*/", "");
+        // Replace newlines with single space
         scriptText = scriptText.replaceAll("\n+", " ");
+        // Replace multiple whitespaces with single space
         scriptText = scriptText.replaceAll("\\s\\s+", " ");
+        // Remove quotes
         scriptText = scriptText.replaceAll("\"", "");
         return scriptText.toLowerCase();
     }
@@ -27,15 +32,11 @@ public class ScriptHelper {
 
                 String keywordRegexp = keyword + "\\s+\\w+";
                 matcher = Pattern.compile(keywordRegexp).matcher(scriptText);
-                if (!matcher.find()) {
-                    continue;
-                }
-                scriptText = scriptText.replaceAll(keywordRegexp, "");
-                matcher.reset();
                 while (matcher.find()) {
                     String objectName = matcher.group().replaceFirst(keyword + "\\s", "");
                     dbObjects.add(new DbObject(objectName, dbObjectType));
                 }
+                scriptText = scriptText.replaceAll(keywordRegexp, "");
             }
         }
 
