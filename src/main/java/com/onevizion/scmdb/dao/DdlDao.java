@@ -8,6 +8,9 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
 
 import static com.onevizion.scmdb.vo.DbObjectType.*;
 
@@ -165,6 +168,131 @@ public class DdlDao extends AbstractDaoOra {
                 "    from user_objects where object_name = upper(:objName) and object_type = upper(:objType)";
         String boolStr = namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);
         return Boolean.valueOf(boolStr);
+    }
+
+    public boolean isStaticReferenceTable(String tableName) {
+        MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
+        String sql = "select case when count(*) = 1 then 'true' else 'false' end" +
+                "  from user_tables t" +
+                " where t.table_name = upper(:tableName)" +
+                "   and not exists (select 1 from user_tab_columns c" +
+                "                    where c.table_name = t.table_name and c.column_name = 'PROGRAM_ID')";
+        String boolStr = namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);
+        return Boolean.valueOf(boolStr);
+    }
+
+    public List<String> getPrimaryKeyColumns(String tableName) {
+        MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
+        String sql = "select cols.column_name" +
+                "  from user_constraints cons" +
+                "  join user_cons_columns cols on cols.constraint_name = cons.constraint_name" +
+                " where cons.table_name = upper(:tableName)" +
+                "   and cons.constraint_type = 'P'" +
+                " order by cols.position";
+        return namedParameterJdbcTemplate.queryForList(sql, namedParams, String.class);
+    }
+
+    public List<String> getLookupColumns(String tableName, List<String> excludedColumns) {
+        MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
+        String sql = "select column_name" +
+                "  from user_tab_columns" +
+                " where table_name = upper(:tableName)" +
+                "   and data_type in ('VARCHAR2', 'CHAR', 'NVARCHAR2', 'NCHAR')" +
+                " order by case when column_name like '%NAME%' then 0" +
+                "               when column_name like '%CODE%' then 1" +
+                "               when column_name like '%TYPE%' then 2" +
+                "               else 3" +
+                "           end, " +
+                "           column_id";
+        return namedParameterJdbcTemplate.queryForList(sql, namedParams, String.class)
+                                         .stream()
+                                         .filter(columnName -> !excludedColumns.contains(columnName))
+                                         .toList();
+    }
+
+    public List<Map<String, Object>> loadReferenceData(String tableName, String pkColumn, String lookupColumn) {
+        tableName = sanitizeIdentifier(tableName);
+        pkColumn = sanitizeIdentifier(pkColumn);
+        lookupColumn = sanitizeIdentifier(lookupColumn);
+
+        String sql = String.format("select %s as id, %s as name from %s order by %s",
+                                   pkColumn, lookupColumn, tableName, pkColumn);
+        return jdbcTemplate.query(sql, (rs, rowNum) -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", rs.getObject("id"));
+            row.put("name", rs.getObject("name"));
+            return row;
+        });
+    }
+
+    public List<Map<String, Object>> loadComponentStructureRows() {
+        String sql = "select c.component_id," +
+                " c.component," +
+                " c.main_table," +
+                " c.support_bpl," +
+                " c.support_audit," +
+                " c.component_name_column," +
+                " c.component_label_id," +
+                " c.grid_page_id," +
+                " t.component_table_id," +
+                " t.table_name," +
+                " t.tmp_table_name," +
+                " t.un_constr_name," +
+                " t.trigger_name" +
+                " from v_component c" +
+                " left join v_component_table t on t.component_id = c.component_id" +
+                " order by c.component, t.table_name";
+        return jdbcTemplate.query(sql, (rs, rowNum) -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("component_id", rs.getObject("component_id"));
+            row.put("component", rs.getObject("component"));
+            row.put("main_table", rs.getObject("main_table"));
+            row.put("support_bpl", rs.getObject("support_bpl"));
+            row.put("support_audit", rs.getObject("support_audit"));
+            row.put("component_name_column", rs.getObject("component_name_column"));
+            row.put("component_label_id", rs.getObject("component_label_id"));
+            row.put("grid_page_id", rs.getObject("grid_page_id"));
+            row.put("component_table_id", rs.getObject("component_table_id"));
+            row.put("table_name", rs.getObject("table_name"));
+            row.put("tmp_table_name", rs.getObject("tmp_table_name"));
+            row.put("un_constr_name", rs.getObject("un_constr_name"));
+            row.put("trigger_name", rs.getObject("trigger_name"));
+            return row;
+        });
+    }
+
+    public List<Map<String, Object>> getTableForeignKeys(String tableName) {
+        MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
+        String sql = "select ac.constraint_name," +
+                " ac.table_name as from_table," +
+                " acc.column_name as from_column," +
+                " r_ac.table_name as to_table," +
+                " r_acc.column_name as to_column" +
+                " from user_constraints ac" +
+                " join user_cons_columns acc on ac.constraint_name = acc.constraint_name" +
+                " join user_constraints r_ac on ac.r_constraint_name = r_ac.constraint_name" +
+                " join user_cons_columns r_acc on r_ac.constraint_name = r_acc.constraint_name" +
+                " and acc.position = r_acc.position" +
+                " where ac.constraint_type = 'R'" +
+                " and ac.table_name = upper(:tableName)" +
+                " order by ac.constraint_name, acc.position";
+        return namedParameterJdbcTemplate.query(sql, namedParams, (rs, rowNum) -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("constraint_name", rs.getObject("constraint_name"));
+            row.put("from_table", rs.getObject("from_table"));
+            row.put("from_column", rs.getObject("from_column"));
+            row.put("to_table", rs.getObject("to_table"));
+            row.put("to_column", rs.getObject("to_column"));
+            return row;
+        });
+    }
+
+    private String sanitizeIdentifier(String identifier) {
+        String sanitized = identifier.toUpperCase(Locale.ROOT);
+        if (!sanitized.matches("[A-Z][A-Z0-9_$#]*")) {
+            throw new IllegalArgumentException("Unsafe DB identifier: " + identifier);
+        }
+        return sanitized;
     }
 
 }

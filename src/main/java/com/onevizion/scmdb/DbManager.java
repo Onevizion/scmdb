@@ -38,6 +38,9 @@ public class DbManager {
     private DdlGenerator ddlGenerator;
 
     @Autowired
+    private JsonSchemaGenerator jsonSchemaGenerator;
+
+    @Autowired
     private AppArguments appArguments;
 
     @Autowired
@@ -251,6 +254,7 @@ public class DbManager {
         Set<DbObject> changedDbObjects = findChangedDbObjects(scriptsToGenDdl);
         ddlGenerator.executeSettingTransformParams();
         ddlGenerator.generateDdls(changedDbObjects, false);
+        jsonSchemaGenerator.generateSchemas(changedDbObjects);
     }
 
     private Set<DbObject> findChangedDbObjects(List<SqlScript> scripts) {
@@ -302,6 +306,11 @@ public class DbManager {
 
         ddlGenerator.executeSettingTransformParams();
         ddlGenerator.generateDllsForAllDbObjects();
+        jsonSchemaGenerator.generateSchemasForAllTables();
+    }
+
+    public void generateJsonSchemasForAllTables() {
+        jsonSchemaGenerator.generateSchemasForAllTables();
     }
 
     /**

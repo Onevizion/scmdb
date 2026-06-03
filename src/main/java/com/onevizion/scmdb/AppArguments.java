@@ -19,6 +19,8 @@ import static java.util.Arrays.asList;
 public class AppArguments {
     private File scriptsDirectory;
     private File ddlsDirectory;
+    private File jsonSchemasDirectory;
+    private File componentStructuresDirectory;
     private Map<SchemaType, DbCnnCredentials> credentials = new HashMap<>();
     private boolean genDdl;
     private boolean executeScripts;
@@ -28,9 +30,12 @@ public class AppArguments {
     private boolean ignoreErrors = false;
     private boolean forceDisableJobs = false;
     private boolean backport = false;
+    private boolean genAllSchemas = false;
     private String ghToken;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
+    private final static String JSON_SCHEMAS_DIRECTORY_NAME = "json";
+    private final static String COMPONENT_STRUCTURES_DIRECTORY_NAME = "json-component-structures";
 
     private AppArguments() {}
 
@@ -50,6 +55,7 @@ public class AppArguments {
         OptionSpec execOption = parser.acceptsAll(asList("e", "exec"));
         OptionSpec genDdlOption = parser.acceptsAll(asList("d", "gen-ddl"));
         OptionSpec allOption = parser.acceptsAll(asList("a", "all"));
+        OptionSpec genAllSchemasOption = parser.accepts("gen-all-schemas");
         OptionSpec noColorOption = parser.acceptsAll(asList("n", "no-color"));
         OptionSpec omitChangedOption = parser.acceptsAll(asList("o", "omit-changed"));
         OptionSpec ignoreErrorsOption = parser.acceptsAll(asList("i", "ignore-errors"));
@@ -74,26 +80,47 @@ public class AppArguments {
             throw new IllegalArgumentException("Path [" + scriptsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
                     " [--scripts-dir] should contains absolute path and points to scripts directory");
         }
-        if(options.has(genDdlOption) || options.has(backportOption)){
+        if(options.has(genDdlOption) || options.has(genAllSchemasOption) || options.has(backportOption)){
             ddlsDirectory = new File(scriptsDirectory.getParentFile().getAbsolutePath() + File.separator +
                     DDL_DIRECTORY_NAME);
             if (!ddlsDirectory.exists() || !ddlsDirectory.isDirectory()) {
                 throw new IllegalArgumentException("Path [" + ddlsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
                         " Can't find ddl directory");
             }
+            jsonSchemasDirectory = new File(scriptsDirectory.getParentFile().getAbsolutePath() + File.separator +
+                                            JSON_SCHEMAS_DIRECTORY_NAME);
+            componentStructuresDirectory = new File(scriptsDirectory.getParentFile().getAbsolutePath() + File.separator +
+                                                    COMPONENT_STRUCTURES_DIRECTORY_NAME);
+            if (!jsonSchemasDirectory.exists() && !jsonSchemasDirectory.mkdirs()) {
+                throw new IllegalArgumentException("Can't create json schemas directory [" +
+                                                   jsonSchemasDirectory.getAbsolutePath() + "]");
+            }
+            if (!jsonSchemasDirectory.isDirectory()) {
+                throw new IllegalArgumentException("Path [" + jsonSchemasDirectory.getAbsolutePath() +
+                                                   "] isn't a directory.");
+            }
+            if (!componentStructuresDirectory.exists() && !componentStructuresDirectory.mkdirs()) {
+                throw new IllegalArgumentException("Can't create component structures directory [" +
+                                                   componentStructuresDirectory.getAbsolutePath() + "]");
+            }
+            if (!componentStructuresDirectory.isDirectory()) {
+                throw new IllegalArgumentException("Path [" + componentStructuresDirectory.getAbsolutePath() +
+                                                   "] isn't a directory.");
+            }
         }
 
-        if (options.has(execOption) && options.has(genDdlOption)) {
+        if (options.has(execOption) && (options.has(genDdlOption) || options.has(genAllSchemasOption))) {
             throw new IllegalArgumentException("You can't specify both --gen-ddl and --exec arguments. Choose one.");
         }
 
-        if (options.has(backportOption) && (options.has(execOption) || options.has(genDdlOption))) {
+        if (options.has(backportOption) && (options.has(execOption) || options.has(genDdlOption) || options.has(genAllSchemasOption))) {
             throw new IllegalArgumentException("--backport cannot be combined with --exec or --gen-ddl.");
         }
 
         executeScripts = options.has(execOption);
         genDdl = options.has(genDdlOption);
         all = options.has(allOption);
+        genAllSchemas = options.has(genAllSchemasOption);
         useColorLogging = !options.has(noColorOption);
         omitChanged = options.has(omitChangedOption);
         ignoreErrors = options.has(ignoreErrorsOption);
@@ -150,6 +177,14 @@ public class AppArguments {
         return ddlsDirectory;
     }
 
+    public File getJsonSchemasDirectory() {
+        return jsonSchemasDirectory;
+    }
+
+    public File getComponentStructuresDirectory() {
+        return componentStructuresDirectory;
+    }
+
     public DbCnnCredentials getDbCredentials(SchemaType schemaType) {
         return credentials.get(schemaType);
     }
@@ -188,6 +223,10 @@ public class AppArguments {
 
     public boolean isBackport() {
         return backport;
+    }
+
+    public boolean isGenAllSchemas() {
+        return genAllSchemas;
     }
 
     public String getGhToken() {
