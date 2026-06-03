@@ -261,6 +261,17 @@ public class DdlDao extends AbstractDaoOra {
         });
     }
 
+    public List<String> loadConfigurationTableNames() {
+        String sql = "select main_table as table_name" +
+                " from v_component" +
+                " where main_table is not null" +
+                " union" +
+                " select table_name" +
+                " from v_component_table" +
+                " where table_name is not null";
+        return jdbcTemplate.queryForList(sql, String.class);
+    }
+
     public List<Map<String, Object>> getTableForeignKeys(String tableName) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
         String sql = "select ac.constraint_name," +

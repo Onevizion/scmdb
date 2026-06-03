@@ -44,16 +44,29 @@ public class JsonSchemaGenerator {
         if (tableNames.isEmpty()) {
             logger.info("No changed tables found for JSON schema generation");
         } else {
-            runPythonGenerator(false, tableNames);
-            staticDataSchemaEnricher.enrichSchemas(tableNames);
+            Set<String> generatedTableNames = runPythonGenerator(false, tableNames);
+            staticDataSchemaEnricher.enrichSchemas(generatedTableNames);
         }
         componentStructureGenerator.generate();
     }
 
     public void generateSchemasForAllTables() {
-        runPythonGenerator(true, Set.of());
-        staticDataSchemaEnricher.enrichAllSchemas();
+        Set<String> tableNames = resolveConfigurationTableNames();
+        if (tableNames.isEmpty()) {
+            logger.info("No configuration tables found for JSON schema generation");
+        } else {
+            Set<String> generatedTableNames = runPythonGenerator(false, tableNames, true);
+            staticDataSchemaEnricher.enrichSchemas(generatedTableNames);
+        }
         componentStructureGenerator.generate();
+    }
+
+    private Set<String> resolveConfigurationTableNames() {
+        return ddlDao.loadConfigurationTableNames()
+                     .stream()
+                     .filter(StringUtils::isNotBlank)
+                     .map(name -> name.toUpperCase(Locale.ROOT))
+                     .collect(Collectors.toCollection(TreeSet::new));
     }
 
     private Set<String> resolveTableNames(Collection<DbObject> dbObjects) {
@@ -78,8 +91,13 @@ public class JsonSchemaGenerator {
         return null;
     }
 
-    private void runPythonGenerator(boolean all, Set<String> tableNames) {
+    private Set<String> runPythonGenerator(boolean all, Set<String> tableNames) {
+        return runPythonGenerator(all, tableNames, false);
+    }
+
+    private Set<String> runPythonGenerator(boolean all, Set<String> tableNames, boolean includeReferences) {
         File tempDir = null;
+        Set<String> generatedTableNames = new TreeSet<>();
         try {
             tempDir = Files.createTempDirectory("scmdb_json_schema_").toFile();
             File generator = extractResource(GENERATOR_RESOURCE, tempDir);
@@ -98,8 +116,11 @@ public class JsonSchemaGenerator {
                 command.add("--tables");
                 command.add(String.join(",", tableNames));
             }
+            if (includeReferences) {
+                command.add("--include-refs");
+            }
 
-            logger.info("Generating JSON schemas{}", GREEN, all ? " for all tables" : " for changed tables");
+            logger.info("Generating JSON schemas{}", GREEN, all ? " for all tables" : " for selected tables");
             Process process = new ProcessBuilder(command)
                     .redirectErrorStream(true)
                     .start();
@@ -109,6 +130,7 @@ public class JsonSchemaGenerator {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     logger.info(line, chooseColor(line));
+                    collectGeneratedTableName(line, generatedTableNames);
                 }
             }
 
@@ -116,12 +138,24 @@ public class JsonSchemaGenerator {
             if (exitCode != 0) {
                 throw new RuntimeException("JSON schema generator failed with exit code " + exitCode);
             }
+            return generatedTableNames;
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException("Failed to generate JSON schemas: " + e.getMessage(), e);
         } finally {
             if (tempDir != null) {
                 FileUtils.deleteQuietly(tempDir);
             }
+        }
+    }
+
+    private void collectGeneratedTableName(String line, Set<String> generatedTableNames) {
+        if (!line.startsWith("  OK")) {
+            return;
+        }
+
+        String[] parts = line.trim().split("\\s+");
+        if (parts.length >= 2) {
+            generatedTableNames.add(parts[1].toUpperCase(Locale.ROOT));
         }
     }
 

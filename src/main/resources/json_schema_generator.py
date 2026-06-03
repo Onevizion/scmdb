@@ -14,6 +14,7 @@ def parse_args():
     parser.add_argument("--output-dir", required=True, help="Directory where *.schema.json files will be written")
     parser.add_argument("--tables", default="", help="Comma-separated table names to generate")
     parser.add_argument("--all", action="store_true", help="Generate schemas for all table DDL files")
+    parser.add_argument("--include-refs", action="store_true", help="Also generate schemas referenced by selected tables")
     return parser.parse_args()
 
 
@@ -25,6 +26,32 @@ def table_names(args, tables_dir):
 
 def is_temporary_table(ddl_text):
     return re.search(r"\bCREATE\s+GLOBAL\s+TEMPORARY\s+TABLE\b", ddl_text, re.IGNORECASE) is not None
+
+
+def referenced_table_names(schema):
+    refs = set()
+    for prop in schema.get("properties", {}).values():
+        if not isinstance(prop, dict):
+            continue
+
+        ref = prop.get("$ref")
+        if not ref or "/" in ref or not ref.endswith(".schema.json"):
+            continue
+
+        refs.add(ref[:-len(".schema.json")].upper())
+    return refs
+
+
+def ddl_file_for_table(tables_dir, table_name):
+    lower_path = tables_dir / f"{table_name.lower()}.sql"
+    if lower_path.exists():
+        return lower_path
+
+    upper_path = tables_dir / f"{table_name}.sql"
+    if upper_path.exists():
+        return upper_path
+
+    return lower_path
 
 
 def main():
@@ -43,13 +70,23 @@ def main():
         print("No tables to generate JSON schemas for")
         return 0
 
+    root_names = set(names)
+    pending_names = list(names)
+    queued_names = set(names)
+    processed_names = set()
+
     generated = 0
     skipped = 0
     failed = 0
 
     print(f"Generating JSON schemas into {output_dir}")
-    for table_name in names:
-        ddl_file = tables_dir / f"{table_name}.sql"
+    while pending_names:
+        table_name = pending_names.pop(0)
+        if table_name in processed_names:
+            continue
+
+        processed_names.add(table_name)
+        ddl_file = ddl_file_for_table(tables_dir, table_name)
         if not ddl_file.exists():
             print(f"  SKIP {table_name}: DDL file not found")
             skipped += 1
@@ -70,6 +107,12 @@ def main():
             output_file.write_text(json.dumps(schema, indent=2, ensure_ascii=False), encoding="utf-8")
             print(f"  OK   {table_name} -> {output_file.name}")
             generated += 1
+
+            if args.include_refs and table_name in root_names:
+                for ref_table_name in sorted(referenced_table_names(schema)):
+                    if ref_table_name not in queued_names:
+                        queued_names.add(ref_table_name)
+                        pending_names.append(ref_table_name)
         except Exception as exc:
             print(f"  FAIL {table_name}: {exc}", file=sys.stderr)
             failed += 1
