@@ -229,8 +229,12 @@ def _cherry_pick_commits(p_repo_root: str, p_remote_branch_name: str, p_commit_i
     if not p_commit_ids:
         return
 
-    # Fetch branch to ensure commits exist locally
-    _run_git(p_repo_root, ["fetch", "origin", p_remote_branch_name])
+    # Try to fetch the feature branch, fallback to master if branch doesn't exist
+    try:
+        _run_git(p_repo_root, ["fetch", "origin", p_remote_branch_name])
+    except RuntimeError:
+        _log(f"Branch '{p_remote_branch_name}' not found, fetching master instead")
+        _run_git(p_repo_root, ["fetch", "origin", "master"])
 
     original_head = _run_git(p_repo_root, ["rev-parse", "HEAD"]).strip()
 
