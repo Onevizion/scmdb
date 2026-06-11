@@ -278,8 +278,8 @@ project.properties.setProperty('git.commit.id', 'git rev-parse --short HEAD'.exe
 
     <repositories>
         <repository>
-            <id>local-maven-repo</id>
-            <url>file:///${project.basedir}/local-maven-repo</url>
+            <id>scmdb</id>
+            <url>https://maven.pkg.github.com/Onevizion/scmdb</url>
         </repository>
     </repositories>
 
