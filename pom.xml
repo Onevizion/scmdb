@@ -127,7 +127,7 @@
         <dependency>
             <groupId>com.oracle.database.xml</groupId>
             <artifactId>xmlparserv2_sans_jaxp_services</artifactId>
-            <version>21.5.0.0</version>
+            <version>21.21.0.0</version>
         </dependency>
 
         <dependency>
