@@ -81,6 +81,7 @@ jobs:
           archive: false
 
   deploy-container:
+    name: Deploy container image
     needs:
       - deploy-maven
     runs-on: ubuntu-latest
