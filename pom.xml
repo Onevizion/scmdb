@@ -147,6 +147,12 @@
             <artifactId>xmlparserv2_sans_jaxp_services</artifactId>
             <version>25.3.0</version>
         </dependency>
+
+        <dependency>
+            <groupId>oracle.sqlcl</groupId>
+            <artifactId>xdb</artifactId>
+            <version>25.3.0</version>
+        </dependency>
     </dependencies>
 
     <build>
