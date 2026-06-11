@@ -126,21 +126,39 @@
         </dependency>
 
         <dependency>
-            <groupId>com.oracle.database.xml</groupId>
-            <artifactId>xmlparserv2_sans_jaxp_services</artifactId>
-            <version>21.21.0.0</version>
+            <groupId>oracle.sqlcl</groupId>
+            <artifactId>ucp11</artifactId>
+            <version>25.3.0</version>
         </dependency>
 
         <dependency>
-            <groupId>com.oracle.jdbc</groupId>
-            <artifactId>orai18n-mapping</artifactId>
-            <version>21.0.0</version>
+            <groupId>oracle.sqlcl</groupId>
+            <artifactId>ojdbc11</artifactId>
+            <version>25.3.0</version>
         </dependency>
 
         <dependency>
-            <groupId>oracle.dbtools</groupId>
+            <groupId>oracle.sqlcl</groupId>
             <artifactId>dbtools-common</artifactId>
-            <version>21.1.0</version>
+            <version>25.3.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>oracle.sqlcl</groupId>
+            <artifactId>dbtools-core</artifactId>
+            <version>25.3.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>oracle.sqlcl</groupId>
+            <artifactId>dbtools-arbori</artifactId>
+            <version>25.3.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>oracle.sqlcl</groupId>
+            <artifactId>xmlparserv2_sans_jaxp_services</artifactId>
+            <version>25.3.0</version>
         </dependency>
     </dependencies>
 
