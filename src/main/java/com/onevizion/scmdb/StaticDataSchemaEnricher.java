@@ -64,44 +64,88 @@ public class StaticDataSchemaEnricher {
         try {
             ObjectNode schema = (ObjectNode) mapper.readTree(schemaFile);
             ObjectNode properties = (ObjectNode) schema.get("properties");
-            if (properties == null || properties.has("PROGRAM_ID") || !ddlDao.isStaticReferenceTable(tableName)) {
+            if (properties == null) {
                 return;
             }
 
             List<String> pkColumns = ddlDao.getPrimaryKeyColumns(tableName);
             if (pkColumns.size() != 1) {
-                logger.info("  SKIP static data {}: primary key is not single-column", YELLOW, tableName);
-                return;
-            }
-
-            List<String> lookupColumns = ddlDao.getLookupColumns(tableName, pkColumns);
-            if (lookupColumns.isEmpty()) {
-                logger.info("  SKIP static data {}: lookup column was not found", YELLOW, tableName);
+                logger.info("  SKIP reference data {}: primary key is not single-column", YELLOW, tableName);
                 return;
             }
 
             String pkColumn = pkColumns.get(0);
-            String lookupColumn = lookupColumns.get(0);
-            List<Map<String, Object>> rows = ddlDao.loadReferenceData(tableName, pkColumn, lookupColumn);
-
-            ObjectNode referenceData = mapper.createObjectNode();
-            referenceData.put("type", "static");
-            referenceData.put("pk_column", pkColumn);
-            ArrayNode lookupColumnsNode = referenceData.putArray("lookup_columns");
-            lookupColumnsNode.add(lookupColumn);
-            ArrayNode data = referenceData.putArray("data");
-            for (Map<String, Object> row : rows) {
-                ObjectNode item = data.addObject();
-                item.set("id", mapper.valueToTree(row.get("id")));
-                item.put("name", row.get("name") == null ? null : String.valueOf(row.get("name")));
+            if (ddlDao.isStaticReferenceTable(tableName)) {
+                enrichStaticReferenceData(tableName, schemaFile, schema, pkColumns, pkColumn);
+                return;
             }
 
-            schema.set("x-reference-data", referenceData);
-            mapper.writeValue(schemaFile, schema);
-            logger.info("  OK static data {}: {} values", GREEN, tableName, rows.size());
+            enrichComponentReferenceData(tableName, schemaFile, schema, properties, pkColumns, pkColumn);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to enrich JSON schema with static data: " + schemaFile.getAbsolutePath(), e);
+            throw new RuntimeException("Failed to enrich JSON schema with reference data: " + schemaFile.getAbsolutePath(), e);
         }
+    }
+
+    private void enrichStaticReferenceData(
+            String tableName,
+            File schemaFile,
+            ObjectNode schema,
+            List<String> pkColumns,
+            String pkColumn
+    ) throws IOException {
+        List<String> lookupColumns = ddlDao.getLookupColumns(tableName, pkColumns);
+        if (lookupColumns.isEmpty()) {
+            logger.info("  SKIP static data {}: lookup column was not found", YELLOW, tableName);
+            return;
+        }
+
+        String lookupColumn = lookupColumns.get(0);
+        List<Map<String, Object>> rows = ddlDao.loadReferenceData(tableName, pkColumn, lookupColumn);
+
+        ObjectNode referenceData = createReferenceData("static", pkColumn, lookupColumn);
+        ArrayNode data = referenceData.putArray("data");
+        for (Map<String, Object> row : rows) {
+            ObjectNode item = data.addObject();
+            item.set("id", mapper.valueToTree(row.get("id")));
+            item.put("name", row.get("name") == null ? null : String.valueOf(row.get("name")));
+        }
+
+        schema.set("x-reference-data", referenceData);
+        mapper.writeValue(schemaFile, schema);
+        logger.info("  OK static data {}: {} values", GREEN, tableName, rows.size());
+    }
+
+    private void enrichComponentReferenceData(
+            String tableName,
+            File schemaFile,
+            ObjectNode schema,
+            ObjectNode properties,
+            List<String> pkColumns,
+            String pkColumn
+    ) throws IOException {
+        String lookupColumn = ddlDao.getComponentLookupColumn(tableName);
+        if (lookupColumn == null) {
+            return;
+        }
+        if (!properties.has("PROGRAM_ID") || !properties.has(lookupColumn)) {
+            return;
+        }
+
+        ObjectNode referenceData = createReferenceData("user", pkColumn, lookupColumn);
+        referenceData.putArray("data");
+
+        schema.set("x-reference-data", referenceData);
+        mapper.writeValue(schemaFile, schema);
+        logger.info("  OK component reference data {}: lookup by {}", GREEN, tableName, lookupColumn);
+    }
+
+    private ObjectNode createReferenceData(String type, String pkColumn, String lookupColumn) {
+        ObjectNode referenceData = mapper.createObjectNode();
+        referenceData.put("type", type);
+        referenceData.put("pk_column", pkColumn);
+        ArrayNode lookupColumnsNode = referenceData.putArray("lookup_columns");
+        lookupColumnsNode.add(lookupColumn);
+        return referenceData;
     }
 
     private File schemaFile(String tableName) {

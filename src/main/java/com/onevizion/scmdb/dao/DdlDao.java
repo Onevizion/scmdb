@@ -215,8 +215,9 @@ public class DdlDao extends AbstractDaoOra {
         pkColumn = sanitizeIdentifier(pkColumn);
         lookupColumn = sanitizeIdentifier(lookupColumn);
 
-        String sql = String.format("select %s as id, %s as name from %s order by %s",
-                                   pkColumn, lookupColumn, tableName, pkColumn);
+        String whereClause = referenceDataWhereClause(tableName);
+        String sql = String.format("select %s as id, %s as name from %s%s order by %s",
+                                   pkColumn, lookupColumn, tableName, whereClause, pkColumn);
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", rs.getObject("id"));
@@ -226,21 +227,20 @@ public class DdlDao extends AbstractDaoOra {
     }
 
     public List<Map<String, Object>> loadComponentStructureRows() {
+        boolean hasBpdItemTypeId = hasColumn("V_COMPONENT", "BPD_ITEM_TYPE_ID");
         String sql = "select c.component_id," +
                 " c.component," +
                 " c.main_table," +
                 " c.support_bpl," +
                 " c.support_audit," +
                 " c.component_name_column," +
-                " c.component_label_id," +
-                " c.grid_page_id," +
                 " t.component_table_id," +
                 " t.table_name," +
-                " t.tmp_table_name," +
-                " t.un_constr_name," +
-                " t.trigger_name" +
+                (hasBpdItemTypeId ? " c.bpd_item_type_id," : " cast(null as number) as bpd_item_type_id,") +
+                (hasBpdItemTypeId ? " bit.item_type as bpd_item_type" : " cast(null as varchar2(4000)) as bpd_item_type") +
                 " from v_component c" +
                 " left join v_component_table t on t.component_id = c.component_id" +
+                (hasBpdItemTypeId ? " left join bpd_item_type bit on bit.item_type_id = c.bpd_item_type_id" : "") +
                 " order by c.component, t.table_name";
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             Map<String, Object> row = new LinkedHashMap<>();
@@ -250,15 +250,38 @@ public class DdlDao extends AbstractDaoOra {
             row.put("support_bpl", rs.getObject("support_bpl"));
             row.put("support_audit", rs.getObject("support_audit"));
             row.put("component_name_column", rs.getObject("component_name_column"));
-            row.put("component_label_id", rs.getObject("component_label_id"));
-            row.put("grid_page_id", rs.getObject("grid_page_id"));
             row.put("component_table_id", rs.getObject("component_table_id"));
             row.put("table_name", rs.getObject("table_name"));
-            row.put("tmp_table_name", rs.getObject("tmp_table_name"));
-            row.put("un_constr_name", rs.getObject("un_constr_name"));
-            row.put("trigger_name", rs.getObject("trigger_name"));
+            row.put("bpd_item_type_id", rs.getObject("bpd_item_type_id"));
+            row.put("bpd_item_type", rs.getObject("bpd_item_type"));
             return row;
         });
+    }
+
+    private String referenceDataWhereClause(String tableName) {
+        if (!"GRID_PAGE".equals(tableName)) {
+            return "";
+        }
+
+        return " where page_url is not null" +
+                " and is_tt_specific = 1" +
+                " and module_name not like 'ADMIN%'" +
+                " and security_group not like 'ADMIN%'" +
+                " and module_name not like 'BPL_EXP_IMP%'" +
+                " and module_name not like 'SELECTOR%'" +
+                " and module_name not like 'ASSIGNMENT%'";
+    }
+
+    private boolean hasColumn(String tableName, String columnName) {
+        MapSqlParameterSource namedParams = new MapSqlParameterSource()
+                .addValue("tableName", tableName)
+                .addValue("columnName", columnName);
+        String sql = "select case when count(*) > 0 then 'true' else 'false' end" +
+                " from user_tab_columns" +
+                " where table_name = upper(:tableName)" +
+                "   and column_name = upper(:columnName)";
+        String boolStr = namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);
+        return Boolean.valueOf(boolStr);
     }
 
     public List<String> loadConfigurationTableNames() {
@@ -270,6 +293,17 @@ public class DdlDao extends AbstractDaoOra {
                 " from v_component_table" +
                 " where table_name is not null";
         return jdbcTemplate.queryForList(sql, String.class);
+    }
+
+    public String getComponentLookupColumn(String tableName) {
+        MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
+        String sql = "select distinct component_name_column" +
+                " from v_component" +
+                " where main_table = upper(:tableName)" +
+                "   and component_name_column is not null" +
+                " order by component_name_column";
+        List<String> lookupColumns = namedParameterJdbcTemplate.queryForList(sql, namedParams, String.class);
+        return lookupColumns.isEmpty() ? null : lookupColumns.get(0);
     }
 
     public List<Map<String, Object>> getTableForeignKeys(String tableName) {

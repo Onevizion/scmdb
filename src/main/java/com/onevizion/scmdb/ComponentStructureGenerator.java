@@ -51,7 +51,9 @@ public class ComponentStructureGenerator {
             if (row.get("component_table_id") != null) {
                 component.tables.add(new TableData(
                         asString(row.get("table_name")),
-                        Objects.equals(asString(row.get("table_name")), component.mainTable)
+                        Objects.equals(asString(row.get("table_name")), component.mainTable),
+                        asInteger(row.get("bpd_item_type_id")),
+                        asString(row.get("bpd_item_type"))
                 ));
             }
         }
@@ -100,11 +102,10 @@ public class ComponentStructureGenerator {
         putValue(node, "main_table", component.mainTable);
         putValue(node, "support_bpl", component.supportBpl);
         putValue(node, "support_audit", component.supportAudit);
-
-        BpdData bpdData = BpdData.BY_COMPONENT_ID.get(component.componentId);
-        if (bpdData != null) {
-            putValue(node, "bpd_item_type_id", bpdData.itemTypeId);
-            putValue(node, "bpd_item_type", bpdData.itemType);
+        putValue(node, "component_name_column", component.componentNameColumn);
+        if (component.bpdItemTypeId != null) {
+            putValue(node, "bpd_item_type_id", component.bpdItemTypeId);
+            putValue(node, "bpd_item_type", component.bpdItemType);
         }
         return node;
     }
@@ -116,6 +117,7 @@ public class ComponentStructureGenerator {
             putValue(node, "table_name", table.tableName);
             putValue(node, "is_main_table", table.mainTable);
             putValue(node, "schema_file", schemaFileName(table.tableName));
+            putBpdData(node, table);
         }
         return nodes;
     }
@@ -155,6 +157,7 @@ public class ComponentStructureGenerator {
         putValue(node, "table_name", table.tableName);
         putValue(node, "schema_file", schemaFileName(table.tableName));
         putValue(node, "is_main_table", table.mainTable);
+        putBpdData(node, table);
         ArrayNode children = node.putArray("children");
 
         for (Map.Entry<String, List<RelationshipData>> entry : relationships.entrySet()) {
@@ -193,6 +196,15 @@ public class ComponentStructureGenerator {
         node.set(fieldName, mapper.valueToTree(value));
     }
 
+    private void putBpdData(ObjectNode node, TableData table) {
+        if (!table.mainTable || table.bpdItemTypeId == null) {
+            return;
+        }
+
+        putValue(node, "bpd_item_type_id", table.bpdItemTypeId);
+        putValue(node, "bpd_item_type", table.bpdItemType);
+    }
+
     private Integer asInteger(Object value) {
         if (value instanceof Number number) {
             return number.intValue();
@@ -218,6 +230,9 @@ public class ComponentStructureGenerator {
         private final String mainTable;
         private final boolean supportBpl;
         private final boolean supportAudit;
+        private final String componentNameColumn;
+        private final Integer bpdItemTypeId;
+        private final String bpdItemType;
         private final List<TableData> tables = new ArrayList<>();
 
         private ComponentData(Map<String, Object> row) {
@@ -226,10 +241,13 @@ public class ComponentStructureGenerator {
             mainTable = asString(row.get("main_table"));
             supportBpl = Objects.equals(asInteger(row.get("support_bpl")), 1);
             supportAudit = Objects.equals(asInteger(row.get("support_audit")), 1);
+            componentNameColumn = asString(row.get("component_name_column"));
+            bpdItemTypeId = asInteger(row.get("bpd_item_type_id"));
+            bpdItemType = asString(row.get("bpd_item_type"));
         }
     }
 
-    private record TableData(String tableName, boolean mainTable) {
+    private record TableData(String tableName, boolean mainTable, Integer bpdItemTypeId, String bpdItemType) {
     }
 
     private class RelationshipData {
@@ -246,28 +264,4 @@ public class ComponentStructureGenerator {
         }
     }
 
-    private record BpdData(Integer itemTypeId, String itemType) {
-        private static final Map<Integer, BpdData> BY_COMPONENT_ID = Map.ofEntries(
-                Map.entry(1, new BpdData(6, "Import")),
-                Map.entry(3, new BpdData(4, "Report")),
-                Map.entry(4, new BpdData(9, "Rule")),
-                Map.entry(5, new BpdData(31, "Config Field")),
-                Map.entry(6, new BpdData(32, "Config V_Table")),
-                Map.entry(10, new BpdData(46, "Trackor Tour")),
-                Map.entry(11, new BpdData(34, "Trackor Type")),
-                Map.entry(12, new BpdData(35, "Trackor Tree")),
-                Map.entry(13, new BpdData(8, "Security Role")),
-                Map.entry(15, new BpdData(33, "Trackor Class")),
-                Map.entry(16, new BpdData(32, "Config V_Table")),
-                Map.entry(17, new BpdData(37, "WorkFlow")),
-                Map.entry(20, new BpdData(39, "Portal View")),
-                Map.entry(22, new BpdData(40, "Notification")),
-                Map.entry(26, new BpdData(38, "Trackor Form")),
-                Map.entry(27, new BpdData(42, "DB Package")),
-                Map.entry(41, new BpdData(49, "Dashboard")),
-                Map.entry(48, new BpdData(34, "Trackor Type")),
-                Map.entry(56, new BpdData(50, "Widget Panel")),
-                Map.entry(57, new BpdData(51, "Widget"))
-        );
-    }
 }
