@@ -170,6 +170,7 @@ public class SqlScriptExecutor {
         }
 
         File tmpFile = new File(workingDir.getAbsolutePath(), System.currentTimeMillis() + "tmp.sql");
+        tmpFile.deleteOnExit();
 
         try {
             FileUtils.copyURLToFile(wrapperScript, tmpFile);
