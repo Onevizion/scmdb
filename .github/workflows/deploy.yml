@@ -14,6 +14,13 @@ jobs:
       version: ${{ steps.get_version.outputs.version }}
     runs-on: ubuntu-latest
     steps:
+      - name: Validate git ref
+        run: |
+          if [[ "${GITHUB_REF}" != "refs/heads/master" ]]; then
+            echo "Release will be performed on the master branch only. Current ref: ${GITHUB_REF}"
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v6
 
