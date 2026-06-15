@@ -77,11 +77,16 @@ public class SqlScriptExecutor {
     }
 
     public int execute(SqlScript script) {
+        File scriptsDirectory = appArguments.getScriptsDirectory();
+        if (scriptsDirectory == null) {
+            scriptsDirectory = SystemUtils.getJavaIoTmpDir();
+        }
+
         File workingDirectory;
         try {
             workingDirectory = script.getResource().isFile()
                     ? script.getResource().getFile().getParentFile()
-                    : appArguments.getScriptsDirectory();
+                    : scriptsDirectory;
         } catch (IOException e) {
             throw new RuntimeException("Unable to get script file from resource for [" + script.getResource() + "]", e);
         }
@@ -107,6 +112,7 @@ public class SqlScriptExecutor {
         } else {
             try {
                 scriptFile = Files.createTempFile("scmdb_classpath", ".sql").toFile();
+                scriptFile.deleteOnExit();
             } catch (IOException e) {
                 throw new RuntimeException(" [" + script.getResource() + "]", e);
             }
@@ -163,7 +169,7 @@ public class SqlScriptExecutor {
             }
         }
 
-        File tmpFile = new File(workingDir.getAbsolutePath() + File.separator + "tmp.sql");
+        File tmpFile = new File(workingDir.getAbsolutePath(), System.currentTimeMillis() + "tmp.sql");
 
         try {
             FileUtils.copyURLToFile(wrapperScript, tmpFile);
