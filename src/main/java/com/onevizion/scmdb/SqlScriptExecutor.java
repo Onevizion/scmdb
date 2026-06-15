@@ -9,7 +9,9 @@ import oracle.dbtools.raptor.newscriptrunner.ScriptExecutor;
 import oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.output.TeeOutputStream;
+import org.apache.commons.lang3.SystemUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.FileSystemResource;
 
 import javax.sql.DataSource;
 import java.io.BufferedOutputStream;
@@ -17,6 +19,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -74,9 +77,18 @@ public class SqlScriptExecutor {
     }
 
     public int execute(SqlScript script) {
+        File workingDirectory;
+        try {
+            workingDirectory = script.getResource().isFile()
+                    ? script.getResource().getFile().getParentFile()
+                    : appArguments.getScriptsDirectory();
+        } catch (IOException e) {
+            throw new RuntimeException("Unable to get script file from resource for [" + script.getResource() + "]", e);
+        }
+
         File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType().isCompileInvalids(),
                                                      appArguments.isIgnoreErrors(),
-                                                     script.getFile().getParentFile());
+                                                     workingDirectory);
         return execute(script, wrapperScriptFile);
     }
 
@@ -84,6 +96,21 @@ public class SqlScriptExecutor {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
                 cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
+
+        File scriptFile;
+        if (script.getResource().isFile()) {
+            try {
+                scriptFile = script.getResource().getFile();
+            } catch (IOException e) {
+                throw new RuntimeException("Unable to get File reference for [" + script.getResource() + "]", e);
+            }
+        } else {
+            try {
+                scriptFile = Files.createTempFile("scmdb_classpath", ".sql").toFile();
+            } catch (IOException e) {
+                throw new RuntimeException(" [" + script.getResource() + "]", e);
+            }
+        }
 
         try (Connection connection = getConnection(script.getSchemaType(), cnnCredentials.getSchemaName());
              ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
@@ -95,7 +122,7 @@ public class SqlScriptExecutor {
             ctx.setOutputStreamWrapper(new BufferedOutputStream(new TeeOutputStream(System.out, outputStream)));
             executor.setScriptRunnerContext(ctx);
             executor.setStmt(String.format(SQL_COMMAND, wrapperScriptFile.getAbsolutePath(),
-                                           script.getFile().getAbsolutePath()));
+                                           scriptFile.getAbsolutePath()));
 
             Instant start = Instant.now();
             executor.run();
@@ -181,6 +208,10 @@ public class SqlScriptExecutor {
 
     private void executeResourceScript(String scriptFileName, String errorMessage, boolean ignoreSqlLog) {
         File scriptsDirectory = appArguments.getScriptsDirectory();
+        if (scriptsDirectory == null) {
+            scriptsDirectory = SystemUtils.getJavaIoTmpDir();
+        }
+
         String tmpFileName = new Date().getTime() + scriptFileName;
         String tmpFilePath = scriptsDirectory.getAbsolutePath() + File.separator + tmpFileName;
         File tmpFile = new File(tmpFilePath);
@@ -194,11 +225,11 @@ public class SqlScriptExecutor {
 
         SqlScript sqlScript = new SqlScript();
         sqlScript.setName(tmpFileName);
-        sqlScript.setFile(tmpFile);
+        sqlScript.setResource(new FileSystemResource(tmpFile));
         sqlScript.setType(COMMIT);
         sqlScript.setSchemaType(OWNER);
 
-        File wrapperScriptFile = getTmpWrapperScript(false, false, sqlScript.getFile().getParentFile());
+        File wrapperScriptFile = getTmpWrapperScript(false, false, tmpFile.getParentFile());
         int exitCode = execute(sqlScript, wrapperScriptFile);
 
         tmpFile.delete();
