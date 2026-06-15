@@ -70,7 +70,10 @@ public class AppArguments {
         if (requireScriptsDirectory && (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory())) {
             throw new IllegalArgumentException("Path [" + scriptsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
                     " [--scripts-dir] should contains absolute path and points to scripts directory");
+        } else if (!requireScriptsDirectory && scriptsDirectory != null) {
+            throw new IllegalArgumentException("[--scripts-dir] parameter is not expected in this context, SCMDB has already migration scripts bundled.");
         }
+
         if(options.has(genDdlOption) || options.has(backportOption)){
             ddlsDirectory = new File(scriptsDirectory.getParentFile().getAbsolutePath() + File.separator +
                     DDL_DIRECTORY_NAME);
