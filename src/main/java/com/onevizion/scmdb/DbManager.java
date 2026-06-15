@@ -139,7 +139,7 @@ public class DbManager {
         } else {
             logger.info("You should execute following script files to update your database:");
             scriptsFacade.copyScriptsToExecDir(newCommitScripts);
-            newCommitScripts.forEach(script -> logger.info(script.getFile().getAbsolutePath()));
+            newCommitScripts.forEach(script -> logger.info("{}", script.getResource()));
             scriptsFacade.batchCreate(newCommitScripts);
         }
     }
@@ -201,8 +201,8 @@ public class DbManager {
                     throw new ScriptExecException(MessageFormat.format(SCRIPT_EXECUTION_ERROR_MESSAGE, rollback.getName()));
                 }
 
-                deletedScripts.keySet().remove(rollback.getName());
-                deletedScripts.keySet().remove(rollback.getCommitName());
+                deletedScripts.remove(rollback.getName());
+                deletedScripts.remove(rollback.getCommitName());
             }
         }
         scriptExecutor.executeCompileSchemas();
