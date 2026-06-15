@@ -1,12 +1,12 @@
 package com.onevizion.scmdb.vo;
 
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.springframework.core.io.Resource;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Objects;
@@ -23,7 +23,7 @@ public class SqlScript implements Comparable<SqlScript> {
     private String output;
     private ScriptType type;
     private ScriptStatus status;
-    private File file;
+    private Resource resource;
     private SchemaType schemaType = SchemaType.OWNER;
     private Integer orderNumber;
 
@@ -33,16 +33,16 @@ public class SqlScript implements Comparable<SqlScript> {
             Comparator.comparing(SqlScript::getOrderNumber, nullsFirst(naturalOrder()))
                       .thenComparing(SqlScript::getName);
 
-    public static SqlScript create(File scriptFile) {
-        return create(scriptFile, true);
+    public static SqlScript create(Resource scriptResource) throws IOException {
+        return create(scriptResource, true);
     }
 
-    public static SqlScript create(File scriptFile, boolean readFileContent) {
+    public static SqlScript create(Resource scriptResource, boolean readFileContent) throws IOException {
         SqlScript script = new SqlScript();
 
-        script.setFile(scriptFile);
-        script.setName(scriptFile.getName());
-        script.setTs(new Date(scriptFile.lastModified()));
+        script.resource = scriptResource;
+        script.setName(scriptResource.getFilename());
+        script.setTs(new Date(scriptResource.lastModified()));
 
         if (FilenameUtils.getBaseName(script.getName()).endsWith(ROLLBACK_SUFFIX)) {
             script.setType(ScriptType.ROLLBACK);
@@ -50,7 +50,7 @@ public class SqlScript implements Comparable<SqlScript> {
             script.setType(ScriptType.COMMIT);
         }
         script.setStatus(ScriptStatus.EXECUTED);
-        script.setSchemaType(SchemaType.getByScriptFileName(scriptFile.getName()));
+        script.setSchemaType(SchemaType.getByScriptFileName(scriptResource.getFilename()));
 
         if (readFileContent) {
             script.loadContentFromFile();
@@ -62,7 +62,7 @@ public class SqlScript implements Comparable<SqlScript> {
     public void loadContentFromFile() {
         String fileContent;
         try {
-            fileContent = FileUtils.readFileToString(file, "UTF-8");
+            fileContent = resource.getContentAsString(StandardCharsets.UTF_8);
             text = fileContent;
             fileHash = DigestUtils.sha1Hex(fileContent.replaceAll("\\r\\n", "\n"));
         } catch (IOException e) {
@@ -85,6 +85,14 @@ public class SqlScript implements Comparable<SqlScript> {
     public void setName(String name) {
         this.name = name;
         this.orderNumber = extractOrderNumber(name);
+    }
+
+    public Resource getResource() {
+        return resource;
+    }
+
+    public void setResource(Resource resource) {
+        this.resource = resource;
     }
 
     public String getFileHash() {
@@ -133,14 +141,6 @@ public class SqlScript implements Comparable<SqlScript> {
 
     public void setStatus(ScriptStatus status) {
         this.status = status;
-    }
-
-    public File getFile() {
-        return file;
-    }
-
-    public void setFile(File file) {
-        this.file = file;
     }
 
     public SchemaType getSchemaType() {
