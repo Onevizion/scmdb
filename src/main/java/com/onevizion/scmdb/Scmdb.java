@@ -1,11 +1,11 @@
 package com.onevizion.scmdb;
 
-import ch.qos.logback.classic.Logger;
 import com.onevizion.scmdb.exception.ScmdbException;
 import com.onevizion.scmdb.facade.DbScriptFacade;
 import oracle.dbtools.db.DBUtil;
 import oracle.ucp.jdbc.PoolDataSource;
 import oracle.ucp.jdbc.PoolDataSourceImpl;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
@@ -14,21 +14,22 @@ import java.util.logging.Level;
 import static com.onevizion.scmdb.vo.SchemaType.*;
 
 public class Scmdb {
-    private static final Logger logger = (Logger) LoggerFactory.getLogger("STDOUT");
 
     public static final int EXIT_CODE_ERROR = 1;
     public static final int EXIT_CODE_SUCCESS = 0;
 
+    private static final Logger LOGGER = LoggerFactory.getLogger("STDOUT");
+
     public static void main(String[] args) {
         try {
-            logger.debug("Initialize spring beans");
+            LOGGER.debug("Initialize spring beans");
             ClassPathXmlApplicationContext ctx = new ClassPathXmlApplicationContext("classpath:beans.xml");
 
             String buildInformation = ctx.getBean("buildInformation", String.class);
-            logger.info("SCMDB Build Information: [{}]", buildInformation);
+            LOGGER.info("SCMDB Build Information: [{}]", buildInformation);
 
             AppArguments appArguments = ctx.getBean(AppArguments.class);
-            appArguments.parse(args);
+            appArguments.parse(args, !ResourceResolveUtils.containsClassPathScripts());
 
             DbScriptFacade sqlScriptsFacade = ctx.getBean(DbScriptFacade.class);
             sqlScriptsFacade.init();
@@ -63,13 +64,13 @@ public class Scmdb {
                 dbManager.updateDb();
             }
         } catch (ScmdbException e) {
-            logger.error(e.getMessage());
+            LOGGER.error(e.getMessage());
             System.exit(EXIT_CODE_ERROR);
         } catch (Exception e) {
-            logger.error("Scmdb internal error", e);
+            LOGGER.error("Scmdb internal error", e);
             System.exit(EXIT_CODE_ERROR);
         }
-        logger.info("\nSCMDB complete");
+        LOGGER.info("\nSCMDB complete");
         System.exit(EXIT_CODE_SUCCESS);
     }
 }
