@@ -19,7 +19,7 @@ import static java.util.Arrays.asList;
 public class AppArguments {
     private File scriptsDirectory;
     private File ddlsDirectory;
-    private Map<SchemaType, DbCnnCredentials> credentials = new HashMap<>();
+    private final Map<SchemaType, DbCnnCredentials> credentials = new HashMap<>();
     private boolean genDdl;
     private boolean executeScripts;
     private boolean useColorLogging = true;
@@ -32,13 +32,7 @@ public class AppArguments {
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
 
-    private AppArguments() {}
-
-    public AppArguments(String[] args) {
-        parse(args);
-    }
-
-    void parse(String[] args) {
+    void parse(String[] args, boolean requireScriptsDirectory) {
         OptionParser parser = new OptionParser();
         OptionSpec<String> ownerSchemaOption = parser.accepts("owner-schema").withRequiredArg().ofType(String.class);
         OptionSpec<String> userSchemaOption = parser.accepts("user-schema").withOptionalArg().ofType(String.class);
@@ -59,8 +53,11 @@ public class AppArguments {
 
         OptionSet options = parser.parse(args);
 
-        if(!options.has(ownerSchemaOption) || !options.has(scriptsDirectoryOption)){
-            throw new IllegalArgumentException("--owner-schema and --scripts-dir are required parameters.");
+        if (!options.has(ownerSchemaOption)) {
+            throw new IllegalArgumentException("--owner-schema is required parameter.");
+        }
+        if (requireScriptsDirectory && !options.has(scriptsDirectoryOption)) {
+            throw new IllegalArgumentException("--scripts-dir is required parameter.");
         }
 
         credentials.put(OWNER, DbCnnCredentials.create(options.valueOf(ownerSchemaOption)));
@@ -70,7 +67,7 @@ public class AppArguments {
         createCredentials(PERFSTAT, options, perfstatSchemaOption);
 
         scriptsDirectory = options.valueOf(scriptsDirectoryOption);
-        if (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory()) {
+        if (requireScriptsDirectory && (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory())) {
             throw new IllegalArgumentException("Path [" + scriptsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
                     " [--scripts-dir] should contains absolute path and points to scripts directory");
         }
