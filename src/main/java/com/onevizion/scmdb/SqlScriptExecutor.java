@@ -36,7 +36,7 @@ import static oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext.ERR_ENCO
 import static org.apache.commons.lang3.time.DurationFormatUtils.formatDurationHMS;
 
 public class SqlScriptExecutor {
-    private static final String SQL_COMMAND = "@%s %s";
+    private static final String SQL_COMMAND = "@%s %s %s";
     private static final String CREATE_SQL = "create.sql";
     private static final String COMPILE_SCHEMAS_SQL = "compile_schemas.sql";
     private static final String SHOW_INVALID_OBJECTS_SQL = "check_invalid_objects.sql";
@@ -77,6 +77,7 @@ public class SqlScriptExecutor {
     }
 
     public int execute(SqlScript script) {
+        boolean isPackageScript = script.getSchemaType().isCompileInvalids() && isPackageScript(script);
         File scriptsDirectory = appArguments.getScriptsDirectory();
         if (scriptsDirectory == null) {
             scriptsDirectory = SystemUtils.getJavaIoTmpDir();
@@ -94,10 +95,10 @@ public class SqlScriptExecutor {
         File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType().isCompileInvalids(),
                                                      appArguments.isIgnoreErrors(),
                                                      workingDirectory);
-        return execute(script, wrapperScriptFile);
+        return execute(script, wrapperScriptFile, isPackageScript);
     }
 
-    private int execute(SqlScript script, File wrapperScriptFile) {
+    private int execute(SqlScript script, File wrapperScriptFile, boolean isPackageScript) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
                 cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
@@ -127,8 +128,12 @@ public class SqlScriptExecutor {
             ctx.setBaseConnection(connection);
             ctx.setOutputStreamWrapper(new BufferedOutputStream(new TeeOutputStream(System.out, outputStream)));
             executor.setScriptRunnerContext(ctx);
+
+            // Pass parameter: 1 = enable pkg_audit_comp (regular script), 0 = don't enable (package script)
+            String enableLockedCompsMod = (!isPackageScript && script.getSchemaType().isCompileInvalids()) ? "1" : "0";
             executor.setStmt(String.format(SQL_COMMAND, wrapperScriptFile.getAbsolutePath(),
-                                           scriptFile.getAbsolutePath()));
+                                           scriptFile.getAbsolutePath(),
+                                           enableLockedCompsMod));
 
             Instant start = Instant.now();
             executor.run();
@@ -179,6 +184,11 @@ public class SqlScriptExecutor {
         }
 
         return tmpFile;
+    }
+
+    private boolean isPackageScript(SqlScript script) {
+        String scriptText = script.getText();
+        return ScriptHelper.isPackageScript(scriptText);
     }
 
     public void createDbScriptTable() {
@@ -237,7 +247,7 @@ public class SqlScriptExecutor {
         sqlScript.setSchemaType(OWNER);
 
         File wrapperScriptFile = getTmpWrapperScript(false, false, tmpFile.getParentFile());
-        int exitCode = execute(sqlScript, wrapperScriptFile);
+        int exitCode = execute(sqlScript, wrapperScriptFile, false);
 
         tmpFile.delete();
 

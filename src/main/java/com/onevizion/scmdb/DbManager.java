@@ -12,8 +12,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.text.MessageFormat;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static com.onevizion.scmdb.ColorLogger.Color.CYAN;
@@ -257,42 +255,10 @@ public class DbManager {
         Set<DbObject> updatedDbObjects;
 
         updatedDbObjects = scripts.stream()
-                                  .map(script -> removeSpecialFromScriptText(script.getText()))
-                                  .flatMap(scriptText -> findChangedDbObjectsInScriptText(scriptText).stream())
+                                  .map(script -> ScriptHelper.removeSpecialFromScriptText(script.getText()))
+                                  .flatMap(scriptText -> ScriptHelper.findChangedDbObjectsInScriptText(scriptText).stream())
                                   .collect(Collectors.toSet());
         return updatedDbObjects;
-    }
-
-    private List<DbObject> findChangedDbObjectsInScriptText(String scriptText) {
-        List<DbObject> dbObjects = new ArrayList<>();
-        Matcher matcher;
-        for (DbObjectType dbObjectType : DbObjectType.values()) {
-            for (String keyword : dbObjectType.getChangeKeywords()) {
-
-                String keywordRegexp = keyword + "\\s+\\w+";
-                matcher = Pattern.compile(keywordRegexp).matcher(scriptText);
-                if (!matcher.find()) {
-                    continue;
-                }
-                scriptText = scriptText.replaceAll(keywordRegexp, "");
-                matcher.reset();
-                while (matcher.find()) {
-                    String objectName = matcher.group().replaceFirst(keyword + "\\s", "");
-                    dbObjects.add(new DbObject(objectName, dbObjectType));
-                }
-            }
-        }
-
-        return dbObjects;
-    }
-
-    private String removeSpecialFromScriptText(String scriptText) {
-        scriptText = scriptText.replaceAll("--.*\r*\n", "");
-        scriptText = scriptText.replaceAll("/\\*([\\s\\S]*?)\\*/", "");
-        scriptText = scriptText.replaceAll("\n+", " ");
-        scriptText = scriptText.replaceAll("\\s\\s+", " ");
-        scriptText = scriptText.replaceAll("\"", "");
-        return scriptText.toLowerCase();
     }
 
     public void generateDdlForAllObjects() {
