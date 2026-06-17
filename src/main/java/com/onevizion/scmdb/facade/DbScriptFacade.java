@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -209,14 +210,13 @@ public class DbScriptFacade {
 
     public void copyScriptsToExecDir(List<SqlScript> scripts) {
         for (SqlScript script : scripts) {
-            File srcFile = new File(appArguments.getScriptsDirectory()
-                                                .getAbsolutePath() + File.separator + script.getName());
             File destFile = new File(execDir.getAbsolutePath() + File.separator + script.getName());
-            try {
+
+            try (InputStream inputStream = script.getResource().getInputStream()) {
                 logger.debug("Copying new script [{}]", destFile.getAbsolutePath());
-                FileUtils.copyFile(srcFile, destFile);
+                FileUtils.copyInputStreamToFile(inputStream, destFile);
             } catch (IOException e) {
-                logger.error("Can't copy file [{}]", srcFile.getAbsolutePath(), e);
+                logger.error("Can't copy script to file [{}]", destFile.getAbsolutePath(), e);
                 throw new RuntimeException(e);
             }
         }
