@@ -14,10 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 
 import javax.sql.DataSource;
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.net.URL;
 import java.nio.file.Files;
 import java.sql.Connection;
@@ -115,7 +112,13 @@ public class SqlScriptExecutor {
                 scriptFile = Files.createTempFile("scmdb_classpath", ".sql").toFile();
                 scriptFile.deleteOnExit();
             } catch (IOException e) {
-                throw new RuntimeException(" [" + script.getResource() + "]", e);
+                throw new RuntimeException("Unable to create temporarily file for [" + script.getResource() + "]", e);
+            }
+
+            try (InputStream inputStream = script.getResource().getInputStream()) {
+                FileUtils.copyInputStreamToFile(inputStream, scriptFile);
+            } catch (IOException e) {
+                throw new RuntimeException("Unable to copy resource [" + script.getResource() + "] to temporary file [" + scriptFile + "]", e);
             }
         }
 
