@@ -44,22 +44,22 @@ public class DbScriptFacade {
     private List<SqlScript> scriptsInDir;
 
     public void init() {
-        try {
-            execDir = appArguments.getScriptsDirectory() != null
-                    ? new File(appArguments.getScriptsDirectory().getAbsolutePath(), EXEC_FOLDER_NAME)
-                    : createTempDirectory();
-        } catch (IOException e) {
-            throw new RuntimeException("Unable to create temporarily", e);
-        }
+        execDir = appArguments.getScriptsDirectory() != null
+                ? new File(appArguments.getScriptsDirectory().getAbsolutePath(), EXEC_FOLDER_NAME)
+                : createTempDirectory();
 
         scriptsInDir = createScriptsFromResources(appArguments.isReadAllFilesContent());
     }
 
-    private File createTempDirectory() throws IOException {
-        File tempDirectory = Files.createTempDirectory(EXEC_FOLDER_NAME).toFile();
-        FileUtils.forceDeleteOnExit(tempDirectory);
+    private File createTempDirectory() {
+        try {
+            File tempDirectory = Files.createTempDirectory(EXEC_FOLDER_NAME).toFile();
+            FileUtils.forceDeleteOnExit(tempDirectory);
 
-        return tempDirectory;
+            return tempDirectory;
+        } catch (IOException e) {
+            throw new RuntimeException("Unable to create temporarily directory", e);
+        }
     }
 
     public List<SqlScript> getNotExecutedScripts() {
