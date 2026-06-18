@@ -11,7 +11,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring.version>7.0.8</spring.version>
         <slf4j.version>2.0.12</slf4j.version>
-        <logback.version>1.5.3</logback.version>
+        <logback.version>1.5.34</logback.version>
         <jackson.version>2.22.0</jackson.version>
         <maven.build.timestamp.format>yyyy-MM-dd HH:mm</maven.build.timestamp.format>
     </properties>
