@@ -2,17 +2,24 @@ package com.onevizion.scmdb.facade;
 
 import com.onevizion.scmdb.AppArguments;
 import com.onevizion.scmdb.ColorLogger;
+import com.onevizion.scmdb.ResourceResolveUtils;
 import com.onevizion.scmdb.dao.DbScriptDaoOra;
 import com.onevizion.scmdb.exception.ScmdbException;
 import com.onevizion.scmdb.vo.SqlScript;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -38,8 +45,22 @@ public class DbScriptFacade {
     private List<SqlScript> scriptsInDir;
 
     public void init() {
-        execDir = new File(appArguments.getScriptsDirectory().getAbsolutePath() + File.separator + EXEC_FOLDER_NAME);
-        scriptsInDir = createScriptsFromFiles(appArguments.isReadAllFilesContent());
+        execDir = appArguments.getScriptsDirectory() != null
+                ? new File(appArguments.getScriptsDirectory().getAbsolutePath(), EXEC_FOLDER_NAME)
+                : createTempDirectory();
+
+        scriptsInDir = createScriptsFromResources(appArguments.isReadAllFilesContent());
+    }
+
+    private File createTempDirectory() {
+        try {
+            File tempDirectory = Files.createTempDirectory(EXEC_FOLDER_NAME).toFile();
+            FileUtils.forceDeleteOnExit(tempDirectory);
+
+            return tempDirectory;
+        } catch (IOException e) {
+            throw new RuntimeException("Unable to create temporarily directory", e);
+        }
     }
 
     public List<SqlScript> getNotExecutedScripts() {
@@ -80,7 +101,7 @@ public class DbScriptFacade {
 
     public void copyRollbackToExecDir(SqlScript rollback) {
         File rollBackFile = new File(execDir.getAbsolutePath() + File.separator + rollback.getName());
-        rollback.setFile(rollBackFile);
+        rollback.setResource(new FileSystemResource(rollBackFile));
         try {
             logger.debug("Creating rollback script [{}]", rollBackFile.getAbsolutePath());
             FileUtils.writeStringToFile(rollBackFile, rollback.getText(), "UTF-8");
@@ -104,13 +125,19 @@ public class DbScriptFacade {
         }
     }
 
-    private List<SqlScript> createScriptsFromFiles(boolean readAllScriptsContent) {
-        List<File> scriptFiles = (List<File>) FileUtils.listFiles(appArguments.getScriptsDirectory(), new String[]{"sql"}, false);
-        return scriptFiles.stream()
-                          .map(f -> SqlScript.create(f, readAllScriptsContent))
-                          .filter(s -> !isIgnoredScript(s))
-                          .sorted()
-                          .collect(Collectors.toList());
+    private List<SqlScript> createScriptsFromResources(boolean readAllScriptsContent) {
+        return ResourceResolveUtils.resolveScriptResources(appArguments.getScriptsDirectory())
+                                   .stream()
+                                   .map(resource -> {
+                                       try {
+                                           return SqlScript.create(resource, readAllScriptsContent);
+                                       } catch (IOException e) {
+                                           throw new RuntimeException("Unable to create SqlScript instance for [" + resource + "]", e);
+                                       }
+                                   })
+                                   .filter(s -> !isIgnoredScript(s))
+                                   .sorted()
+                                   .toList();
     }
 
     public List<SqlScript> getUpdatedScripts() {
@@ -174,7 +201,7 @@ public class DbScriptFacade {
     }
 
     public void createAllFromDirectory() {
-        sqlScriptDaoOra.createAll(createScriptsFromFiles(true));
+        sqlScriptDaoOra.createAll(createScriptsFromResources(true));
     }
 
     public void delete(Long id) {
@@ -183,14 +210,13 @@ public class DbScriptFacade {
 
     public void copyScriptsToExecDir(List<SqlScript> scripts) {
         for (SqlScript script : scripts) {
-            File srcFile = new File(appArguments.getScriptsDirectory()
-                                                .getAbsolutePath() + File.separator + script.getName());
             File destFile = new File(execDir.getAbsolutePath() + File.separator + script.getName());
-            try {
+
+            try (InputStream inputStream = script.getResource().getInputStream()) {
                 logger.debug("Copying new script [{}]", destFile.getAbsolutePath());
-                FileUtils.copyFile(srcFile, destFile);
+                FileUtils.copyInputStreamToFile(inputStream, destFile);
             } catch (IOException e) {
-                logger.error("Can't copy file [{}]", srcFile.getAbsolutePath(), e);
+                logger.error("Can't copy script to file [{}]", destFile.getAbsolutePath(), e);
                 throw new RuntimeException(e);
             }
         }
