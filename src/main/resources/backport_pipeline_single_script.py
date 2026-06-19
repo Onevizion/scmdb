@@ -240,12 +240,12 @@ def _has_diff(p_repo_root: str, p_args: list[str]) -> bool:
     res = subprocess.run(
         ["git", "-C", p_repo_root, "diff"] + p_args,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
         text=True,
         timeout=GIT_TIMEOUT,
     )
     if res.returncode > 1:
-        raise RuntimeError(f"Git command failed: git -C {p_repo_root} diff {' '.join(p_args)}")
+        raise RuntimeError(f"Git command failed: git -C {p_repo_root} diff {' '.join(p_args)}\n{(res.stderr or '').strip()}")
     return res.returncode == 1
 
 
