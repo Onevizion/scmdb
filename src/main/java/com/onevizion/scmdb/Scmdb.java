@@ -17,6 +17,7 @@ public class Scmdb {
 
     public static final int EXIT_CODE_ERROR = 1;
     public static final int EXIT_CODE_SUCCESS = 0;
+    public static final int EXIT_CODE_DRY_RUN = 2;
 
     private static final Logger LOGGER = LoggerFactory.getLogger("STDOUT");
 
@@ -62,6 +63,9 @@ public class Scmdb {
                 }
             } else {
                 dbManager.updateDb();
+                if (appArguments.isDryRun()) {
+                    System.exit(EXIT_CODE_DRY_RUN);
+                }
             }
         } catch (ScmdbException e) {
             LOGGER.error(e.getMessage());

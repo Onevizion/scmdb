@@ -37,6 +37,7 @@ When passwords for all schemas are the same (may be common for local dev env), o
 * ```--ignore-errors``` do not stop on errors 
 * ```--no-color``` do not color output
 * ```--force-disable-jobs``` automatically disable database jobs before executing scripts and re-enable them afterward.
+* ```--dry-run``` print the list of scripts (including rollbacks) that would be executed, without modifying the database or the ```db_script``` table, then exit with a non-zero code (2). Useful as a pre-deploy check. Cannot be combined with ```--gen-ddl``` or ```--backport```.
 * ```--backport``` run backport pipeline: cherry-pick PR commits, regenerate package scripts, execute them and generate DDL. Cannot be combined with ```--exec``` or ```--gen-ddl```. Requires GitHub token (see ```--gh-token```). PR number is prompted interactively.
 * ```--gh-token=<token>``` GitHub personal access token for the backport pipeline. Can also be provided via ```GITHUB_TOKEN``` environment variables (env variables take priority over CLI argument).
 
@@ -71,3 +72,9 @@ The PR (Pull-Request) number will be prompted interactively after started. The p
 2. Regenerate package scripts from DDL sources;
 3. Execute new scripts (same as `--exec`);
 4. Generate DDL for changed objects (same as `--gen-ddl`);
+
+**6. Preview pending scripts before a deployment (dry-run):**
+
+```java -jar scmdb.jar --owner-schema=$ownerSchema --scripts-dir=db/scripts --no-color --dry-run```
+
+Prints the commit scripts and rollbacks that would be executed, does not touch the database or the ```db_script``` table, and exits with code 2. Intended as a pre-deploy check step in CI/CD: a non-zero exit code signals that this was only a preview and the database was NOT updated.

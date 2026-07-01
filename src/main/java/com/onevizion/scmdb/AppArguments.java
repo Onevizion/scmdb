@@ -28,6 +28,7 @@ public class AppArguments {
     private boolean ignoreErrors = false;
     private boolean forceDisableJobs = false;
     private boolean backport = false;
+    private boolean dryRun = false;
     private String ghToken;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
@@ -49,6 +50,7 @@ public class AppArguments {
         OptionSpec ignoreErrorsOption = parser.acceptsAll(asList("i", "ignore-errors"));
         OptionSpec forceDisableJobsOption = parser.accepts("force-disable-jobs");
         OptionSpec backportOption = parser.accepts("backport");
+        OptionSpec dryRunOption = parser.accepts("dry-run");
         OptionSpec<String> ghTokenOption = parser.accepts("gh-token").withRequiredArg().ofType(String.class);
 
         OptionSet options = parser.parse(args);
@@ -91,6 +93,10 @@ public class AppArguments {
             throw new IllegalArgumentException("--backport cannot be combined with --exec or --gen-ddl.");
         }
 
+        if (options.has(dryRunOption) && (options.has(backportOption) || options.has(genDdlOption))) {
+            throw new IllegalArgumentException("--dry-run cannot be combined with --backport or --gen-ddl.");
+        }
+
         executeScripts = options.has(execOption);
         genDdl = options.has(genDdlOption);
         all = options.has(allOption);
@@ -98,6 +104,7 @@ public class AppArguments {
         omitChanged = options.has(omitChangedOption);
         ignoreErrors = options.has(ignoreErrorsOption);
         forceDisableJobs = options.has(forceDisableJobsOption);
+        dryRun = options.has(dryRunOption);
 
         backport = options.has(backportOption);
         if (backport) {
@@ -188,6 +195,10 @@ public class AppArguments {
 
     public boolean isBackport() {
         return backport;
+    }
+
+    public boolean isDryRun() {
+        return dryRun;
     }
 
     public String getGhToken() {
