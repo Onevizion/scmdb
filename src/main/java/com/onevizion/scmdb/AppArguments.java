@@ -28,6 +28,7 @@ public class AppArguments {
     private boolean ignoreErrors = false;
     private boolean forceDisableJobs = false;
     private boolean backport = false;
+    private boolean skipRollbackConfirm;
     private String ghToken;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
@@ -49,6 +50,7 @@ public class AppArguments {
         OptionSpec ignoreErrorsOption = parser.acceptsAll(asList("i", "ignore-errors"));
         OptionSpec forceDisableJobsOption = parser.accepts("force-disable-jobs");
         OptionSpec backportOption = parser.accepts("backport");
+        OptionSpec<?> skipRollbackConfirm = parser.accepts("skip-rollback-confirm");
         OptionSpec<String> ghTokenOption = parser.accepts("gh-token").withRequiredArg().ofType(String.class);
 
         OptionSet options = parser.parse(args);
@@ -111,6 +113,8 @@ public class AppArguments {
                         "--gh-token or GITHUB_TOKEN environment variable is required when using --backport.");
             }
         }
+
+        this.skipRollbackConfirm = options.has(skipRollbackConfirm);
     }
 
     public void fillDataSourceCredentials(PoolDataSource poolDataSource, SchemaType schemaType) {
@@ -188,6 +192,10 @@ public class AppArguments {
 
     public boolean isBackport() {
         return backport;
+    }
+
+    public boolean isSkipRollbackConfirm() {
+        return skipRollbackConfirm;
     }
 
     public String getGhToken() {
