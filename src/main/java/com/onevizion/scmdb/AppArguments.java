@@ -21,7 +21,7 @@ public class AppArguments {
     private File ddlsDirectory;
     private File jsonSchemasDirectory;
     private File componentStructuresDirectory;
-    private Map<SchemaType, DbCnnCredentials> credentials = new HashMap<>();
+    private final Map<SchemaType, DbCnnCredentials> credentials = new HashMap<>();
     private boolean genDdl;
     private boolean executeScripts;
     private boolean useColorLogging = true;
@@ -37,13 +37,7 @@ public class AppArguments {
     private final static String JSON_SCHEMAS_DIRECTORY_NAME = "json";
     private final static String COMPONENT_STRUCTURES_DIRECTORY_NAME = "json-component-structures";
 
-    private AppArguments() {}
-
-    public AppArguments(String[] args) {
-        parse(args);
-    }
-
-    void parse(String[] args) {
+    void parse(String[] args, boolean requireScriptsDirectory) {
         OptionParser parser = new OptionParser();
         OptionSpec<String> ownerSchemaOption = parser.accepts("owner-schema").withRequiredArg().ofType(String.class);
         OptionSpec<String> userSchemaOption = parser.accepts("user-schema").withOptionalArg().ofType(String.class);
@@ -65,8 +59,11 @@ public class AppArguments {
 
         OptionSet options = parser.parse(args);
 
-        if(!options.has(ownerSchemaOption) || !options.has(scriptsDirectoryOption)){
-            throw new IllegalArgumentException("--owner-schema and --scripts-dir are required parameters.");
+        if (!options.has(ownerSchemaOption)) {
+            throw new IllegalArgumentException("--owner-schema is required parameter.");
+        }
+        if (requireScriptsDirectory && !options.has(scriptsDirectoryOption)) {
+            throw new IllegalArgumentException("--scripts-dir is required parameter.");
         }
 
         credentials.put(OWNER, DbCnnCredentials.create(options.valueOf(ownerSchemaOption)));
@@ -76,11 +73,14 @@ public class AppArguments {
         createCredentials(PERFSTAT, options, perfstatSchemaOption);
 
         scriptsDirectory = options.valueOf(scriptsDirectoryOption);
-        if (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory()) {
+        if (requireScriptsDirectory && (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory())) {
             throw new IllegalArgumentException("Path [" + scriptsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
                     " [--scripts-dir] should contains absolute path and points to scripts directory");
+        } else if (!requireScriptsDirectory && scriptsDirectory != null) {
+            throw new IllegalArgumentException("[--scripts-dir] parameter is not expected in this context, SCMDB has already migration scripts bundled.");
         }
-        if(options.has(genDdlOption) || options.has(genAllSchemasOption) || options.has(backportOption)){
+
+        if (options.has(genDdlOption) || options.has(genAllSchemasOption) || options.has(backportOption)){
             ddlsDirectory = new File(scriptsDirectory.getParentFile().getAbsolutePath() + File.separator +
                     DDL_DIRECTORY_NAME);
             if (!ddlsDirectory.exists() || !ddlsDirectory.isDirectory()) {

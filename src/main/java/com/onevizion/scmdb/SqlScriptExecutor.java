@@ -9,14 +9,14 @@ import oracle.dbtools.raptor.newscriptrunner.ScriptExecutor;
 import oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.output.TeeOutputStream;
+import org.apache.commons.lang3.SystemUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.FileSystemResource;
 
 import javax.sql.DataSource;
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.net.URL;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -33,7 +33,7 @@ import static oracle.dbtools.raptor.newscriptrunner.ScriptRunnerContext.ERR_ENCO
 import static org.apache.commons.lang3.time.DurationFormatUtils.formatDurationHMS;
 
 public class SqlScriptExecutor {
-    private static final String SQL_COMMAND = "@%s %s";
+    private static final String SQL_COMMAND = "@%s %s %s";
     private static final String CREATE_SQL = "create.sql";
     private static final String COMPILE_SCHEMAS_SQL = "compile_schemas.sql";
     private static final String SHOW_INVALID_OBJECTS_SQL = "check_invalid_objects.sql";
@@ -74,16 +74,53 @@ public class SqlScriptExecutor {
     }
 
     public int execute(SqlScript script) {
+        boolean isPackageScript = script.getSchemaType().isCompileInvalids() && isPackageScript(script);
+        File scriptsDirectory = appArguments.getScriptsDirectory();
+        if (scriptsDirectory == null) {
+            scriptsDirectory = SystemUtils.getJavaIoTmpDir();
+        }
+
+        File workingDirectory;
+        try {
+            workingDirectory = script.getResource().isFile()
+                    ? script.getResource().getFile().getParentFile()
+                    : scriptsDirectory;
+        } catch (IOException e) {
+            throw new RuntimeException("Unable to get script file from resource for [" + script.getResource() + "]", e);
+        }
+
         File wrapperScriptFile = getTmpWrapperScript(script.getSchemaType().isCompileInvalids(),
                                                      appArguments.isIgnoreErrors(),
-                                                     script.getFile().getParentFile());
-        return execute(script, wrapperScriptFile);
+                                                     workingDirectory);
+        return execute(script, wrapperScriptFile, isPackageScript);
     }
 
-    private int execute(SqlScript script, File wrapperScriptFile) {
+    private int execute(SqlScript script, File wrapperScriptFile, boolean isPackageScript) {
         DbCnnCredentials cnnCredentials = appArguments.getDbCredentials(script.getSchemaType());
         logger.info("\nExecuting script [{}] in schema [{}]. Start: {}", GREEN, script.getName(),
                 cnnCredentials.getSchemaWithUrlBeforeDot(), ZonedDateTime.now().format(ISO_TIME));
+
+        File scriptFile;
+        if (script.getResource().isFile()) {
+            try {
+                scriptFile = script.getResource().getFile();
+            } catch (IOException e) {
+                throw new RuntimeException("Unable to get File reference for [" + script.getResource() + "]", e);
+            }
+        } else {
+            try {
+                scriptFile = Files.createTempFile("scmdb_classpath", ".sql").toFile();
+                scriptFile.deleteOnExit();
+            } catch (IOException e) {
+                throw new RuntimeException("Unable to create temporarily file for [" + script.getResource() + "]", e);
+            }
+
+            try (InputStream inputStream = script.getResource().getInputStream()) {
+                FileUtils.copyInputStreamToFile(inputStream, scriptFile);
+            } catch (IOException e) {
+                throw new RuntimeException("Unable to copy resource [" + script.getResource() + "] to temporary file [" + scriptFile + "]", e);
+            }
+        }
 
         try (Connection connection = getConnection(script.getSchemaType(), cnnCredentials.getSchemaName());
              ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
@@ -94,8 +131,12 @@ public class SqlScriptExecutor {
             ctx.setBaseConnection(connection);
             ctx.setOutputStreamWrapper(new BufferedOutputStream(new TeeOutputStream(System.out, outputStream)));
             executor.setScriptRunnerContext(ctx);
+
+            // Pass parameter: 1 = enable pkg_audit_comp (regular script), 0 = don't enable (package script)
+            String enableLockedCompsMod = (!isPackageScript && script.getSchemaType().isCompileInvalids()) ? "1" : "0";
             executor.setStmt(String.format(SQL_COMMAND, wrapperScriptFile.getAbsolutePath(),
-                                           script.getFile().getAbsolutePath()));
+                                           scriptFile.getAbsolutePath(),
+                                           enableLockedCompsMod));
 
             Instant start = Instant.now();
             executor.run();
@@ -136,7 +177,8 @@ public class SqlScriptExecutor {
             }
         }
 
-        File tmpFile = new File(workingDir.getAbsolutePath() + File.separator + "tmp.sql");
+        File tmpFile = new File(workingDir.getAbsolutePath(), System.currentTimeMillis() + "tmp.sql");
+        tmpFile.deleteOnExit();
 
         try {
             FileUtils.copyURLToFile(wrapperScript, tmpFile);
@@ -145,6 +187,11 @@ public class SqlScriptExecutor {
         }
 
         return tmpFile;
+    }
+
+    private boolean isPackageScript(SqlScript script) {
+        String scriptText = script.getText();
+        return ScriptHelper.isPackageScript(scriptText);
     }
 
     public void createDbScriptTable() {
@@ -181,6 +228,10 @@ public class SqlScriptExecutor {
 
     private void executeResourceScript(String scriptFileName, String errorMessage, boolean ignoreSqlLog) {
         File scriptsDirectory = appArguments.getScriptsDirectory();
+        if (scriptsDirectory == null) {
+            scriptsDirectory = SystemUtils.getJavaIoTmpDir();
+        }
+
         String tmpFileName = new Date().getTime() + scriptFileName;
         String tmpFilePath = scriptsDirectory.getAbsolutePath() + File.separator + tmpFileName;
         File tmpFile = new File(tmpFilePath);
@@ -194,12 +245,12 @@ public class SqlScriptExecutor {
 
         SqlScript sqlScript = new SqlScript();
         sqlScript.setName(tmpFileName);
-        sqlScript.setFile(tmpFile);
+        sqlScript.setResource(new FileSystemResource(tmpFile));
         sqlScript.setType(COMMIT);
         sqlScript.setSchemaType(OWNER);
 
-        File wrapperScriptFile = getTmpWrapperScript(false, false, sqlScript.getFile().getParentFile());
-        int exitCode = execute(sqlScript, wrapperScriptFile);
+        File wrapperScriptFile = getTmpWrapperScript(false, false, tmpFile.getParentFile());
+        int exitCode = execute(sqlScript, wrapperScriptFile, false);
 
         tmpFile.delete();
 
