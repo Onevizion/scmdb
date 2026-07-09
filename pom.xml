@@ -14,6 +14,7 @@
         <logback.version>1.5.34</logback.version>
         <jackson.version>2.22.0</jackson.version>
         <maven.build.timestamp.format>yyyy-MM-dd HH:mm</maven.build.timestamp.format>
+        <sqlcl.version>26.2.0</sqlcl.version>
     </properties>
 
     <dependencies>
@@ -128,43 +129,43 @@
         <dependency>
             <groupId>oracle.sqlcl</groupId>
             <artifactId>ucp11</artifactId>
-            <version>25.3.0</version>
+            <version>${sqlcl.version}</version>
         </dependency>
 
         <dependency>
             <groupId>oracle.sqlcl</groupId>
             <artifactId>ojdbc11</artifactId>
-            <version>25.3.0</version>
+            <version>${sqlcl.version}</version>
         </dependency>
 
         <dependency>
             <groupId>oracle.sqlcl</groupId>
             <artifactId>dbtools-common</artifactId>
-            <version>25.3.0</version>
+            <version>${sqlcl.version}</version>
         </dependency>
 
         <dependency>
             <groupId>oracle.sqlcl</groupId>
             <artifactId>dbtools-core</artifactId>
-            <version>25.3.0</version>
+            <version>${sqlcl.version}</version>
         </dependency>
 
         <dependency>
             <groupId>oracle.sqlcl</groupId>
             <artifactId>dbtools-arbori</artifactId>
-            <version>25.3.0</version>
+            <version>${sqlcl.version}</version>
         </dependency>
 
         <dependency>
             <groupId>oracle.sqlcl</groupId>
             <artifactId>xmlparserv2_sans_jaxp_services</artifactId>
-            <version>25.3.0</version>
+            <version>${sqlcl.version}</version>
         </dependency>
 
         <dependency>
             <groupId>oracle.sqlcl</groupId>
             <artifactId>xdb</artifactId>
-            <version>25.3.0</version>
+            <version>${sqlcl.version}</version>
         </dependency>
     </dependencies>
 
