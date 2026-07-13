@@ -73,24 +73,30 @@ public class AppArguments {
         createCredentials(PERFSTAT, options, perfstatSchemaOption);
 
         scriptsDirectory = options.valueOf(scriptsDirectoryOption);
-        if (requireScriptsDirectory && (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory())) {
+        boolean requireSourceTreeDirectories = options.has(genDdlOption)
+                                                || options.has(genAllSchemasOption)
+                                                || options.has(backportOption);
+
+        if (requireSourceTreeDirectories && scriptsDirectory == null) {
+            throw new IllegalArgumentException("--scripts-dir is required for --gen-ddl, --gen-all-schemas and --backport modes.");
+        }
+
+        if ((requireScriptsDirectory || requireSourceTreeDirectories) && (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory())) {
             throw new IllegalArgumentException("Path [" + scriptsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
                     " [--scripts-dir] should contains absolute path and points to scripts directory");
-        } else if (!requireScriptsDirectory && scriptsDirectory != null) {
+        } else if (!requireScriptsDirectory && scriptsDirectory != null && !requireSourceTreeDirectories) {
             throw new IllegalArgumentException("[--scripts-dir] parameter is not expected in this context, SCMDB has already migration scripts bundled.");
         }
 
-        if (options.has(genDdlOption) || options.has(genAllSchemasOption) || options.has(backportOption)){
-            ddlsDirectory = new File(scriptsDirectory.getParentFile().getAbsolutePath() + File.separator +
-                    DDL_DIRECTORY_NAME);
+        if (requireSourceTreeDirectories){
+            File dbDirectory = scriptsDirectory.getAbsoluteFile().getParentFile();
+            ddlsDirectory = new File(dbDirectory, DDL_DIRECTORY_NAME);
             if (!ddlsDirectory.exists() || !ddlsDirectory.isDirectory()) {
                 throw new IllegalArgumentException("Path [" + ddlsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
                         " Can't find ddl directory");
             }
-            jsonSchemasDirectory = new File(scriptsDirectory.getParentFile().getAbsolutePath() + File.separator +
-                                            JSON_SCHEMAS_DIRECTORY_NAME);
-            componentStructuresDirectory = new File(scriptsDirectory.getParentFile().getAbsolutePath() + File.separator +
-                                                    COMPONENT_STRUCTURES_DIRECTORY_NAME);
+            jsonSchemasDirectory = new File(dbDirectory, JSON_SCHEMAS_DIRECTORY_NAME);
+            componentStructuresDirectory = new File(dbDirectory, COMPONENT_STRUCTURES_DIRECTORY_NAME);
             if (!jsonSchemasDirectory.exists() && !jsonSchemasDirectory.mkdirs()) {
                 throw new IllegalArgumentException("Can't create json schemas directory [" +
                                                    jsonSchemasDirectory.getAbsolutePath() + "]");

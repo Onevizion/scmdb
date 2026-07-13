@@ -1,10 +1,11 @@
 package com.onevizion.scmdb;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.onevizion.scmdb.dao.DdlDao;
+import org.apache.commons.lang3.ArrayUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -23,27 +24,30 @@ public class StaticDataSchemaEnricher {
 
     private static final String SCHEMA_FILE_SUFFIX = ".schema.json";
 
-    @Autowired
-    private AppArguments appArguments;
+    private final JsonMapper mapper = JsonMapper.builder()
+                                                .enable(SerializationFeature.INDENT_OUTPUT)
+                                                .build();
+
+    private final AppArguments appArguments;
+    private final DdlDao ddlDao;
+    private final ColorLogger logger;
 
     @Autowired
-    private DdlDao ddlDao;
-
-    @Autowired
-    private ColorLogger logger;
-
-    private final ObjectMapper mapper = new ObjectMapper()
-            .enable(SerializationFeature.INDENT_OUTPUT);
+    public StaticDataSchemaEnricher(AppArguments appArguments, DdlDao ddlDao, ColorLogger logger) {
+        this.appArguments = appArguments;
+        this.ddlDao = ddlDao;
+        this.logger = logger;
+    }
 
     public void enrichSchemas(Set<String> tableNames) {
         for (String tableName : tableNames) {
-            enrichSchema(tableName, schemaFile(tableName));
+            enrichSchema(tableName, getSchemaFile(tableName));
         }
     }
 
     public void enrichAllSchemas() {
         File[] schemaFiles = appArguments.getJsonSchemasDirectory().listFiles((dir, name) -> name.endsWith(SCHEMA_FILE_SUFFIX));
-        if (schemaFiles == null || schemaFiles.length == 0) {
+        if (ArrayUtils.isEmpty(schemaFiles)) {
             logger.info("No JSON schemas found for static data enrichment");
             return;
         }
@@ -51,7 +55,7 @@ public class StaticDataSchemaEnricher {
         for (File schemaFile : schemaFiles) {
             String fileName = schemaFile.getName();
             String tableName = fileName.substring(0, fileName.length() - SCHEMA_FILE_SUFFIX.length())
-                                   .toUpperCase(Locale.ROOT);
+                                       .toUpperCase(Locale.ROOT);
             enrichSchema(tableName, schemaFile);
         }
     }
@@ -86,13 +90,9 @@ public class StaticDataSchemaEnricher {
         }
     }
 
-    private void enrichStaticReferenceData(
-            String tableName,
-            File schemaFile,
-            ObjectNode schema,
-            List<String> pkColumns,
-            String pkColumn
-    ) throws IOException {
+    private void enrichStaticReferenceData(String tableName, File schemaFile, ObjectNode schema,
+                                           List<String> pkColumns, String pkColumn) throws IOException {
+
         List<String> lookupColumns = ddlDao.getLookupColumns(tableName, pkColumns);
         if (lookupColumns.isEmpty()) {
             logger.info("  SKIP static data {}: lookup column was not found", YELLOW, tableName);
@@ -115,19 +115,11 @@ public class StaticDataSchemaEnricher {
         logger.info("  OK static data {}: {} values", GREEN, tableName, rows.size());
     }
 
-    private void enrichComponentReferenceData(
-            String tableName,
-            File schemaFile,
-            ObjectNode schema,
-            ObjectNode properties,
-            List<String> pkColumns,
-            String pkColumn
-    ) throws IOException {
+    private void enrichComponentReferenceData(String tableName, File schemaFile, ObjectNode schema,
+                                              ObjectNode properties, List<String> pkColumns, String pkColumn)
+                                              throws IOException {
         String lookupColumn = ddlDao.getComponentLookupColumn(tableName);
-        if (lookupColumn == null) {
-            return;
-        }
-        if (!properties.has("PROGRAM_ID") || !properties.has(lookupColumn)) {
+        if (lookupColumn == null || !properties.has("PROGRAM_ID") || !properties.has(lookupColumn)) {
             return;
         }
 
@@ -136,7 +128,8 @@ public class StaticDataSchemaEnricher {
 
         schema.set("x-reference-data", referenceData);
         mapper.writeValue(schemaFile, schema);
-        logger.info("  OK component reference data {}: lookup by {}", GREEN, tableName, lookupColumn);
+        logger.info("  OK component reference data {}: lookup by {}", GREEN,
+                    tableName, lookupColumn);
     }
 
     private ObjectNode createReferenceData(String type, String pkColumn, String lookupColumn) {
@@ -148,7 +141,7 @@ public class StaticDataSchemaEnricher {
         return referenceData;
     }
 
-    private File schemaFile(String tableName) {
+    private File getSchemaFile(String tableName) {
         return new File(appArguments.getJsonSchemasDirectory(),
                         tableName.toLowerCase(Locale.ROOT) + SCHEMA_FILE_SUFFIX);
     }

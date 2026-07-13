@@ -7,6 +7,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.stereotype.Component;
 
+import java.text.MessageFormat;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -161,49 +162,57 @@ public class DdlDao extends AbstractDaoOra {
         MapSqlParameterSource namedParams = new MapSqlParameterSource();
         namedParams.addValue("objName", objectName);
         namedParams.addValue("objType", objectType.getName().toUpperCase());
-        String sql = "select case when" +
-                "                count(object_name) > 0 then 'true'" +
-                "            else 'false'" +
-                "        end" +
-                "    from user_objects where object_name = upper(:objName) and object_type = upper(:objType)";
+        String sql = """
+                select case when\
+                                count(object_name) > 0 then 'true'\
+                            else 'false'\
+                        end\
+                    from user_objects where object_name = upper(:objName) and object_type = upper(:objType)
+                """;
         String boolStr = namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);
         return Boolean.valueOf(boolStr);
     }
 
     public boolean isStaticReferenceTable(String tableName) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
-        String sql = "select case when count(*) = 1 then 'true' else 'false' end" +
-                "  from user_tables t" +
-                " where t.table_name = upper(:tableName)" +
-                "   and not exists (select 1 from user_tab_columns c" +
-                "                    where c.table_name = t.table_name and c.column_name = 'PROGRAM_ID')";
+        String sql = """
+                select case when count(*) = 1 then 'true' else 'false' end\
+                  from user_tables t\
+                 where t.table_name = upper(:tableName)\
+                   and not exists (select 1 from user_tab_columns c\
+                                    where c.table_name = t.table_name and c.column_name = 'PROGRAM_ID')
+                """;
         String boolStr = namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);
         return Boolean.valueOf(boolStr);
     }
 
     public List<String> getPrimaryKeyColumns(String tableName) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
-        String sql = "select cols.column_name" +
-                "  from user_constraints cons" +
-                "  join user_cons_columns cols on cols.constraint_name = cons.constraint_name" +
-                " where cons.table_name = upper(:tableName)" +
-                "   and cons.constraint_type = 'P'" +
-                " order by cols.position";
+        String sql = """
+                select cols.column_name\
+                  from user_constraints cons\
+                  join user_cons_columns cols on cols.constraint_name = cons.constraint_name\
+                 where cons.table_name = upper(:tableName)\
+                   and cons.constraint_type = 'P'\
+                 order by cols.position
+                """;
         return namedParameterJdbcTemplate.queryForList(sql, namedParams, String.class);
     }
 
     public List<String> getLookupColumns(String tableName, List<String> excludedColumns) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
-        String sql = "select column_name" +
-                "  from user_tab_columns" +
-                " where table_name = upper(:tableName)" +
-                "   and data_type in ('VARCHAR2', 'CHAR', 'NVARCHAR2', 'NCHAR')" +
-                " order by case when column_name like '%NAME%' then 0" +
-                "               when column_name like '%CODE%' then 1" +
-                "               when column_name like '%TYPE%' then 2" +
-                "               else 3" +
-                "           end, " +
-                "           column_id";
+        String sql = """
+                select column_name\
+                  from user_tab_columns\
+                 where table_name = upper(:tableName)\
+                   and data_type in ('VARCHAR2', 'CHAR', 'NVARCHAR2', 'NCHAR')\
+                 order by case when column_name like '%NAME%' then 0\
+                               when column_name like '%CODE%' then 1\
+                               when column_name like '%TYPE%' then 2\
+                               else 3\
+                           end, \
+                           column_id
+                """;
         return namedParameterJdbcTemplate.queryForList(sql, namedParams, String.class)
                                          .stream()
                                          .filter(columnName -> !excludedColumns.contains(columnName))
@@ -211,9 +220,9 @@ public class DdlDao extends AbstractDaoOra {
     }
 
     public List<Map<String, Object>> loadReferenceData(String tableName, String pkColumn, String lookupColumn) {
-        tableName = sanitizeIdentifier(tableName);
-        pkColumn = sanitizeIdentifier(pkColumn);
-        lookupColumn = sanitizeIdentifier(lookupColumn);
+        tableName = sanitizeSqlIdentifier(tableName);
+        pkColumn = sanitizeSqlIdentifier(pkColumn);
+        lookupColumn = sanitizeSqlIdentifier(lookupColumn);
 
         String whereClause = referenceDataWhereClause(tableName);
         String sql = String.format("select %s as id, %s as name from %s%s order by %s",
@@ -228,20 +237,24 @@ public class DdlDao extends AbstractDaoOra {
 
     public List<Map<String, Object>> loadComponentStructureRows() {
         boolean hasBpdItemTypeId = hasColumn("V_COMPONENT", "BPD_ITEM_TYPE_ID");
-        String sql = "select c.component_id," +
-                " c.component," +
-                " c.main_table," +
-                " c.support_bpl," +
-                " c.support_audit," +
-                " c.component_name_column," +
-                " t.component_table_id," +
-                " t.table_name," +
-                (hasBpdItemTypeId ? " c.bpd_item_type_id," : " cast(null as number) as bpd_item_type_id,") +
-                (hasBpdItemTypeId ? " bit.item_type as bpd_item_type" : " cast(null as varchar2(4000)) as bpd_item_type") +
-                " from v_component c" +
-                " left join v_component_table t on t.component_id = c.component_id" +
-                (hasBpdItemTypeId ? " left join bpd_item_type bit on bit.item_type_id = c.bpd_item_type_id" : "") +
-                " order by c.component, t.table_name";
+        String sql = MessageFormat.format("""
+            select c.component_id,
+                   c.component,
+                   c.main_table,
+                   c.support_bpl,
+                   c.support_audit,
+                   c.component_name_column,
+                   t.component_table_id,
+                   t.table_name,
+                   {0}
+                   {1}
+              from v_component c
+              left join v_component_table t on t.component_id = c.component_id
+              {2}
+              order by c.component, t.table_name""",
+                hasBpdItemTypeId ? " c.bpd_item_type_id," : " cast(null as number) as bpd_item_type_id,",
+                hasBpdItemTypeId ? " bit.item_type as bpd_item_type" : " cast(null as varchar2(4000)) as bpd_item_type",
+                hasBpdItemTypeId ? " left join bpd_item_type bit on bit.item_type_id = c.bpd_item_type_id" : "");
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("component_id", rs.getObject("component_id"));
@@ -263,64 +276,74 @@ public class DdlDao extends AbstractDaoOra {
             return "";
         }
 
-        return " where page_url is not null" +
-                " and is_tt_specific = 1" +
-                " and module_name not like 'ADMIN%'" +
-                " and security_group not like 'ADMIN%'" +
-                " and module_name not like 'BPL_EXP_IMP%'" +
-                " and module_name not like 'SELECTOR%'" +
-                " and module_name not like 'ASSIGNMENT%'";
+        return """
+                 where page_url is not null\
+                 and is_tt_specific = 1\
+                 and module_name not like 'ADMIN%'\
+                 and security_group not like 'ADMIN%'\
+                 and module_name not like 'BPL_EXP_IMP%'\
+                 and module_name not like 'SELECTOR%'\
+                 and module_name not like 'ASSIGNMENT%'\
+                """;
     }
 
     private boolean hasColumn(String tableName, String columnName) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource()
                 .addValue("tableName", tableName)
                 .addValue("columnName", columnName);
-        String sql = "select case when count(*) > 0 then 'true' else 'false' end" +
-                " from user_tab_columns" +
-                " where table_name = upper(:tableName)" +
-                "   and column_name = upper(:columnName)";
+        String sql = """
+                select case when count(*) > 0 then 'true' else 'false' end\
+                 from user_tab_columns\
+                 where table_name = upper(:tableName)\
+                   and column_name = upper(:columnName)
+                """;
         String boolStr = namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);
         return Boolean.valueOf(boolStr);
     }
 
     public List<String> loadConfigurationTableNames() {
-        String sql = "select main_table as table_name" +
-                " from v_component" +
-                " where main_table is not null" +
-                " union" +
-                " select table_name" +
-                " from v_component_table" +
-                " where table_name is not null";
+        String sql = """
+                select main_table as table_name\
+                 from v_component\
+                 where main_table is not null\
+                 union\
+                 select table_name\
+                 from v_component_table\
+                 where table_name is not null
+                """;
         return jdbcTemplate.queryForList(sql, String.class);
     }
 
     public String getComponentLookupColumn(String tableName) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
-        String sql = "select distinct component_name_column" +
-                " from v_component" +
-                " where main_table = upper(:tableName)" +
-                "   and component_name_column is not null" +
-                " order by component_name_column";
+        String sql = """
+                select distinct component_name_column\
+                 from v_component\
+                 where main_table = upper(:tableName)\
+                   and component_name_column is not null\
+                 order by component_name_column
+                """;
         List<String> lookupColumns = namedParameterJdbcTemplate.queryForList(sql, namedParams, String.class);
         return lookupColumns.isEmpty() ? null : lookupColumns.get(0);
     }
 
     public List<Map<String, Object>> getTableForeignKeys(String tableName) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
-        String sql = "select ac.constraint_name," +
-                " ac.table_name as from_table," +
-                " acc.column_name as from_column," +
-                " r_ac.table_name as to_table," +
-                " r_acc.column_name as to_column" +
-                " from user_constraints ac" +
-                " join user_cons_columns acc on ac.constraint_name = acc.constraint_name" +
-                " join user_constraints r_ac on ac.r_constraint_name = r_ac.constraint_name" +
-                " join user_cons_columns r_acc on r_ac.constraint_name = r_acc.constraint_name" +
-                " and acc.position = r_acc.position" +
-                " where ac.constraint_type = 'R'" +
-                " and ac.table_name = upper(:tableName)" +
-                " order by ac.constraint_name, acc.position";
+        String sql = """
+                select ac.constraint_name,\
+                 ac.table_name as from_table,\
+                 acc.column_name as from_column,\
+                 r_ac.table_name as to_table,\
+                 r_acc.column_name as to_column\
+                 from user_constraints ac\
+                 join user_cons_columns acc on ac.constraint_name = acc.constraint_name\
+                 join user_constraints r_ac on ac.r_constraint_name = r_ac.constraint_name\
+                 join user_cons_columns r_acc on r_ac.constraint_name = r_acc.constraint_name\
+                 and acc.position = r_acc.position\
+                 where ac.constraint_type = 'R'\
+                 and ac.table_name = upper(:tableName)\
+                 order by ac.constraint_name, acc.position
+                """;
         return namedParameterJdbcTemplate.query(sql, namedParams, (rs, rowNum) -> {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("constraint_name", rs.getObject("constraint_name"));
@@ -332,10 +355,10 @@ public class DdlDao extends AbstractDaoOra {
         });
     }
 
-    private String sanitizeIdentifier(String identifier) {
+    private String sanitizeSqlIdentifier(String identifier) {
         String sanitized = identifier.toUpperCase(Locale.ROOT);
         if (!sanitized.matches("[A-Z][A-Z0-9_$#]*")) {
-            throw new IllegalArgumentException("Unsafe DB identifier: " + identifier);
+            throw new IllegalArgumentException("Unsafe SQL identifier: " + identifier);
         }
         return sanitized;
     }

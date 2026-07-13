@@ -116,7 +116,7 @@ public class ComponentStructureGenerator {
             ObjectNode node = nodes.addObject();
             putValue(node, "table_name", table.tableName);
             putValue(node, "is_main_table", table.mainTable);
-            putValue(node, "schema_file", schemaFileName(table.tableName));
+            putValue(node, "schema_file", getSchemaFileName(table.tableName));
             putBpdData(node, table);
         }
         return nodes;
@@ -155,7 +155,7 @@ public class ComponentStructureGenerator {
 
         ObjectNode node = mapper.createObjectNode();
         putValue(node, "table_name", table.tableName);
-        putValue(node, "schema_file", schemaFileName(table.tableName));
+        putValue(node, "schema_file", getSchemaFileName(table.tableName));
         putValue(node, "is_main_table", table.mainTable);
         putBpdData(node, table);
         ArrayNode children = node.putArray("children");
@@ -188,7 +188,7 @@ public class ComponentStructureGenerator {
                         "component_" + component.componentId + "_" + component.mainTable.toLowerCase(Locale.ROOT) + ".json");
     }
 
-    private String schemaFileName(String tableName) {
+    private String getSchemaFileName(String tableName) {
         return tableName.toLowerCase(Locale.ROOT) + ".schema.json";
     }
 
