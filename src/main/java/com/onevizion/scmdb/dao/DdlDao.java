@@ -1,5 +1,6 @@
 package com.onevizion.scmdb.dao;
 
+import com.onevizion.scmdb.StringPlaceholderUtils;
 import com.onevizion.scmdb.vo.DbObject;
 import com.onevizion.scmdb.vo.DbObjectType;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -7,7 +8,6 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.stereotype.Component;
 
-import java.text.MessageFormat;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -225,8 +225,15 @@ public class DdlDao extends AbstractDaoOra {
         lookupColumn = sanitizeSqlIdentifier(lookupColumn);
 
         String whereClause = referenceDataWhereClause(tableName);
-        String sql = String.format("select %s as id, %s as name from %s%s order by %s",
-                                   pkColumn, lookupColumn, tableName, whereClause, pkColumn);
+        String sql = StringPlaceholderUtils.replace("""
+                                                    select {pkColumn} as id,
+                                                           {lookupColumn} as name
+                                                      from {tableName}{whereClause}
+                                                     order by {pkColumn}""",
+                                                    Map.of("pkColumn", pkColumn,
+                                                           "lookupColumn", lookupColumn,
+                                                           "tableName", tableName,
+                                                           "whereClause", whereClause));
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", rs.getObject("id"));
@@ -237,24 +244,30 @@ public class DdlDao extends AbstractDaoOra {
 
     public List<Map<String, Object>> loadComponentStructureRows() {
         boolean hasBpdItemTypeId = hasColumn("V_COMPONENT", "BPD_ITEM_TYPE_ID");
-        String sql = MessageFormat.format("""
-            select c.component_id,
-                   c.component,
-                   c.main_table,
-                   c.support_bpl,
-                   c.support_audit,
-                   c.component_name_column,
-                   t.component_table_id,
-                   t.table_name,
-                   {0}
-                   {1}
-              from v_component c
-              left join v_component_table t on t.component_id = c.component_id
-              {2}
-              order by c.component, t.table_name""",
-                hasBpdItemTypeId ? " c.bpd_item_type_id," : " cast(null as number) as bpd_item_type_id,",
-                hasBpdItemTypeId ? " bit.item_type as bpd_item_type" : " cast(null as varchar2(4000)) as bpd_item_type",
-                hasBpdItemTypeId ? " left join bpd_item_type bit on bit.item_type_id = c.bpd_item_type_id" : "");
+        String bpdItemTypeIdColumn = hasBpdItemTypeId ? "c.bpd_item_type_id,"
+                                                      : "cast(null as number) as bpd_item_type_id,";
+        String bpdItemTypeColumn = hasBpdItemTypeId ? "bit.item_type as bpd_item_type"
+                                                    : "cast(null as varchar2(4000)) as bpd_item_type";
+        String bpdItemTypeJoin = hasBpdItemTypeId ? "left join bpd_item_type bit on bit.item_type_id = c.bpd_item_type_id"
+                                                  : "";
+        String sql = StringPlaceholderUtils.replace("""
+                                                    select c.component_id,
+                                                           c.component,
+                                                           c.main_table,
+                                                           c.support_bpl,
+                                                           c.support_audit,
+                                                           c.component_name_column,
+                                                           t.component_table_id,
+                                                           t.table_name,
+                                                           {bpdItemTypeIdColumn}
+                                                           {bpdItemTypeColumn}
+                                                      from v_component c
+                                                      left join v_component_table t on t.component_id = c.component_id
+                                                      {bpdItemTypeJoin}
+                                                     order by c.component, t.table_name""",
+                                                    Map.of("bpdItemTypeIdColumn", bpdItemTypeIdColumn,
+                                                           "bpdItemTypeColumn", bpdItemTypeColumn,
+                                                           "bpdItemTypeJoin", bpdItemTypeJoin));
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("component_id", rs.getObject("component_id"));
@@ -301,7 +314,7 @@ public class DdlDao extends AbstractDaoOra {
         return Boolean.valueOf(boolStr);
     }
 
-    public List<String> loadConfigurationTableNames() {
+    public List<String> loadComponentTableNames() {
         String sql = """
                 select main_table as table_name\
                  from v_component\
