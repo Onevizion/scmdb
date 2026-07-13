@@ -5,16 +5,19 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.onevizion.scmdb.dao.DdlDao;
-import org.apache.commons.lang3.ArrayUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
@@ -46,27 +49,39 @@ public class StaticDataSchemaEnricher {
     }
 
     public void enrichAllSchemas() {
-        File[] schemaFiles = appArguments.getJsonSchemasDirectory().listFiles((dir, name) -> name.endsWith(SCHEMA_FILE_SUFFIX));
-        if (ArrayUtils.isEmpty(schemaFiles)) {
-            logger.info("No JSON schemas found for static data enrichment");
-            return;
-        }
+        Path schemasDirectory = appArguments.getJsonSchemasDirectory().toPath();
+        try (Stream<Path> schemaFiles = Files.list(schemasDirectory)) {
+            List<Path> schemaFileList = schemaFiles
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(SCHEMA_FILE_SUFFIX))
+                    .toList();
 
-        for (File schemaFile : schemaFiles) {
-            String fileName = schemaFile.getName();
-            String tableName = fileName.substring(0, fileName.length() - SCHEMA_FILE_SUFFIX.length())
-                                       .toUpperCase(Locale.ROOT);
-            enrichSchema(tableName, schemaFile);
+            if (schemaFileList.isEmpty()) {
+                logger.info("No JSON schemas found for static data enrichment");
+                return;
+            }
+
+            for (Path schemaFile : schemaFileList) {
+                String fileName = schemaFile.getFileName().toString();
+                String tableName = fileName.substring(0, fileName.length() - SCHEMA_FILE_SUFFIX.length())
+                                           .toUpperCase(Locale.ROOT);
+                enrichSchema(tableName, schemaFile);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to list JSON schemas for static data enrichment: " + schemasDirectory.toAbsolutePath(), e);
         }
     }
 
-    private void enrichSchema(String tableName, File schemaFile) {
-        if (!schemaFile.isFile()) {
+    private void enrichSchema(String tableName, Path schemaFile) {
+        if (!Files.isRegularFile(schemaFile)) {
             return;
         }
 
         try {
-            ObjectNode schema = (ObjectNode) mapper.readTree(schemaFile);
+            ObjectNode schema;
+            try (InputStream inputStream = Files.newInputStream(schemaFile)) {
+                schema = (ObjectNode) mapper.readTree(inputStream);
+            }
             ObjectNode properties = (ObjectNode) schema.get("properties");
             if (properties == null) {
                 return;
@@ -86,11 +101,11 @@ public class StaticDataSchemaEnricher {
 
             enrichComponentReferenceData(tableName, schemaFile, schema, properties, pkColumns, pkColumn);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to enrich JSON schema with reference data: " + schemaFile.getAbsolutePath(), e);
+            throw new RuntimeException("Failed to enrich JSON schema with reference data: " + schemaFile.toAbsolutePath(), e);
         }
     }
 
-    private void enrichStaticReferenceData(String tableName, File schemaFile, ObjectNode schema,
+    private void enrichStaticReferenceData(String tableName, Path schemaFile, ObjectNode schema,
                                            List<String> pkColumns, String pkColumn) throws IOException {
 
         List<String> lookupColumns = ddlDao.getLookupColumns(tableName, pkColumns);
@@ -111,11 +126,11 @@ public class StaticDataSchemaEnricher {
         }
 
         schema.set("x-reference-data", referenceData);
-        mapper.writeValue(schemaFile, schema);
+        writeSchema(schemaFile, schema);
         logger.info("  OK static data {}: {} values", GREEN, tableName, rows.size());
     }
 
-    private void enrichComponentReferenceData(String tableName, File schemaFile, ObjectNode schema,
+    private void enrichComponentReferenceData(String tableName, Path schemaFile, ObjectNode schema,
                                               ObjectNode properties, List<String> pkColumns, String pkColumn)
                                               throws IOException {
         String lookupColumn = ddlDao.getComponentLookupColumn(tableName);
@@ -127,9 +142,15 @@ public class StaticDataSchemaEnricher {
         referenceData.putArray("data");
 
         schema.set("x-reference-data", referenceData);
-        mapper.writeValue(schemaFile, schema);
+        writeSchema(schemaFile, schema);
         logger.info("  OK component reference data {}: lookup by {}", GREEN,
                     tableName, lookupColumn);
+    }
+
+    private void writeSchema(Path schemaFile, ObjectNode schema) throws IOException {
+        try (OutputStream outputStream = Files.newOutputStream(schemaFile)) {
+            mapper.writeValue(outputStream, schema);
+        }
     }
 
     private ObjectNode createReferenceData(String type, String pkColumn, String lookupColumn) {
@@ -141,8 +162,9 @@ public class StaticDataSchemaEnricher {
         return referenceData;
     }
 
-    private File getSchemaFile(String tableName) {
-        return new File(appArguments.getJsonSchemasDirectory(),
-                        tableName.toLowerCase(Locale.ROOT) + SCHEMA_FILE_SUFFIX);
+    private Path getSchemaFile(String tableName) {
+        return appArguments.getJsonSchemasDirectory()
+                           .toPath()
+                           .resolve(tableName.toLowerCase(Locale.ROOT) + SCHEMA_FILE_SUFFIX);
     }
 }
