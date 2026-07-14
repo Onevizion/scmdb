@@ -163,10 +163,9 @@ public class DdlDao extends AbstractDaoOra {
         namedParams.addValue("objName", objectName);
         namedParams.addValue("objType", objectType.getName().toUpperCase());
         String sql = """
-                select case when\
-                                count(object_name) > 0 then 'true'\
-                            else 'false'\
-                        end\
+                select case when count(object_name) > 0 then 'true'
+                            else 'false'
+                        end
                     from user_objects where object_name = upper(:objName) and object_type = upper(:objType)
                 """;
         String boolStr = namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);
@@ -176,10 +175,10 @@ public class DdlDao extends AbstractDaoOra {
     public boolean isStaticReferenceTable(String tableName) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
         String sql = """
-                select case when count(*) = 1 then 'true' else 'false' end\
-                  from user_tables t\
-                 where t.table_name = upper(:tableName)\
-                   and not exists (select 1 from user_tab_columns c\
+                select case when count(*) = 1 then 'true' else 'false' end
+                  from user_tables t
+                 where t.table_name = upper(:tableName)
+                   and not exists (select 1 from user_tab_columns c
                                     where c.table_name = t.table_name and c.column_name = 'PROGRAM_ID')
                 """;
         String boolStr = namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);
@@ -189,11 +188,11 @@ public class DdlDao extends AbstractDaoOra {
     public List<String> getPrimaryKeyColumns(String tableName) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
         String sql = """
-                select cols.column_name\
-                  from user_constraints cons\
-                  join user_cons_columns cols on cols.constraint_name = cons.constraint_name\
-                 where cons.table_name = upper(:tableName)\
-                   and cons.constraint_type = 'P'\
+                select cols.column_name
+                  from user_constraints cons
+                  join user_cons_columns cols on cols.constraint_name = cons.constraint_name
+                 where cons.table_name = upper(:tableName)
+                   and cons.constraint_type = 'P'
                  order by cols.position
                 """;
         return namedParameterJdbcTemplate.queryForList(sql, namedParams, String.class);
@@ -202,15 +201,15 @@ public class DdlDao extends AbstractDaoOra {
     public List<String> getLookupColumns(String tableName, List<String> excludedColumns) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
         String sql = """
-                select column_name\
-                  from user_tab_columns\
-                 where table_name = upper(:tableName)\
-                   and data_type in ('VARCHAR2', 'CHAR', 'NVARCHAR2', 'NCHAR')\
-                 order by case when column_name like '%NAME%' then 0\
-                               when column_name like '%CODE%' then 1\
-                               when column_name like '%TYPE%' then 2\
-                               else 3\
-                           end, \
+                select column_name
+                  from user_tab_columns
+                 where table_name = upper(:tableName)
+                   and data_type in ('VARCHAR2', 'CHAR', 'NVARCHAR2', 'NCHAR')
+                 order by case when column_name like '%NAME%' then 0
+                               when column_name like '%CODE%' then 1
+                               when column_name like '%TYPE%' then 2
+                               else 3
+                           end,
                            column_id
                 """;
         return namedParameterJdbcTemplate.queryForList(sql, namedParams, String.class)
@@ -290,13 +289,13 @@ public class DdlDao extends AbstractDaoOra {
         }
 
         return """
-                 where page_url is not null\
-                 and is_tt_specific = 1\
-                 and module_name not like 'ADMIN%'\
-                 and security_group not like 'ADMIN%'\
-                 and module_name not like 'BPL_EXP_IMP%'\
-                 and module_name not like 'SELECTOR%'\
-                 and module_name not like 'ASSIGNMENT%'\
+                 where page_url is not null
+                 and is_tt_specific = 1
+                 and module_name not like 'ADMIN%'
+                 and security_group not like 'ADMIN%'
+                 and module_name not like 'BPL_EXP_IMP%'
+                 and module_name not like 'SELECTOR%'
+                 and module_name not like 'ASSIGNMENT%'
                 """;
     }
 
@@ -305,9 +304,9 @@ public class DdlDao extends AbstractDaoOra {
                 .addValue("tableName", tableName)
                 .addValue("columnName", columnName);
         String sql = """
-                select case when count(*) > 0 then 'true' else 'false' end\
-                 from user_tab_columns\
-                 where table_name = upper(:tableName)\
+                select case when count(*) > 0 then 'true' else 'false' end
+                 from user_tab_columns
+                 where table_name = upper(:tableName)
                    and column_name = upper(:columnName)
                 """;
         String boolStr = namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);
@@ -316,12 +315,12 @@ public class DdlDao extends AbstractDaoOra {
 
     public List<String> loadComponentTableNames() {
         String sql = """
-                select main_table as table_name\
-                 from v_component\
-                 where main_table is not null\
-                 union\
-                 select table_name\
-                 from v_component_table\
+                select main_table as table_name
+                 from v_component
+                 where main_table is not null
+                 union
+                 select table_name
+                 from v_component_table
                  where table_name is not null
                 """;
         return jdbcTemplate.queryForList(sql, String.class);
@@ -330,10 +329,10 @@ public class DdlDao extends AbstractDaoOra {
     public String getComponentLookupColumn(String tableName) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
         String sql = """
-                select distinct component_name_column\
-                 from v_component\
-                 where main_table = upper(:tableName)\
-                   and component_name_column is not null\
+                select distinct component_name_column
+                  from v_component
+                 where main_table = upper(:tableName)
+                   and component_name_column is not null
                  order by component_name_column
                 """;
         List<String> lookupColumns = namedParameterJdbcTemplate.queryForList(sql, namedParams, String.class);
@@ -343,18 +342,18 @@ public class DdlDao extends AbstractDaoOra {
     public List<Map<String, Object>> getTableForeignKeys(String tableName) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
         String sql = """
-                select ac.constraint_name,\
-                 ac.table_name as from_table,\
-                 acc.column_name as from_column,\
-                 r_ac.table_name as to_table,\
-                 r_acc.column_name as to_column\
-                 from user_constraints ac\
-                 join user_cons_columns acc on ac.constraint_name = acc.constraint_name\
-                 join user_constraints r_ac on ac.r_constraint_name = r_ac.constraint_name\
-                 join user_cons_columns r_acc on r_ac.constraint_name = r_acc.constraint_name\
-                 and acc.position = r_acc.position\
-                 where ac.constraint_type = 'R'\
-                 and ac.table_name = upper(:tableName)\
+                select ac.constraint_name,
+                       ac.table_name as from_table,
+                       acc.column_name as from_column,
+                       r_ac.table_name as to_table,
+                       r_acc.column_name as to_column
+                  from user_constraints ac
+                  join user_cons_columns acc on ac.constraint_name = acc.constraint_name
+                  join user_constraints r_ac on ac.r_constraint_name = r_ac.constraint_name
+                  join user_cons_columns r_acc on r_ac.constraint_name = r_acc.constraint_name
+                                              and acc.position = r_acc.position
+                 where ac.constraint_type = 'R'
+                   and ac.table_name = upper(:tableName)
                  order by ac.constraint_name, acc.position
                 """;
         return namedParameterJdbcTemplate.query(sql, namedParams, (rs, rowNum) -> {
