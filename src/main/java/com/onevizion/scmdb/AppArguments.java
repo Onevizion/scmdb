@@ -28,6 +28,7 @@ public class AppArguments {
     private boolean ignoreErrors = false;
     private boolean forceDisableJobs = false;
     private boolean backport = false;
+    private boolean rollback = false;
     private String ghToken;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
@@ -49,6 +50,7 @@ public class AppArguments {
         OptionSpec ignoreErrorsOption = parser.acceptsAll(asList("i", "ignore-errors"));
         OptionSpec forceDisableJobsOption = parser.accepts("force-disable-jobs");
         OptionSpec backportOption = parser.accepts("backport");
+        OptionSpec rollbackOption = parser.accepts("rollback");
         OptionSpec<String> ghTokenOption = parser.accepts("gh-token").withRequiredArg().ofType(String.class);
 
         OptionSet options = parser.parse(args);
@@ -91,6 +93,10 @@ public class AppArguments {
             throw new IllegalArgumentException("--backport cannot be combined with --exec or --gen-ddl.");
         }
 
+        if (options.has(rollbackOption) && (options.has(execOption) || options.has(genDdlOption) || options.has(backportOption))) {
+            throw new IllegalArgumentException("--rollback cannot be combined with --exec, --gen-ddl or --backport.");
+        }
+
         executeScripts = options.has(execOption);
         genDdl = options.has(genDdlOption);
         all = options.has(allOption);
@@ -98,6 +104,7 @@ public class AppArguments {
         omitChanged = options.has(omitChangedOption);
         ignoreErrors = options.has(ignoreErrorsOption);
         forceDisableJobs = options.has(forceDisableJobsOption);
+        rollback = options.has(rollbackOption);
 
         backport = options.has(backportOption);
         if (backport) {
@@ -179,7 +186,7 @@ public class AppArguments {
     }
 
     public boolean isReadAllFilesContent() {
-        return genDdl || backport || !omitChanged;
+        return genDdl || backport || rollback || !omitChanged;
     }
 
     public boolean isForceDisableJobs() {
@@ -188,6 +195,10 @@ public class AppArguments {
 
     public boolean isBackport() {
         return backport;
+    }
+
+    public boolean isRollback() {
+        return rollback;
     }
 
     public String getGhToken() {
