@@ -1,8 +1,10 @@
 package com.onevizion.scmdb.dao;
 
 import com.onevizion.scmdb.StringPlaceholderUtils;
+import com.onevizion.scmdb.vo.ComponentRow;
 import com.onevizion.scmdb.vo.DbObject;
 import com.onevizion.scmdb.vo.DbObjectType;
+import com.onevizion.scmdb.vo.ForeignKey;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -88,7 +90,26 @@ public class DdlDao extends AbstractDaoOra {
         dbObject.setType(DbObjectType.getByName(rs.getString("object_type")));
         return dbObject;
     };
-    
+
+    private static final RowMapper<ForeignKey> foreignKeyRowMapper = (rs, rowNum) ->
+            new ForeignKey(rs.getString("constraint_name"),
+                           rs.getString("from_table"),
+                           rs.getString("from_column"),
+                           rs.getString("to_table"),
+                           rs.getString("to_column"));
+
+    private static final RowMapper<ComponentRow> componentRowMapper = (rs, rowNum) ->
+            new ComponentRow(rs.getObject("component_id", Integer.class),
+                             rs.getString("component"),
+                             rs.getString("main_table"),
+                             rs.getObject("support_bpl", Integer.class),
+                             rs.getObject("support_audit", Integer.class),
+                             rs.getString("component_name_column"),
+                             rs.getObject("component_table_id", Integer.class),
+                             rs.getString("table_name"),
+                             rs.getObject("bpd_item_type_id", Integer.class),
+                             rs.getString("bpd_item_type"));
+
     public void executeTransformParamStatements() {
         String plsqlBlock = "begin" +
                 "\n dbms_metadata.set_transform_param(dbms_metadata.session_transform,'PRETTY',true);" +
@@ -241,7 +262,7 @@ public class DdlDao extends AbstractDaoOra {
         });
     }
 
-    public List<Map<String, Object>> loadComponentStructureRows() {
+    public List<ComponentRow> loadComponentStructureRows() {
         boolean hasBpdItemTypeId = hasColumn("V_COMPONENT", "BPD_ITEM_TYPE_ID");
         String bpdItemTypeIdColumn = hasBpdItemTypeId ? "c.bpd_item_type_id,"
                                                       : "cast(null as number) as bpd_item_type_id,";
@@ -267,20 +288,7 @@ public class DdlDao extends AbstractDaoOra {
                                                     Map.of("bpdItemTypeIdColumn", bpdItemTypeIdColumn,
                                                            "bpdItemTypeColumn", bpdItemTypeColumn,
                                                            "bpdItemTypeJoin", bpdItemTypeJoin));
-        return jdbcTemplate.query(sql, (rs, rowNum) -> {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("component_id", rs.getObject("component_id"));
-            row.put("component", rs.getObject("component"));
-            row.put("main_table", rs.getObject("main_table"));
-            row.put("support_bpl", rs.getObject("support_bpl"));
-            row.put("support_audit", rs.getObject("support_audit"));
-            row.put("component_name_column", rs.getObject("component_name_column"));
-            row.put("component_table_id", rs.getObject("component_table_id"));
-            row.put("table_name", rs.getObject("table_name"));
-            row.put("bpd_item_type_id", rs.getObject("bpd_item_type_id"));
-            row.put("bpd_item_type", rs.getObject("bpd_item_type"));
-            return row;
-        });
+        return jdbcTemplate.query(sql, componentRowMapper);
     }
 
     private String referenceDataWhereClause(String tableName) {
@@ -339,7 +347,7 @@ public class DdlDao extends AbstractDaoOra {
         return lookupColumns.isEmpty() ? null : lookupColumns.get(0);
     }
 
-    public List<Map<String, Object>> getTableForeignKeys(String tableName) {
+    public List<ForeignKey> getTableForeignKeys(String tableName) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
         String sql = """
                 select ac.constraint_name,
@@ -356,15 +364,7 @@ public class DdlDao extends AbstractDaoOra {
                    and ac.table_name = upper(:tableName)
                  order by ac.constraint_name, acc.position
                 """;
-        return namedParameterJdbcTemplate.query(sql, namedParams, (rs, rowNum) -> {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("constraint_name", rs.getObject("constraint_name"));
-            row.put("from_table", rs.getObject("from_table"));
-            row.put("from_column", rs.getObject("from_column"));
-            row.put("to_table", rs.getObject("to_table"));
-            row.put("to_column", rs.getObject("to_column"));
-            return row;
-        });
+        return namedParameterJdbcTemplate.query(sql, namedParams, foreignKeyRowMapper);
     }
 
     private String sanitizeSqlIdentifier(String identifier) {

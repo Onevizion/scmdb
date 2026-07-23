@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Stream;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
@@ -45,30 +44,6 @@ public class StaticDataSchemaEnricher {
     public void enrichSchemas(Set<String> tableNames) {
         for (String tableName : tableNames) {
             enrichSchema(tableName, getSchemaFile(tableName));
-        }
-    }
-
-    public void enrichAllSchemas() {
-        Path schemasDirectory = appArguments.getJsonSchemasDirectory().toPath();
-        try (Stream<Path> schemaFiles = Files.list(schemasDirectory)) {
-            List<Path> schemaFileList = schemaFiles
-                    .filter(Files::isRegularFile)
-                    .filter(path -> path.getFileName().toString().endsWith(SCHEMA_FILE_SUFFIX))
-                    .toList();
-
-            if (schemaFileList.isEmpty()) {
-                logger.info("No JSON schemas found for static data enrichment");
-                return;
-            }
-
-            for (Path schemaFile : schemaFileList) {
-                String fileName = schemaFile.getFileName().toString();
-                String tableName = fileName.substring(0, fileName.length() - SCHEMA_FILE_SUFFIX.length())
-                                           .toUpperCase(Locale.ROOT);
-                enrichSchema(tableName, schemaFile);
-            }
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to list JSON schemas for static data enrichment: " + schemasDirectory.toAbsolutePath(), e);
         }
     }
 
@@ -101,7 +76,8 @@ public class StaticDataSchemaEnricher {
 
             enrichComponentReferenceData(tableName, schemaFile, schema, properties, pkColumns, pkColumn);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to enrich JSON schema with reference data: " + schemaFile.toAbsolutePath(), e);
+            throw new RuntimeException(
+                    "Failed to enrich JSON schema with reference data: " + schemaFile.toAbsolutePath(), e);
         }
     }
 
@@ -132,7 +108,7 @@ public class StaticDataSchemaEnricher {
 
     private void enrichComponentReferenceData(String tableName, Path schemaFile, ObjectNode schema,
                                               ObjectNode properties, List<String> pkColumns, String pkColumn)
-                                              throws IOException {
+            throws IOException {
         String lookupColumn = ddlDao.getComponentLookupColumn(tableName);
         if (lookupColumn == null || !properties.has("PROGRAM_ID") || !properties.has(lookupColumn)) {
             return;
@@ -167,4 +143,5 @@ public class StaticDataSchemaEnricher {
                            .toPath()
                            .resolve(tableName.toLowerCase(Locale.ROOT) + SCHEMA_FILE_SUFFIX);
     }
+
 }

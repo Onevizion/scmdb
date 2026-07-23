@@ -37,13 +37,20 @@ public class AppArguments {
     private final static String JSON_SCHEMAS_DIRECTORY_NAME = "json";
     private final static String COMPONENT_STRUCTURES_DIRECTORY_NAME = "json-component-structures";
 
+    private final static String DDL_DIRECTORY_NOT_FOUND_MSG =
+            "Path [{0}] does not exist or is not a directory. Cannot find ddl directory";
+    private final static String CANNOT_CREATE_DIRECTORY_MSG = "Cannot create {0} directory [{1}]";
+    private final static String NOT_A_DIRECTORY_MSG = "Path [{0}] is not a directory";
+
     void parse(String[] args, boolean requireScriptsDirectory) {
         OptionParser parser = new OptionParser();
         OptionSpec<String> ownerSchemaOption = parser.accepts("owner-schema").withRequiredArg().ofType(String.class);
         OptionSpec<String> userSchemaOption = parser.accepts("user-schema").withOptionalArg().ofType(String.class);
         OptionSpec<String> rptSchemaOption = parser.accepts("rpt-schema").withOptionalArg().ofType(String.class);
         OptionSpec<String> pkgSchemaOption = parser.accepts("pkg-schema").withOptionalArg().ofType(String.class);
-        OptionSpec<String> perfstatSchemaOption = parser.accepts("perfstat-schema").withOptionalArg().ofType(String.class);
+        OptionSpec<String> perfstatSchemaOption = parser.accepts("perfstat-schema")
+                                                        .withOptionalArg()
+                                                        .ofType(String.class);
         OptionSpec<File> scriptsDirectoryOption = parser.accepts("scripts-dir").withRequiredArg().ofType(File.class);
 
         OptionSpec execOption = parser.acceptsAll(asList("e", "exec"));
@@ -74,52 +81,34 @@ public class AppArguments {
 
         scriptsDirectory = options.valueOf(scriptsDirectoryOption);
         boolean requireSourceTreeDirectories = options.has(genDdlOption)
-                                                || options.has(genAllSchemasOption)
-                                                || options.has(backportOption);
+                                               || options.has(genAllSchemasOption)
+                                               || options.has(backportOption);
 
         if (requireSourceTreeDirectories && scriptsDirectory == null) {
-            throw new IllegalArgumentException("--scripts-dir is required for --gen-ddl, --gen-all-schemas and --backport modes.");
+            throw new IllegalArgumentException(
+                    "--scripts-dir is required for --gen-ddl, --gen-all-schemas and --backport modes.");
         }
 
-        if ((requireScriptsDirectory || requireSourceTreeDirectories) && (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory())) {
-            throw new IllegalArgumentException("Path [" + scriptsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
+        if ((requireScriptsDirectory || requireSourceTreeDirectories) &&
+            (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory())) {
+            throw new IllegalArgumentException(
+                    "Path [" + scriptsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
                     " [--scripts-dir] should contains absolute path and points to scripts directory");
         } else if (!requireScriptsDirectory && scriptsDirectory != null && !requireSourceTreeDirectories) {
-            throw new IllegalArgumentException("[--scripts-dir] parameter is not expected in this context, SCMDB has already migration scripts bundled.");
+            throw new IllegalArgumentException(
+                    "[--scripts-dir] parameter is not expected in this context, SCMDB has already migration scripts bundled.");
         }
 
-        if (requireSourceTreeDirectories){
-            File dbDirectory = scriptsDirectory.getAbsoluteFile().getParentFile();
-            ddlsDirectory = new File(dbDirectory, DDL_DIRECTORY_NAME);
-            if (!ddlsDirectory.exists() || !ddlsDirectory.isDirectory()) {
-                throw new IllegalArgumentException("Path [" + ddlsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
-                        " Can't find ddl directory");
-            }
-            jsonSchemasDirectory = new File(dbDirectory, JSON_SCHEMAS_DIRECTORY_NAME);
-            componentStructuresDirectory = new File(dbDirectory, COMPONENT_STRUCTURES_DIRECTORY_NAME);
-            if (!jsonSchemasDirectory.exists() && !jsonSchemasDirectory.mkdirs()) {
-                throw new IllegalArgumentException("Can't create json schemas directory [" +
-                                                   jsonSchemasDirectory.getAbsolutePath() + "]");
-            }
-            if (!jsonSchemasDirectory.isDirectory()) {
-                throw new IllegalArgumentException("Path [" + jsonSchemasDirectory.getAbsolutePath() +
-                                                   "] isn't a directory.");
-            }
-            if (!componentStructuresDirectory.exists() && !componentStructuresDirectory.mkdirs()) {
-                throw new IllegalArgumentException("Can't create component structures directory [" +
-                                                   componentStructuresDirectory.getAbsolutePath() + "]");
-            }
-            if (!componentStructuresDirectory.isDirectory()) {
-                throw new IllegalArgumentException("Path [" + componentStructuresDirectory.getAbsolutePath() +
-                                                   "] isn't a directory.");
-            }
+        if (requireSourceTreeDirectories) {
+            resolveSourceTreeDirectories();
         }
 
         if (options.has(execOption) && (options.has(genDdlOption) || options.has(genAllSchemasOption))) {
             throw new IllegalArgumentException("You can't specify both --gen-ddl and --exec arguments. Choose one.");
         }
 
-        if (options.has(backportOption) && (options.has(execOption) || options.has(genDdlOption) || options.has(genAllSchemasOption))) {
+        if (options.has(backportOption) &&
+            (options.has(execOption) || options.has(genDdlOption) || options.has(genAllSchemasOption))) {
             throw new IllegalArgumentException("--backport cannot be combined with --exec or --gen-ddl.");
         }
 
@@ -146,6 +135,30 @@ public class AppArguments {
         }
     }
 
+    private void resolveSourceTreeDirectories() {
+        File dbDirectory = scriptsDirectory.getAbsoluteFile().getParentFile();
+        ddlsDirectory = new File(dbDirectory, DDL_DIRECTORY_NAME);
+        if (!ddlsDirectory.exists() || !ddlsDirectory.isDirectory()) {
+            throw new IllegalArgumentException(MessageFormat.format(DDL_DIRECTORY_NOT_FOUND_MSG,
+                                                                    ddlsDirectory.getAbsolutePath()));
+        }
+        jsonSchemasDirectory = ensureDirectory(dbDirectory, JSON_SCHEMAS_DIRECTORY_NAME, "json schemas");
+        componentStructuresDirectory = ensureDirectory(dbDirectory, COMPONENT_STRUCTURES_DIRECTORY_NAME,
+                                                       "component structures");
+    }
+
+    private File ensureDirectory(File parentDirectory, String directoryName, String description) {
+        File directory = new File(parentDirectory, directoryName);
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw new IllegalArgumentException(MessageFormat.format(CANNOT_CREATE_DIRECTORY_MSG,
+                                                                    description, directory.getAbsolutePath()));
+        }
+        if (!directory.isDirectory()) {
+            throw new IllegalArgumentException(MessageFormat.format(NOT_A_DIRECTORY_MSG, directory.getAbsolutePath()));
+        }
+        return directory;
+    }
+
     public void fillDataSourceCredentials(PoolDataSource poolDataSource, SchemaType schemaType) {
         DbCnnCredentials credentials = this.credentials.get(schemaType);
         try {
@@ -170,8 +183,9 @@ public class AppArguments {
             }
         } else {
             String ownerConnectionString = credentials.get(OWNER).getConnectionString();
-            credentials.put(schemaType, DbCnnCredentials.create(DbCnnCredentials.genCnnStrForSchema(ownerConnectionString,
-                    schemaType)));
+            credentials.put(schemaType,
+                            DbCnnCredentials.create(DbCnnCredentials.genCnnStrForSchema(ownerConnectionString,
+                                                                                        schemaType)));
         }
     }
 

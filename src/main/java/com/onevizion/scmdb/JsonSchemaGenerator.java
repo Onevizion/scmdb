@@ -16,35 +16,38 @@ import java.util.stream.Collectors;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
 import static com.onevizion.scmdb.ColorLogger.Color.YELLOW;
-import static com.onevizion.scmdb.vo.DbObjectType.*;
 
 @Component
 public class JsonSchemaGenerator {
 
     private static final String GENERATOR_RESOURCE = "json_schema_generator.py";
     private static final String PARSER_RESOURCE = "json_schema_py_ddl_parser.py";
+    private static final String OK_PREFIX = "  OK";
+    private static final String SKIP_PREFIX = "  SKIP";
+
+    private final AppArguments appArguments;
+    private final DdlDao ddlDao;
+    private final ColorLogger logger;
+    private final StaticDataSchemaEnricher staticDataSchemaEnricher;
+    private final ComponentStructureGenerator componentStructureGenerator;
 
     @Autowired
-    private AppArguments appArguments;
-
-    @Autowired
-    private DdlDao ddlDao;
-
-    @Autowired
-    private ColorLogger logger;
-
-    @Autowired
-    private StaticDataSchemaEnricher staticDataSchemaEnricher;
-
-    @Autowired
-    private ComponentStructureGenerator componentStructureGenerator;
+    public JsonSchemaGenerator(AppArguments appArguments, DdlDao ddlDao, ColorLogger logger,
+                               StaticDataSchemaEnricher staticDataSchemaEnricher,
+                               ComponentStructureGenerator componentStructureGenerator) {
+        this.appArguments = appArguments;
+        this.ddlDao = ddlDao;
+        this.logger = logger;
+        this.staticDataSchemaEnricher = staticDataSchemaEnricher;
+        this.componentStructureGenerator = componentStructureGenerator;
+    }
 
     public void generateSchemas(Collection<DbObject> changedDbObjects) {
         Set<String> tableNames = resolveTableNames(changedDbObjects);
         if (tableNames.isEmpty()) {
             logger.info("No changed tables found for JSON schema generation");
         } else {
-            Set<String> generatedTableNames = runPythonGenerator(false, tableNames);
+            Set<String> generatedTableNames = runPythonGenerator(tableNames, false);
             staticDataSchemaEnricher.enrichSchemas(generatedTableNames);
         }
         componentStructureGenerator.generate();
@@ -55,7 +58,7 @@ public class JsonSchemaGenerator {
         if (tableNames.isEmpty()) {
             logger.info("No configuration tables found for JSON schema generation");
         } else {
-            Set<String> generatedTableNames = runPythonGenerator(false, tableNames, true);
+            Set<String> generatedTableNames = runPythonGenerator(tableNames, true);
             staticDataSchemaEnricher.enrichSchemas(generatedTableNames);
         }
         componentStructureGenerator.generate();
@@ -79,23 +82,18 @@ public class JsonSchemaGenerator {
 
     private String resolveTableName(DbObject dbObject) {
         DbObjectType type = dbObject.getType();
-        if (type == TABLE) {
-            return dbObject.getName();
+        if (type == null) {
+            return null;
         }
-        if (type == COMMENT) {
-            return dbObject.getName().split("\\.")[0];
-        }
-        if (type == INDEX || type == TRIGGER || type == SEQUENCE) {
-            return ddlDao.getTableNameByDepObject(dbObject);
-        }
-        return null;
+        return switch (type) {
+            case TABLE -> dbObject.getName();
+            case COMMENT -> dbObject.getName().split("\\.")[0];
+            case INDEX, TRIGGER, SEQUENCE -> ddlDao.getTableNameByDepObject(dbObject);
+            default -> null;
+        };
     }
 
-    private Set<String> runPythonGenerator(boolean all, Set<String> tableNames) {
-        return runPythonGenerator(all, tableNames, false);
-    }
-
-    private Set<String> runPythonGenerator(boolean all, Set<String> tableNames, boolean includeReferences) {
+    private Set<String> runPythonGenerator(Set<String> tableNames, boolean includeReferences) {
         File tempDir = null;
         Set<String> generatedTableNames = new TreeSet<>();
         try {
@@ -110,17 +108,13 @@ public class JsonSchemaGenerator {
             command.add(appArguments.getDdlsDirectory().getAbsolutePath());
             command.add("--output-dir");
             command.add(appArguments.getJsonSchemasDirectory().getAbsolutePath());
-            if (all) {
-                command.add("--all");
-            } else {
-                command.add("--tables");
-                command.add(String.join(",", tableNames));
-            }
+            command.add("--tables");
+            command.add(String.join(",", tableNames));
             if (includeReferences) {
                 command.add("--include-refs");
             }
 
-            logger.info("Generating JSON schemas{}", GREEN, all ? " for all tables" : " for selected tables");
+            logger.info("Generating JSON schemas for selected tables", GREEN);
             Process process = new ProcessBuilder(command)
                     .redirectErrorStream(true)
                     .start();
@@ -149,7 +143,7 @@ public class JsonSchemaGenerator {
     }
 
     private void collectGeneratedTableName(String line, Set<String> generatedTableNames) {
-        if (!line.startsWith("  OK")) {
+        if (!line.startsWith(OK_PREFIX)) {
             return;
         }
 
@@ -173,12 +167,9 @@ public class JsonSchemaGenerator {
     }
 
     private ColorLogger.Color chooseColor(String line) {
-        if (line.startsWith("  OK")) {
-            return GREEN;
-        }
-        if (line.startsWith("  SKIP")) {
-            return YELLOW;
-        }
-        return ColorLogger.Color.WHITE;
+        return line.startsWith(OK_PREFIX) ? GREEN
+                                          : line.startsWith(SKIP_PREFIX) ? YELLOW
+                                                                         : ColorLogger.Color.WHITE;
     }
+
 }
