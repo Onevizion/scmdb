@@ -7,7 +7,7 @@ import com.onevizion.scmdb.dao.DbScriptDaoOra;
 import com.onevizion.scmdb.exception.ScmdbException;
 import com.onevizion.scmdb.vo.SqlScript;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Component;
@@ -86,7 +86,7 @@ public class DbScriptFacade {
 
     private boolean isIgnoredScript(SqlScript script) {
         String[] parts = script.getName().split("_");
-        boolean isDevScript = parts.length <= 1 || !NumberUtils.isDigits(parts[0]);
+        boolean isDevScript = parts.length <= 1 || !StringUtils.isNumeric(parts[0]);
         if (isDevScript) {
             logger.info("Dev script [" + script.getName() + "] was ignored");
         }
