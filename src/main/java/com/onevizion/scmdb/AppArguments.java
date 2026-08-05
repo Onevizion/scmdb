@@ -1,6 +1,7 @@
 package com.onevizion.scmdb;
 
 import com.onevizion.scmdb.vo.DbCnnCredentials;
+import com.onevizion.scmdb.vo.RollbackMode;
 import com.onevizion.scmdb.vo.SchemaType;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -28,7 +29,7 @@ public class AppArguments {
     private boolean ignoreErrors = false;
     private boolean forceDisableJobs = false;
     private boolean backport = false;
-    private boolean skipRollbackConfirm;
+    private RollbackMode rollbackMode;
     private String ghToken;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
@@ -50,7 +51,10 @@ public class AppArguments {
         OptionSpec ignoreErrorsOption = parser.acceptsAll(asList("i", "ignore-errors"));
         OptionSpec forceDisableJobsOption = parser.accepts("force-disable-jobs");
         OptionSpec backportOption = parser.accepts("backport");
-        OptionSpec<?> skipRollbackConfirm = parser.accepts("skip-rollback-confirm");
+        OptionSpec<RollbackMode> rollbackMode = parser.accepts("rollback-mode")
+                                                      .withRequiredArg()
+                                                      .ofType(RollbackMode.class)
+                                                      .defaultsTo(RollbackMode.ASK);
         OptionSpec<String> ghTokenOption = parser.accepts("gh-token").withRequiredArg().ofType(String.class);
 
         OptionSet options = parser.parse(args);
@@ -114,7 +118,7 @@ public class AppArguments {
             }
         }
 
-        this.skipRollbackConfirm = options.has(skipRollbackConfirm);
+        this.rollbackMode = options.valueOf(rollbackMode);
     }
 
     public void fillDataSourceCredentials(PoolDataSource poolDataSource, SchemaType schemaType) {
@@ -194,8 +198,8 @@ public class AppArguments {
         return backport;
     }
 
-    public boolean isSkipRollbackConfirm() {
-        return skipRollbackConfirm;
+    public RollbackMode getRollbackMode() {
+        return rollbackMode;
     }
 
     public String getGhToken() {

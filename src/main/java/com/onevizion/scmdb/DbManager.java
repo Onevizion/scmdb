@@ -154,28 +154,34 @@ public class DbManager {
             return;
         }
 
-        if (appArguments.isOmitChanged()) {
-            logger.info(ROLLBACKS_TO_SKIP_MSG, appArguments.getDbCredentials(OWNER).getSchemaWithUrlBeforeDot());
-            rollbacksToExec.forEach(s -> logger.info(s.getName()));
-            logger.info("\n");
-
-            scriptsFacade.deleteAll(deletedScripts.values());
-            return;
-        }
-
         boolean executeRollbacks = false;
         if (appArguments.isExecuteScripts()) {
-            if (appArguments.isSkipRollbackConfirm()) {
-                logger.info("[{}] rollback scripts will be executed without confirmation.", GREEN, rollbacksToExec.size());
-                rollbacksToExec.forEach(r -> logger.info(r.getName(), GREEN));
-                executeRollbacks = true;
-            } else {
-                logger.info("Do you really want to execute {} rollbacks? \n", GREEN, rollbacksToExec.size());
-                rollbacksToExec.forEach(r -> logger.info(r.getName(), GREEN));
-                logger.info("\nType [no] and rollbacks will be copied to EXECUTE_ME directory and marked as executed. " +
-                                    "Execute them manually and run scmdb again to execute new scripts.", GREEN);
-                logger.info("Type [yes] to continue and execute all rollbacks", GREEN);
-                executeRollbacks = userGrantsPermission();
+            switch (appArguments.getRollbackMode()) {
+                case ASK -> {
+                    logger.info("Do you really want to execute {} rollbacks? \n", GREEN, rollbacksToExec.size());
+                    rollbacksToExec.forEach(r -> logger.info(r.getName(), GREEN));
+                    logger.info(
+                            "\nType [no] and rollbacks will be copied to EXECUTE_ME directory and marked as executed. " +
+                                    "Execute them manually and run scmdb again to execute new scripts.",
+                            GREEN);
+                    logger.info("Type [yes] to continue and execute all rollbacks", GREEN);
+                    executeRollbacks = userGrantsPermission();
+                }
+                case SKIP -> {
+                    logger.info(ROLLBACKS_TO_SKIP_MSG, appArguments.getDbCredentials(OWNER).getSchemaWithUrlBeforeDot());
+                    rollbacksToExec.forEach(s -> logger.info(s.getName()));
+                    logger.info("\n");
+
+                    scriptsFacade.deleteAll(deletedScripts.values());
+                    return;
+                }
+                case FORCE_EXECUTE -> {
+                    logger.info("[{}] rollback scripts will be executed without confirmation.",
+                                GREEN,
+                                rollbacksToExec.size());
+                    rollbacksToExec.forEach(r -> logger.info(r.getName(), GREEN));
+                    executeRollbacks = true;
+                }
             }
         }
 
