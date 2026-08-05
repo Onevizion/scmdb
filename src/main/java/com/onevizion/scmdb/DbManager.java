@@ -172,6 +172,7 @@ public class DbManager {
                     rollbacksToExec.forEach(s -> logger.info(s.getName()));
                     logger.info("\n");
 
+                    // Skip both rollback execution and copying to EXECUTE_ME directory
                     scriptsFacade.deleteAll(deletedScripts.values());
                     return;
                 }
