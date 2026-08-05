@@ -143,6 +143,8 @@ public class DbManager {
     }
 
     private void checkDeletedScripts() {
+        logger.info("Rollback scripts execution mode: [{}]", appArguments.getRollbackMode());
+
         Map<String, SqlScript> deletedScripts = scriptsFacade.getDeletedScriptsMap();
         List<SqlScript> rollbacksToExec = deletedScripts.values()
                                                         .stream()
