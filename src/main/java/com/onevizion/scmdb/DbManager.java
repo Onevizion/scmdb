@@ -157,7 +157,7 @@ public class DbManager {
         }
 
         boolean executeRollbacks = false;
-        if (appArguments.isExecuteScripts()) {
+        if (appArguments.isExecuteScripts() || appArguments.getRollbackMode() == RollbackMode.SKIP) {
             switch (appArguments.getRollbackMode()) {
                 case ASK -> {
                     logger.info("Do you really want to execute {} rollbacks? \n", GREEN, rollbacksToExec.size());
