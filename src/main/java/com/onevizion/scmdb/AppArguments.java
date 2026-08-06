@@ -1,6 +1,7 @@
 package com.onevizion.scmdb;
 
 import com.onevizion.scmdb.vo.DbCnnCredentials;
+import com.onevizion.scmdb.vo.RollbackMode;
 import com.onevizion.scmdb.vo.SchemaType;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -29,6 +30,7 @@ public class AppArguments {
     private boolean forceDisableJobs = false;
     private boolean backport = false;
     private boolean rollbackDev = false;
+    private RollbackMode rollbackMode;
     private String ghToken;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
@@ -51,6 +53,10 @@ public class AppArguments {
         OptionSpec forceDisableJobsOption = parser.accepts("force-disable-jobs");
         OptionSpec backportOption = parser.accepts("backport");
         OptionSpec rollbackDevOption = parser.accepts("rollback-dev");
+        OptionSpec<RollbackMode> rollbackMode = parser.accepts("rollback-mode")
+                                                      .withRequiredArg()
+                                                      .ofType(RollbackMode.class)
+                                                      .defaultsTo(RollbackMode.ASK);
         OptionSpec<String> ghTokenOption = parser.accepts("gh-token").withRequiredArg().ofType(String.class);
 
         OptionSet options = parser.parse(args);
@@ -118,6 +124,8 @@ public class AppArguments {
                         "--gh-token or GITHUB_TOKEN environment variable is required when using --backport.");
             }
         }
+
+        this.rollbackMode = options.valueOf(rollbackMode);
     }
 
     public void fillDataSourceCredentials(PoolDataSource poolDataSource, SchemaType schemaType) {
@@ -199,6 +207,10 @@ public class AppArguments {
 
     public boolean isRollbackDev() {
         return rollbackDev;
+    }
+
+    public RollbackMode getRollbackMode() {
+        return rollbackMode;
     }
 
     public String getGhToken() {
