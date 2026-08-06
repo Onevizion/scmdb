@@ -284,12 +284,8 @@ project.properties.setProperty('git.commit.id', 'git rev-parse --short HEAD'.exe
     </repositories>
 
     <distributionManagement>
-        <snapshotRepository>
-            <id>github-snapshots</id>
-            <url>https://maven.pkg.github.com/Onevizion/scmdb</url>
-        </snapshotRepository>
         <repository>
-            <id>github-releases</id>
+            <id>scmdb</id>
             <url>https://maven.pkg.github.com/Onevizion/scmdb</url>
         </repository>
     </distributionManagement>
