@@ -74,6 +74,8 @@ The PR (Pull-Request) number will be prompted interactively after started. The p
 
 ## Deploy dependencies
 
+To deploy these JARs to GitHub Packages, configure Maven credentials for server id `scmdb` (e.g., in `~/.m2/settings.xml`). Keep the `-Dversion` values below in sync with `pom.xml` (`<sqlcl.version>`).
+
 ```shell
 mvn deploy:deploy-file \
   -DgroupId="oracle.sqlcl" \
