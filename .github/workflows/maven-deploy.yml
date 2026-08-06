@@ -1,17 +1,15 @@
-name: Deploy
-
-on:
-  workflow_dispatch:
+name: Maven Deploy
 
 permissions:
   contents: read
   packages: write
 
+on:
+  workflow_dispatch:
+
 jobs:
-  deploy-maven:
-    name: Build & Deploy to GitHub packages (Maven)
-    outputs:
-      version: ${{ steps.get_version.outputs.version }}
+  build:
+    name: Build & Deploy to GitHub packages
     runs-on: ubuntu-latest
     steps:
       - name: Validate git ref
@@ -68,12 +66,6 @@ jobs:
           </settings>
           EOF
 
-      - name: Extract version from project
-        id: get_version
-        run: |
-          VERSION="$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)"
-          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
-
       - name: Deploy
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -86,38 +78,3 @@ jobs:
           retention-days: 2
           if-no-files-found: error
           archive: false
-
-  deploy-container:
-    name: Deploy container image
-    needs:
-      - deploy-maven
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Download build artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: scmdb.jar
-          skip-decompress: true
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: token
-          password: ${{ github.token }}
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build and push
-        uses: docker/build-push-action@v7
-        with:
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ghcr.io/onevizion/scmdb/scmdb:${{ needs.deploy-maven.outputs.version }}
