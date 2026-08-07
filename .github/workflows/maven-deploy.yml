@@ -69,7 +69,7 @@ jobs:
       - name: Deploy
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: mvn package deploy -P scmdb "-DaltDeploymentRepository=scmdb::https://maven.pkg.github.com/$GITHUB_REPOSITORY"
+        run: mvn package deploy -P scmdb "-DaltDeploymentRepository=scmdb::default::https://maven.pkg.github.com/$GITHUB_REPOSITORY"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
