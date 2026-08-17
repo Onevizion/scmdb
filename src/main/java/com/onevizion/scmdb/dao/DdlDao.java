@@ -2,6 +2,7 @@ package com.onevizion.scmdb.dao;
 
 import com.onevizion.scmdb.vo.DbObject;
 import com.onevizion.scmdb.vo.DbObjectType;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -156,7 +157,7 @@ public class DdlDao extends AbstractDaoOra {
     }
 
     public boolean isExist(String objectName, DbObjectType objectType) {
-        if (objectName == null || objectName.isBlank() || objectType == null) {
+        if (StringUtils.isBlank(objectName) || objectType == null || StringUtils.isBlank(objectType.getName())) {
             return false;
         }
 
