@@ -7,6 +7,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.stereotype.Component;
 
+import java.sql.Types;
 import java.util.List;
 
 import static com.onevizion.scmdb.vo.DbObjectType.*;
@@ -101,8 +102,8 @@ public class DdlDao extends AbstractDaoOra {
     public String extractDdl(DbObject dbObject) {
         String sql = "select dbms_metadata.get_ddl(upper(:dbObjType), upper(:dbObjName)) from dual";
         MapSqlParameterSource namedParams = new MapSqlParameterSource();
-        namedParams.addValue("dbObjName", dbObject.getName());
-        namedParams.addValue("dbObjType", dbObject.getType().toString());
+        namedParams.addValue("dbObjName", dbObject.getName(), Types.VARCHAR);
+        namedParams.addValue("dbObjType", dbObject.getType().toString(), Types.VARCHAR);
         return namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);
     }
 
@@ -149,15 +150,19 @@ public class DdlDao extends AbstractDaoOra {
         String sql = "select 'TABLE' object_type from user_tables where table_name = upper(:dbObjName)" +
                 " union all select 'VIEW' object_type from user_views where view_name = upper(:dbObjName)";
         MapSqlParameterSource namedParams = new MapSqlParameterSource();
-        namedParams.addValue("dbObjName", dbObjName);
+        namedParams.addValue("dbObjName", dbObjName, Types.VARCHAR);
         String dbObjTypeString = namedParameterJdbcTemplate.queryForObject(sql, namedParams, String.class);
         return DbObjectType.valueOf(dbObjTypeString);
     }
 
     public boolean isExist(String objectName, DbObjectType objectType) {
+        if (objectName == null || objectName.isBlank() || objectType == null) {
+            return false;
+        }
+
         MapSqlParameterSource namedParams = new MapSqlParameterSource();
-        namedParams.addValue("objName", objectName);
-        namedParams.addValue("objType", objectType.getName().toUpperCase());
+        namedParams.addValue("objName", objectName, Types.VARCHAR);
+        namedParams.addValue("objType", objectType.getName(), Types.VARCHAR);
         String sql = "select case when" +
                 "                count(object_name) > 0 then 'true'" +
                 "            else 'false'" +
