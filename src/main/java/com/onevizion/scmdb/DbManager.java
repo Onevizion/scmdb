@@ -109,6 +109,48 @@ public class DbManager {
                 GREEN, result.getScriptsWritten(), result.getRollbackScriptsWritten());
     }
 
+    public void runRollback() {
+        logger.info("SCMDB {}", getClass().getPackage().getImplementationVersion());
+
+        scriptsFacade.checkDbConnection();
+
+        if (!scriptsFacade.isScriptTableExist()) {
+            throw new ScmdbException("Rollback cannot be executed because DB_SCRIPT table does not exist.");
+        }
+
+        scriptExecutor.showInvalidObjects();
+
+        if (appArguments.isForceDisableJobs()) {
+            scriptExecutor.disableJobs();
+        }
+
+        try {
+            scriptsFacade.cleanExecDir();
+            checkUpdatedScripts();
+
+            Map<String, SqlScript> savedScripts = scriptsFacade.getSavedScriptsMap();
+            List<SqlScript> rollbacksToExec = scriptsFacade.getDevelopmentRollbackScriptsForSavedCommits(savedScripts);
+            rollbacksToExec = sortScriptsInExecutionOrder(rollbacksToExec, ROLLBACK);
+
+            if (rollbacksToExec.isEmpty()) {
+                logger.info("No development rollbacks to execute in [{}]:", appArguments.getDbCredentials(OWNER).getSchemaWithUrlBeforeDot());
+                return;
+            }
+
+            logger.info("\nDevelopment rollbacks to be executed in [{}]:", appArguments.getDbCredentials(OWNER).getSchemaWithUrlBeforeDot());
+            rollbacksToExec.forEach(rollback -> logger.info(rollback.getName(), GREEN));
+            executeRollbacks(savedScripts, rollbacksToExec, false);
+
+            logger.info("\nRollback completed successfully. {} rollback scripts executed.", GREEN, rollbacksToExec.size());
+        } finally {
+            if (appArguments.isForceDisableJobs()) {
+                scriptExecutor.enableJobs();
+            }
+        }
+
+        scriptExecutor.showInvalidObjects();
+    }
+
     private void executeNewScripts() {
         List<SqlScript> newScripts = scriptsFacade.getNotExecutedScripts();
         if (newScripts.isEmpty()) {
@@ -201,9 +243,15 @@ public class DbManager {
     }
 
     private void executeRollbacks(Map<String, SqlScript> deletedScripts, List<SqlScript> rollbacksToExec) {
+        executeRollbacks(deletedScripts, rollbacksToExec, true);
+    }
+
+    private void executeRollbacks(Map<String, SqlScript> deletedScripts, List<SqlScript> rollbacksToExec, boolean copyRollbackToExecDir) {
         for (SqlScript rollback : rollbacksToExec) {
             if (deletedScripts.containsKey(rollback.getCommitName())) {
-                scriptsFacade.copyRollbackToExecDir(rollback);
+                if (copyRollbackToExecDir) {
+                    scriptsFacade.copyRollbackToExecDir(rollback);
+                }
 
                 SqlScript commit = deletedScripts.get(rollback.getCommitName());
                 scriptsFacade.delete(rollback.getId());

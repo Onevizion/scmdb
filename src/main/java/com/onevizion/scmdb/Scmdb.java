@@ -54,6 +54,8 @@ public class Scmdb {
             if (appArguments.isBackport()) {
                 BackportRunner backportRunner = ctx.getBean(BackportRunner.class);
                 dbManager.runBackport(backportRunner);
+            } else if (appArguments.isRollbackDev()) {
+                dbManager.runRollback();
             } else if (appArguments.isGenDdl()) {
                 if (appArguments.isAll()) {
                     dbManager.generateDdlForAllObjects();
