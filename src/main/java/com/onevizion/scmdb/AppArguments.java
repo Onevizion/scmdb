@@ -32,12 +32,12 @@ public class AppArguments {
     private boolean forceDisableJobs = false;
     private boolean backport = false;
     private RollbackMode rollbackMode;
-    private boolean genAllSchemas = false;
+    private boolean genCompsSchema = false;
     private String ghToken;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
-    private final static String JSON_SCHEMAS_DIRECTORY_NAME = "json";
-    private final static String COMPONENT_STRUCTURES_DIRECTORY_NAME = "json-component-structures";
+    private final static String JSON_SCHEMAS_DIRECTORY_NAME = "comp-schema-tables";
+    private final static String COMPONENT_STRUCTURES_DIRECTORY_NAME = "comp-schema-structure";
 
     private final static String DDL_DIRECTORY_NOT_FOUND_MSG =
             "Path [{0}] does not exist or is not a directory. Cannot find ddl directory";
@@ -55,15 +55,15 @@ public class AppArguments {
                                                         .ofType(String.class);
         OptionSpec<File> scriptsDirectoryOption = parser.accepts("scripts-dir").withRequiredArg().ofType(File.class);
 
-        OptionSpec execOption = parser.acceptsAll(asList("e", "exec"));
-        OptionSpec genDdlOption = parser.acceptsAll(asList("d", "gen-ddl"));
-        OptionSpec allOption = parser.acceptsAll(asList("a", "all"));
-        OptionSpec genAllSchemasOption = parser.accepts("gen-all-schemas");
-        OptionSpec noColorOption = parser.acceptsAll(asList("n", "no-color"));
-        OptionSpec omitChangedOption = parser.acceptsAll(asList("o", "omit-changed"));
-        OptionSpec ignoreErrorsOption = parser.acceptsAll(asList("i", "ignore-errors"));
-        OptionSpec forceDisableJobsOption = parser.accepts("force-disable-jobs");
-        OptionSpec backportOption = parser.accepts("backport");
+        OptionSpec<Void> execOption = parser.acceptsAll(asList("e", "exec"));
+        OptionSpec<Void> genDdlOption = parser.acceptsAll(asList("d", "gen-ddl"));
+        OptionSpec<Void> allOption = parser.acceptsAll(asList("a", "all"));
+        OptionSpec<Void> genCompsSchemaOption = parser.accepts("gen-comps-schema");
+        OptionSpec<Void> noColorOption = parser.acceptsAll(asList("n", "no-color"));
+        OptionSpec<Void> omitChangedOption = parser.acceptsAll(asList("o", "omit-changed"));
+        OptionSpec<Void> ignoreErrorsOption = parser.acceptsAll(asList("i", "ignore-errors"));
+        OptionSpec<Void> forceDisableJobsOption = parser.accepts("force-disable-jobs");
+        OptionSpec<Void> backportOption = parser.accepts("backport");
         OptionSpec<RollbackMode> rollbackMode = parser.accepts("rollback-mode")
                                                       .withRequiredArg()
                                                       .ofType(RollbackMode.class)
@@ -87,12 +87,12 @@ public class AppArguments {
 
         scriptsDirectory = options.valueOf(scriptsDirectoryOption);
         boolean requireSourceTreeDirectories = options.has(genDdlOption)
-                                               || options.has(genAllSchemasOption)
+                                               || options.has(genCompsSchemaOption)
                                                || options.has(backportOption);
 
         if (requireSourceTreeDirectories && scriptsDirectory == null) {
             throw new IllegalArgumentException(
-                    "--scripts-dir is required for --gen-ddl, --gen-all-schemas and --backport modes.");
+                    "--scripts-dir is required for --gen-ddl, --gen-comps-schema and --backport modes.");
         }
 
         if ((requireScriptsDirectory || requireSourceTreeDirectories) &&
@@ -109,19 +109,19 @@ public class AppArguments {
             resolveSourceTreeDirectories();
         }
 
-        if (options.has(execOption) && (options.has(genDdlOption) || options.has(genAllSchemasOption))) {
-            throw new IllegalArgumentException("You can't specify both --gen-ddl and --exec arguments. Choose one.");
+        if (options.has(execOption) && (options.has(genDdlOption) || options.has(genCompsSchemaOption))) {
+            throw new IllegalArgumentException("You can't specify --exec together with --gen-ddl or --gen-comps-schema. Choose one mode.");
         }
 
         if (options.has(backportOption) &&
-            (options.has(execOption) || options.has(genDdlOption) || options.has(genAllSchemasOption))) {
-            throw new IllegalArgumentException("--backport cannot be combined with --exec or --gen-ddl.");
+            (options.has(execOption) || options.has(genDdlOption) || options.has(genCompsSchemaOption))) {
+            throw new IllegalArgumentException("--backport cannot be combined with --exec, --gen-ddl or --gen-comps-schema.");
         }
 
         executeScripts = options.has(execOption);
         genDdl = options.has(genDdlOption);
         all = options.has(allOption);
-        genAllSchemas = options.has(genAllSchemasOption);
+        genCompsSchema = options.has(genCompsSchemaOption);
         useColorLogging = !options.has(noColorOption);
         omitChanged = options.has(omitChangedOption);
         ignoreErrors = options.has(ignoreErrorsOption);
@@ -150,9 +150,9 @@ public class AppArguments {
             throw new IllegalArgumentException(MessageFormat.format(DDL_DIRECTORY_NOT_FOUND_MSG,
                                                                     ddlsDirectory.getAbsolutePath()));
         }
-        jsonSchemasDirectory = ensureDirectory(dbDirectory, JSON_SCHEMAS_DIRECTORY_NAME, "json schemas");
+        jsonSchemasDirectory = ensureDirectory(dbDirectory, JSON_SCHEMAS_DIRECTORY_NAME, "component schema tables");
         componentStructuresDirectory = ensureDirectory(dbDirectory, COMPONENT_STRUCTURES_DIRECTORY_NAME,
-                                                       "component structures");
+                                                       "component schema structure");
     }
 
     private File ensureDirectory(File parentDirectory, String directoryName, String description) {
@@ -242,7 +242,7 @@ public class AppArguments {
     }
 
     public boolean isReadAllFilesContent() {
-        return genDdl || backport || !omitChanged;
+        return genDdl || genCompsSchema || backport || !omitChanged;
     }
 
     public boolean isForceDisableJobs() {
@@ -257,8 +257,8 @@ public class AppArguments {
         return rollbackMode;
     }
 
-    public boolean isGenAllSchemas() {
-        return genAllSchemas;
+    public boolean isGenCompsSchema() {
+        return genCompsSchema;
     }
 
     public String getGhToken() {
