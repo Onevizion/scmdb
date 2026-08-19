@@ -65,7 +65,7 @@ public class JsonSchemaGenerator {
     }
 
     private Set<String> resolveConfigurationTableNames() {
-        return ddlDao.loadComponentTableNames()
+        return ddlDao.findAllComponentMainTableNames()
                      .stream()
                      .filter(StringUtils::isNotBlank)
                      .map(name -> name.toUpperCase(Locale.ROOT))

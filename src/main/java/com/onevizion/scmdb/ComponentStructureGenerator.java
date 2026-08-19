@@ -81,7 +81,8 @@ public class ComponentStructureGenerator {
     }
 
     private List<ComponentData> loadComponents() {
-        Map<Integer, List<ComponentRow>> rowsByComponent = ddlDao.loadComponentStructureRows()
+        boolean hasBpdItemTypeId = ddlDao.hasColumnInTable("V_COMPONENT", "BPD_ITEM_TYPE_ID");
+        Map<Integer, List<ComponentRow>> rowsByComponent = ddlDao.findComponentRows(hasBpdItemTypeId)
                                                                  .stream()
                                                                  .filter(row -> row.componentId() != null)
                                                                  .collect(Collectors.groupingBy(
@@ -140,7 +141,7 @@ public class ComponentStructureGenerator {
     private Map<String, List<ForeignKey>> loadRelationships(Set<String> tableNames) {
         Map<String, List<ForeignKey>> relationships = new LinkedHashMap<>();
         for (String tableName : tableNames) {
-            List<ForeignKey> tableRelationships = ddlDao.getTableForeignKeys(tableName)
+            List<ForeignKey> tableRelationships = ddlDao.findForeignKeysByTableName(tableName)
                                                         .stream()
                                                         .filter(foreignKey -> tableNames.contains(foreignKey.toTable()))
                                                         .toList();

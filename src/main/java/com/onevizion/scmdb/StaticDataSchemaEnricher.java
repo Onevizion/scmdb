@@ -62,14 +62,14 @@ public class StaticDataSchemaEnricher {
                 return;
             }
 
-            List<String> pkColumns = ddlDao.getPrimaryKeyColumns(tableName);
+            List<String> pkColumns = ddlDao.findPrimaryKeyColumnNamesByTableName(tableName);
             if (pkColumns.size() != 1) {
                 logger.info("  SKIP reference data {}: primary key is not single-column", YELLOW, tableName);
                 return;
             }
 
             String pkColumn = pkColumns.get(0);
-            if (ddlDao.isStaticReferenceTable(tableName)) {
+            if (ddlDao.isStaticReferenceTableByName(tableName)) {
                 enrichStaticReferenceData(tableName, schemaFile, schema, pkColumns, pkColumn);
                 return;
             }
@@ -84,14 +84,14 @@ public class StaticDataSchemaEnricher {
     private void enrichStaticReferenceData(String tableName, Path schemaFile, ObjectNode schema,
                                            List<String> pkColumns, String pkColumn) throws IOException {
 
-        List<String> lookupColumns = ddlDao.getLookupColumns(tableName, pkColumns);
+        List<String> lookupColumns = ddlDao.findLookupColumnNamesByTableName(tableName, pkColumns);
         if (lookupColumns.isEmpty()) {
             logger.info("  SKIP static data {}: lookup column was not found", YELLOW, tableName);
             return;
         }
 
         String lookupColumn = lookupColumns.get(0);
-        List<Map<String, Object>> rows = ddlDao.loadReferenceData(tableName, pkColumn, lookupColumn);
+        List<Map<String, Object>> rows = ddlDao.getTableData(tableName, pkColumn, lookupColumn);
 
         ObjectNode referenceData = createReferenceData("static", pkColumn, lookupColumn);
         ArrayNode data = referenceData.putArray("data");
