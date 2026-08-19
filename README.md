@@ -76,3 +76,84 @@ The PR (Pull-Request) number will be prompted interactively after started. The p
 2. Regenerate package scripts from DDL sources;
 3. Execute new scripts (same as `--exec`);
 4. Generate DDL for changed objects (same as `--gen-ddl`);
+
+## Deploy dependencies
+
+To deploy these JARs to GitHub Packages, configure Maven credentials for server id `scmdb` (e.g., in `~/.m2/settings.xml`). Keep the `-Dversion` values below in sync with `pom.xml` (`<sqlcl.version>`).
+
+```shell
+mvn deploy:deploy-file \
+  -DgroupId="oracle.sqlcl" \
+  -DartifactId="dbtools-common" \
+  -Dversion="26.2.0" \
+  -Dpackaging="jar" \
+  -Dfile="dbtools-common.jar" \
+  -DrepositoryId="scmdb" \
+  -Durl="https://maven.pkg.github.com/Onevizion/scmdb"
+```
+
+```shell
+mvn deploy:deploy-file \
+  -DgroupId="oracle.sqlcl" \
+  -DartifactId="ucp11" \
+  -Dversion="26.2.0" \
+  -Dpackaging="jar" \
+  -Dfile="ucp11.jar" \
+  -DrepositoryId="scmdb" \
+  -Durl="https://maven.pkg.github.com/Onevizion/scmdb"
+```
+
+```shell
+mvn deploy:deploy-file \
+  -DgroupId="oracle.sqlcl" \
+  -DartifactId="ojdbc11" \
+  -Dversion="26.2.0" \
+  -Dpackaging="jar" \
+  -Dfile="ojdbc11.jar" \
+  -DrepositoryId="scmdb" \
+  -Durl="https://maven.pkg.github.com/Onevizion/scmdb"
+```
+
+```shell
+mvn deploy:deploy-file \
+  -DgroupId="oracle.sqlcl" \
+  -DartifactId="dbtools-core" \
+  -Dversion="26.2.0" \
+  -Dpackaging="jar" \
+  -Dfile="dbtools-core.jar" \
+  -DrepositoryId="scmdb" \
+  -Durl="https://maven.pkg.github.com/Onevizion/scmdb"
+```
+
+```shell
+mvn deploy:deploy-file \
+  -DgroupId="oracle.sqlcl" \
+  -DartifactId="dbtools-arbori" \
+  -Dversion="26.2.0" \
+  -Dpackaging="jar" \
+  -Dfile="dbtools-arbori.jar" \
+  -DrepositoryId="scmdb" \
+  -Durl="https://maven.pkg.github.com/Onevizion/scmdb"
+```
+
+```shell
+mvn deploy:deploy-file \
+  -DgroupId="oracle.sqlcl" \
+  -DartifactId="xmlparserv2_sans_jaxp_services" \
+  -Dversion="26.2.0" \
+  -Dpackaging="jar" \
+  -Dfile="xmlparserv2_sans_jaxp_services.jar" \
+  -DrepositoryId="scmdb" \
+  -Durl="https://maven.pkg.github.com/Onevizion/scmdb"
+```
+
+```shell
+mvn deploy:deploy-file \
+  -DgroupId="oracle.sqlcl" \
+  -DartifactId="xdb" \
+  -Dversion="26.2.0" \
+  -Dpackaging="jar" \
+  -Dfile="xdb.jar" \
+  -DrepositoryId="scmdb" \
+  -Durl="https://maven.pkg.github.com/Onevizion/scmdb"
+```

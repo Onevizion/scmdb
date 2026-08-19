@@ -2,7 +2,7 @@ package com.onevizion.scmdb.vo;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.core.io.Resource;
 
 import java.io.IOException;
@@ -201,7 +201,7 @@ public class SqlScript implements Comparable<SqlScript> {
 
     private static Integer extractOrderNumber(String scriptName) {
         String[] parts = scriptName.split("_");
-        if (parts.length >= 1 && NumberUtils.isDigits(parts[0])) {
+        if (parts.length >= 1 && StringUtils.isNumeric(parts[0])) {
             return Integer.valueOf(parts[0]);
         } else {
             //NULL for deprecated a dev scripts, change after removing dev scripts support.

@@ -1,5 +1,6 @@
 package com.onevizion.scmdb.dao;
 
+import java.sql.Types;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -306,8 +307,8 @@ public class DdlDao extends AbstractDaoOra {
 
     public String getDdl(DbObject dbObject) {
         MapSqlParameterSource params = new MapSqlParameterSource();
-        params.addValue("name", dbObject.getName())
-              .addValue("type", dbObject.getType().toString());
+        params.addValue("name", dbObject.getName(), Types.VARCHAR)
+              .addValue("type", dbObject.getType().toString(), Types.VARCHAR);
         return namedParameterJdbcTemplate.queryForObject(READ_DDL, params, String.class);
     }
 
@@ -427,13 +428,13 @@ public class DdlDao extends AbstractDaoOra {
     }
 
     public String getComponentLookupColumn(String tableName) {
-        MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
+        MapSqlParameterSource namedParams = new MapSqlParameterSource().addValue("tableName", tableName, Types.VARCHAR);
         List<String> lookupColumns = namedParameterJdbcTemplate.queryForList(GET_COMPONENT_LOOKUP_COLUMN_BY_TABLE_NAME, namedParams, String.class);
         return lookupColumns.isEmpty() ? null : lookupColumns.get(0);
     }
 
     public List<ForeignKey> findForeignKeysByTableName(String tableName) {
-        MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
+        MapSqlParameterSource namedParams = new MapSqlParameterSource().addValue("tableName", tableName, Types.VARCHAR);
         return namedParameterJdbcTemplate.query(FIND_FOREIGN_KEYS_BY_TABLE_NAME, namedParams, foreignKeyRowMapper);
     }
 
