@@ -24,6 +24,9 @@ import com.onevizion.scmdb.vo.ForeignKey;
 @Component
 public class DdlDao extends AbstractDaoOra {
 
+    private static final String TABLE_NAME = "tableName";
+    private static final String COLUMN_NAME = "columnName";
+
     private final static String FIND_ALL_DB_OBJECTS = """
             select object_name as name,
                    object_type as type,
@@ -313,7 +316,8 @@ public class DdlDao extends AbstractDaoOra {
     }
 
     public List<DbObject> findTableRelatedObjectDdlByTableNameAndObjectType(String tableName, DbObjectType dbOjectType) {
-        MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
+        MapSqlParameterSource namedParams = new MapSqlParameterSource()
+                .addValue(TABLE_NAME, tableName, Types.VARCHAR);
 
         return switch(dbOjectType) {
             case COMMENT -> namedParameterJdbcTemplate.query(FIND_DDL_COMMENTS_BY_TABLE_NAME, namedParams, dbObjectRowMapper);
@@ -358,18 +362,21 @@ public class DdlDao extends AbstractDaoOra {
     }
 
     public boolean isStaticReferenceTableByName(String tableName) {
-        MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
+        MapSqlParameterSource namedParams = new MapSqlParameterSource()
+                .addValue(TABLE_NAME, tableName, Types.VARCHAR);
         int countObjects = namedParameterJdbcTemplate.queryForObject(COUNT_STATIC_TABLES_BY_NAME, namedParams, int.class);
         return countObjects == 1;
     }
 
     public List<String> findPrimaryKeyColumnNamesByTableName(String tableName) {
-        MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
+        MapSqlParameterSource namedParams = new MapSqlParameterSource()
+                .addValue(TABLE_NAME, tableName, Types.VARCHAR);
         return namedParameterJdbcTemplate.queryForList(FIND_PRIMARY_KEY_COLUMNS_BY_TABLE_NAME, namedParams, String.class);
     }
 
     public List<String> findLookupColumnNamesByTableName(String tableName, List<String> excludedColumns) {
-        MapSqlParameterSource namedParams = new MapSqlParameterSource("tableName", tableName);
+        MapSqlParameterSource namedParams = new MapSqlParameterSource()
+                .addValue(TABLE_NAME, tableName, Types.VARCHAR);
         return namedParameterJdbcTemplate.queryForList(FIND_LOOKUP_COLUMN_NAMES_BY_TABLE_NAME, namedParams, String.class)
                                          .stream()
                                          .filter(columnName -> !excludedColumns.contains(columnName))
@@ -417,8 +424,8 @@ public class DdlDao extends AbstractDaoOra {
 
     public boolean hasColumnInTable(String tableName, String columnName) {
         MapSqlParameterSource namedParams = new MapSqlParameterSource()
-                .addValue("tableName", tableName)
-                .addValue("columnName", columnName);
+                .addValue(TABLE_NAME, tableName, Types.VARCHAR)
+                .addValue(COLUMN_NAME, columnName, Types.VARCHAR);
         int countColumns = namedParameterJdbcTemplate.queryForObject(HAS_COLUMN, namedParams, int.class);
         return countColumns > 0;
     }
@@ -428,13 +435,15 @@ public class DdlDao extends AbstractDaoOra {
     }
 
     public String getComponentLookupColumn(String tableName) {
-        MapSqlParameterSource namedParams = new MapSqlParameterSource().addValue("tableName", tableName, Types.VARCHAR);
+        MapSqlParameterSource namedParams = new MapSqlParameterSource()
+                .addValue(TABLE_NAME, tableName, Types.VARCHAR);
         List<String> lookupColumns = namedParameterJdbcTemplate.queryForList(GET_COMPONENT_LOOKUP_COLUMN_BY_TABLE_NAME, namedParams, String.class);
         return lookupColumns.isEmpty() ? null : lookupColumns.get(0);
     }
 
     public List<ForeignKey> findForeignKeysByTableName(String tableName) {
-        MapSqlParameterSource namedParams = new MapSqlParameterSource().addValue("tableName", tableName, Types.VARCHAR);
+        MapSqlParameterSource namedParams = new MapSqlParameterSource()
+                .addValue(TABLE_NAME, tableName, Types.VARCHAR);
         return namedParameterJdbcTemplate.query(FIND_FOREIGN_KEYS_BY_TABLE_NAME, namedParams, foreignKeyRowMapper);
     }
 
