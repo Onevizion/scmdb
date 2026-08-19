@@ -54,11 +54,12 @@ public class Scmdb {
             if (appArguments.isBackport()) {
                 BackportRunner backportRunner = ctx.getBean(BackportRunner.class);
                 dbManager.runBackport(backportRunner);
-            } else if (appArguments.isGenDdl()) {
-                if (appArguments.isAll()) {
-                    dbManager.generateDdlForAllObjects();
-                } else {
-                    dbManager.generateDdlForNewOrChangedScripts();
+            } else if (appArguments.isGenDdl() || appArguments.isGenCompsSchema()) {
+                if (appArguments.isGenDdl()) {
+                    dbManager.generateDdl();
+                }
+                if (appArguments.isGenCompsSchema()) {
+                    dbManager.generateJsonSchemas();
                 }
             } else {
                 dbManager.updateDb();

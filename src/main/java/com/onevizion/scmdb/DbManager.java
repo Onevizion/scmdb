@@ -36,6 +36,9 @@ public class DbManager {
     private DdlGenerator ddlGenerator;
 
     @Autowired
+    private JsonSchemaGenerator jsonSchemaGenerator;
+
+    @Autowired
     private AppArguments appArguments;
 
     @Autowired
@@ -253,23 +256,29 @@ public class DbManager {
 
         scriptsFacade.checkDbConnection();
 
-        List<SqlScript> scripts = scriptsFacade.getDevelopmentScripts();
-        scripts.addAll(scriptsFacade.getUpdatedScripts());
-        List<SqlScript> scriptsToGenDdl = scripts.stream()
-                                                 .sorted()
-                                                 .filter(script -> script.getType() == ScriptType.COMMIT)
-                                                 .filter(script -> script.getSchemaType() == OWNER)
-                                                 .collect(Collectors.toList());
-
-        Set<DbObject> changedDbObjects = findChangedDbObjects(scriptsToGenDdl);
         ddlGenerator.executeSettingTransformParams();
-        ddlGenerator.generateDdls(changedDbObjects, false);
+        ddlGenerator.generateDdls(findChangedDbObjects(), false);
     }
 
-    private Set<DbObject> findChangedDbObjects(List<SqlScript> scripts) {
+    public void generateDdl() {
+        if (appArguments.isAll()) {
+            generateDdlForAllObjects();
+        } else {
+            generateDdlForNewOrChangedScripts();
+        }
+    }
+
+    private Set<DbObject> findChangedDbObjects() {
+        List<SqlScript> scripts = scriptsFacade.getDevelopmentScripts();
+        scripts.addAll(scriptsFacade.getUpdatedScripts());
+        List<SqlScript> scriptsToGenerate = scripts.stream()
+                                                   .sorted()
+                                                   .filter(script -> script.getType() == ScriptType.COMMIT)
+                                                   .filter(script -> script.getSchemaType() == OWNER)
+                                                   .toList();
         Set<DbObject> updatedDbObjects;
 
-        updatedDbObjects = scripts.stream()
+        updatedDbObjects = scriptsToGenerate.stream()
                                   .map(script -> ScriptHelper.removeSpecialFromScriptText(script.getText()))
                                   .flatMap(scriptText -> ScriptHelper.findChangedDbObjectsInScriptText(scriptText).stream())
                                   .collect(Collectors.toSet());
@@ -283,6 +292,26 @@ public class DbManager {
 
         ddlGenerator.executeSettingTransformParams();
         ddlGenerator.generateDllsForAllDbObjects();
+    }
+
+    public void generateJsonSchemasForNewOrChangedScripts() {
+        logger.info("Generating component schemas for new and updated scripts");
+
+        scriptsFacade.checkDbConnection();
+
+        jsonSchemaGenerator.generateSchemas(findChangedDbObjects());
+    }
+
+    public void generateJsonSchemas() {
+        if (appArguments.isAll()) {
+            generateJsonSchemasForAllTables();
+        } else {
+            generateJsonSchemasForNewOrChangedScripts();
+        }
+    }
+
+    public void generateJsonSchemasForAllTables() {
+        jsonSchemaGenerator.generateSchemasForAllTables();
     }
 
     /**
