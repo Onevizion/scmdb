@@ -28,6 +28,9 @@ public class DbManager {
     private static final String SCRIPTS_TO_EXEC_MSG = "\nScripts to be executed in [{}]:";
     private static final String ROLLBACKS_TO_SKIP_MSG = "\nRollbacks skipped in [{}]:";
     private static final String SCRIPT_NUMBERING_IS_MORE_THAN_TWO_DIGITS_REGEX = "^\\d{3,}_.*";
+    private static final String DRY_RUN_ROLLBACKS_TO_EXEC_MSG = "\nRollback scripts to execute in [{}]:";
+    private static final String DRY_RUN_NOT_INITIALIZED_MSG = "DRY-RUN: SCMDB is not initialized in [{}]. First run would register all scripts as baseline without executing them.";
+    private static final String DRY_RUN_COMPLETE_MSG = "\nDRY-RUN: nothing executed, DB_SCRIPT table not modified.";
 
     @Autowired
     private DbScriptFacade scriptsFacade;
@@ -50,6 +53,11 @@ public class DbManager {
         scriptsFacade.checkDbConnection();
 
         scriptExecutor.showInvalidObjects();
+
+        if (appArguments.isDryRun()) {
+            runDryRun();
+            return;
+        }
 
         if (appArguments.isForceDisableJobs() && !appArguments.isGenDdl()) {
             scriptExecutor.disableJobs();
@@ -76,6 +84,46 @@ public class DbManager {
         }
         
         scriptExecutor.showInvalidObjects();
+    }
+
+    private void runDryRun() {
+        String schema = appArguments.getDbCredentials(OWNER).getSchemaWithUrlBeforeDot();
+
+        if (!scriptsFacade.isScriptTableExist() || scriptsFacade.isFirstRun()) {
+            logger.info(DRY_RUN_NOT_INITIALIZED_MSG, schema);
+            logger.info(DRY_RUN_COMPLETE_MSG);
+            return;
+        }
+
+        List<SqlScript> rollbacksToExec = getDeletedRollbacksToExec();
+        List<SqlScript> newCommitScripts = sortScriptsInExecutionOrder(scriptsFacade.getNotExecutedScripts(), COMMIT);
+
+        if (newCommitScripts.isEmpty() && rollbacksToExec.isEmpty()) {
+            logger.info(NO_SCRIPTS_TO_EXEC_MSG, schema);
+        } else {
+            if (!newCommitScripts.isEmpty()) {
+                logger.info(SCRIPTS_TO_EXEC_MSG, schema);
+                newCommitScripts.forEach(script -> logger.info(script.getName()));
+            }
+            if (!rollbacksToExec.isEmpty()) {
+                logger.info(DRY_RUN_ROLLBACKS_TO_EXEC_MSG, schema);
+                rollbacksToExec.forEach(script -> logger.info(script.getName()));
+            }
+        }
+
+        logger.info(DRY_RUN_COMPLETE_MSG);
+    }
+
+    private List<SqlScript> getDeletedRollbacksToExec() {
+        if (appArguments.isOmitChanged()) {
+            return List.of();
+        }
+        Map<String, SqlScript> deletedScripts = scriptsFacade.getDeletedScriptsMap();
+        List<SqlScript> rollbacksToExec = deletedScripts.values()
+                                                        .stream()
+                                                        .filter(script -> deletedScripts.containsKey(script.getCommitName()))
+                                                        .collect(Collectors.toList());
+        return sortScriptsInExecutionOrder(rollbacksToExec, ROLLBACK);
     }
 
     public void runBackport(BackportRunner backportRunner) {
