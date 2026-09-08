@@ -32,7 +32,7 @@ When passwords for all schemas are the same (may be common for local dev env), o
 
 * ```--scripts-dir=<location of the directory with DB scripts>```
 * ```--gen-ddl``` generate DDL for objects created or modified with new scripts
-* ```--gen-comps-schema``` generate GraphQL type-system SDL from canonical table DDL and component metadata into sibling ```comp-schema-graphql```. Generated input types keep physical ID fields and add typed reference inputs with names derived directly from DDL columns (for example ```program: { programId: ... }``` or ```program: { programName: ... }```). Nested GraphQL fields retain the complete child table name in camelCase (for example ```WIDGET_PARAM``` becomes ```widgetParam```).
+* ```--gen-comps-schema``` generate GraphQL type-system SDL from canonical table DDL and component metadata into sibling ```comp-schema-graphql```. By default, only components affected by tables changed in development or updated scripts are regenerated; dependencies through foreign-key references are included. Generated input types keep physical ID fields and add typed reference inputs with names derived directly from DDL columns (for example ```program: { programId: ... }``` or ```program: { programName: ... }```). Nested GraphQL fields retain the complete child table name in camelCase (for example ```WIDGET_PARAM``` becomes ```widgetParam```).
 * ```--all``` regenerate all objects for ```--gen-ddl``` and/or ```--gen-comps-schema```
 * ```--exec``` execute new scripts
 * ```--omit-changed``` do not check for script changes. Script modifications detection is based on hash code calc, omiting this procedure may improove perfomance

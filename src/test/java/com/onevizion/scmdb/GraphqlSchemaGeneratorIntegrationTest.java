@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -67,8 +68,10 @@ class GraphqlSchemaGeneratorIntegrationTest {
         DdlTableMetadataProvider provider = new DdlTableMetadataProvider(arguments, ddlDao);
         ComponentStructureGenerator structures = new ComponentStructureGenerator(arguments, ddlDao, provider, logger);
 
-        GraphqlSchemaGenerator.GenerationResult result = new GraphqlSchemaGenerator(
-                arguments, structures, new GraphqlNamingService(), logger).generate();
+        GraphqlSchemaGenerator.GenerationResult result = new GraphqlSchemaGenerator(arguments,
+                                                                                    structures,
+                                                                                    new GraphqlNamingService(),
+                                                                                    logger).generate();
 
         assertEquals(5, result.generated());
         assertEquals(0, result.failed());
@@ -76,7 +79,7 @@ class GraphqlSchemaGeneratorIntegrationTest {
         List<Path> files;
         try (var paths = Files.list(outputDirectory)) {
             files = paths.filter(path -> path.toString().endsWith(".graphql"))
-                    .sorted(Comparator.comparing(Path::toString)).toList();
+                         .sorted(Comparator.comparing(Path::toString)).toList();
         }
         assertEquals(5, files.size());
         assertFalse(Files.exists(outputDirectory.resolve("schema.graphql")));
@@ -98,13 +101,13 @@ class GraphqlSchemaGeneratorIntegrationTest {
         assertTrue(sdl.contains("directive @column("));
         assertFalse(sdl.contains("JsonNode"));
         assertTrue(Files.readString(outputDirectory.resolve("component_58_config_field.graphql"))
-            .contains("type ConfigField"));
+                        .contains("type ConfigField"));
         assertTrue(Files.readString(outputDirectory.resolve("component_59_report_params.graphql"))
-            .contains("type ReportParams"));
+                        .contains("type ReportParams"));
         assertTrue(Files.readString(outputDirectory.resolve("component_60_xitor_type.graphql"))
-            .contains("type XitorType"));
+                        .contains("type XitorType"));
         assertTrue(Files.readString(outputDirectory.resolve("component_61_work_plan.graphql"))
-            .contains("type WorkPlan"));
+                        .contains("type WorkPlan"));
     }
 
     @Test
@@ -112,8 +115,10 @@ class GraphqlSchemaGeneratorIntegrationTest {
         AppArguments arguments = arguments("failure");
         ComponentMetadata valid = component(1, "VALID", false);
         ComponentMetadata invalid = component(2, "INVALID", true);
-        ComponentStructureGenerator structures = new ComponentStructureGenerator(
-                arguments, new FixtureDdlDao(List.of()), null, new SilentColorLogger()) {
+        ComponentStructureGenerator structures = new ComponentStructureGenerator(arguments,
+                                                                                 new FixtureDdlDao(List.of()),
+                                                                                 null,
+                                                                                 new SilentColorLogger()) {
             @Override
             public List<ComponentMetadata> buildModels() {
                 return List.of(valid, invalid);
@@ -121,14 +126,82 @@ class GraphqlSchemaGeneratorIntegrationTest {
         };
 
         GraphqlSchemaGenerator.GenerationResult result = new GraphqlSchemaGenerator(arguments, structures,
-                new GraphqlNamingService(), new SilentColorLogger()).generate();
+                                                                                    new GraphqlNamingService(),
+                                                                                    new SilentColorLogger()).generate();
 
         assertEquals(1, result.generated());
         assertEquals(1, result.failed());
-        assertTrue(Files.isRegularFile(arguments.getGraphqlSchemasDirectory().toPath()
-                .resolve("component_1_valid.graphql")));
-        assertFalse(Files.exists(arguments.getGraphqlSchemasDirectory().toPath()
-                .resolve("component_2_invalid.graphql")));
+        assertTrue(Files.isRegularFile(arguments.getGraphqlSchemasDirectory()
+                                                .toPath()
+                                                .resolve("component_1_valid.graphql")));
+        assertFalse(Files.exists(arguments.getGraphqlSchemasDirectory()
+                                          .toPath()
+                                          .resolve("component_2_invalid.graphql")));
+    }
+
+    @Test
+    void regeneratesOnlyComponentsAffectedThroughTheirTableDependencies() throws Exception {
+        AppArguments arguments = arguments("incremental");
+        Path tables = Files.createDirectories(arguments.getDdlsDirectory().toPath().resolve("tables"));
+        Files.writeString(tables.resolve("dependent.sql"), """
+                CREATE TABLE DEPENDENT (
+                  DEPENDENT_ID NUMBER NOT NULL,
+                  SHARED_LOOKUP_ID NUMBER,
+                  CONSTRAINT PK_DEPENDENT PRIMARY KEY (DEPENDENT_ID),
+                  CONSTRAINT FK_DEPENDENT_LOOKUP FOREIGN KEY (SHARED_LOOKUP_ID)
+                    REFERENCES SHARED_LOOKUP (SHARED_LOOKUP_ID)
+                );
+                """);
+        writeSimpleTable(tables, "SHARED_LOOKUP");
+        writeSimpleTable(tables, "UNRELATED");
+        FixtureDdlDao ddlDao = new FixtureDdlDao(List.of(componentRow(1, "Dependent", "DEPENDENT"),
+                                                         componentRow(2, "Unrelated", "UNRELATED")));
+        SilentColorLogger logger = new SilentColorLogger();
+        DdlTableMetadataProvider provider = new DdlTableMetadataProvider(arguments, ddlDao);
+        ComponentStructureGenerator structures = new ComponentStructureGenerator(arguments, ddlDao, provider, logger);
+        GraphqlSchemaGenerator generator = new GraphqlSchemaGenerator(arguments, structures,
+                                                                      new GraphqlNamingService(), logger);
+        Path outputDirectory = arguments.getGraphqlSchemasDirectory().toPath();
+        Files.createDirectories(outputDirectory);
+        Path dependentOutput = outputDirectory.resolve("component_1_old_name.graphql");
+        Path unrelatedOutput = outputDirectory.resolve("component_2_unrelated.graphql");
+        Path unrelatedAuxiliaryFile = outputDirectory.resolve("custom.graphql");
+        Files.writeString(dependentOutput, "stale dependent schema");
+        Files.writeString(unrelatedOutput, "unrelated schema");
+        Files.writeString(unrelatedAuxiliaryFile, "custom schema");
+
+        GraphqlSchemaGenerator.GenerationResult result = generator.generateAffected(Set.of("shared_lookup"));
+
+        assertEquals(1, result.generated());
+        assertEquals(0, result.failed());
+        assertFalse(Files.exists(dependentOutput));
+        assertTrue(Files.readString(outputDirectory.resolve("component_1_dependent.graphql")).contains("type Dependent"));
+        assertEquals("unrelated schema", Files.readString(unrelatedOutput));
+        assertEquals("custom schema", Files.readString(unrelatedAuxiliaryFile));
+    }
+
+    @Test
+    void doesNothingWhenNoChangedTablesWereResolved() throws Exception {
+        AppArguments arguments = arguments("no-changes");
+        ComponentStructureGenerator structures = new ComponentStructureGenerator(arguments,
+                                                                                 new FixtureDdlDao(List.of()),
+                                                                                 null, new SilentColorLogger()) {
+            @Override
+            public List<ComponentMetadata> buildModels() {
+                throw new AssertionError("Models must not be loaded when there are no changed tables");
+            }
+        };
+        GraphqlSchemaGenerator generator = new GraphqlSchemaGenerator(arguments, structures,
+                new GraphqlNamingService(), new SilentColorLogger());
+        Path output = arguments.getGraphqlSchemasDirectory().toPath().resolve("existing.graphql");
+        Files.createDirectories(output.getParent());
+        Files.writeString(output, "existing schema");
+
+        GraphqlSchemaGenerator.GenerationResult result = generator.generateAffected(Set.of());
+
+        assertEquals(0, result.generated());
+        assertEquals(0, result.failed());
+        assertEquals("existing schema", Files.readString(output));
     }
 
     @Test
@@ -151,13 +224,12 @@ class GraphqlSchemaGeneratorIntegrationTest {
                   CONSTRAINT FK_CHILD_PARENT FOREIGN KEY (PARENT_ID) REFERENCES PARENT (PARENT_ID)
                 );
                 """);
-        FixtureDdlDao ddlDao = new FixtureDdlDao(List.of(
-                new ComponentRow(9, "Cycle", "PARENT", 0, 0, null, 1, "PARENT", null, null),
-                new ComponentRow(9, "Cycle", "PARENT", 0, 0, null, 2, "CHILD", null, null)));
+        FixtureDdlDao ddlDao = new FixtureDdlDao(List.of(new ComponentRow(9, "Cycle", "PARENT", 0, 0, null, 1, "PARENT", null, null),
+                                                         new ComponentRow(9, "Cycle", "PARENT", 0, 0, null, 2, "CHILD", null, null)));
         DdlTableMetadataProvider provider = new DdlTableMetadataProvider(arguments, ddlDao);
 
-        ComponentMetadata component = new ComponentStructureGenerator(
-                arguments, ddlDao, provider, new SilentColorLogger()).buildModels().get(0);
+        ComponentMetadata component = new ComponentStructureGenerator(arguments, ddlDao, provider,
+                                                                      new SilentColorLogger()).buildModels().get(0);
 
         assertEquals("CHILD", component.hierarchy().children().get(0).tableName());
         assertTrue(component.hierarchy().children().get(0).children().get(0).cycle());
@@ -169,10 +241,9 @@ class GraphqlSchemaGeneratorIntegrationTest {
         Path scripts = Files.createDirectories(db.resolve("scripts"));
         Files.createDirectories(db.resolve("ddl"));
         AppArguments arguments = new AppArguments();
-        arguments.parse(new String[] {
-                "--owner-schema=test/test@localhost:1521/ORCLCDB",
-                "--scripts-dir=" + scripts,
-                "--gen-comps-schema"
+        arguments.parse(new String[] {"--owner-schema=test/test@localhost:1521/ORCLCDB",
+                                      "--scripts-dir=" + scripts,
+                                      "--gen-comps-schema"
         }, false);
         return arguments;
     }
@@ -186,23 +257,24 @@ class GraphqlSchemaGeneratorIntegrationTest {
 
     private static ComponentRow componentRow(int id, String componentName, String tableName) {
         return new ComponentRow(id, componentName, tableName, 0, 0, null,
-                id, tableName, null, null);
+                                id, tableName, null, null);
     }
 
     private static ComponentMetadata component(int id, String name, boolean invalidRelation) {
         ColumnMetadata idColumn = new ColumnMetadata(name + "_ID", "NUMBER", GraphqlScalar.ID,
-            false, null, null, null, null, null, null, false, null, ConstraintMetadata.empty(), null);
+                                                     false, null, null, null, null,
+                                                     null, null, false, null, ConstraintMetadata.empty(), null);
         TableMetadata table = new TableMetadata(name, null, List.of(idColumn), List.of(idColumn.name()),
-                List.of(), List.of(), null);
+                                                List.of(), List.of(), null);
         if (!invalidRelation) {
             return new ComponentMetadata(id, name, name, List.of(table),
                     new ComponentHierarchyNode(name, true, false, null, List.of()));
         }
         RelationMetadata brokenRelation = new RelationMetadata(name, List.of(), name,
-                List.of(), "BROKEN", true, false);
+                                                               List.of(), "BROKEN", true, false);
         ComponentHierarchyNode child = new ComponentHierarchyNode(name, false, false, brokenRelation, List.of());
         return new ComponentMetadata(id, name, name, List.of(table),
-                new ComponentHierarchyNode(name, true, false, null, List.of(child)));
+                                     new ComponentHierarchyNode(name, true, false, null, List.of(child)));
     }
 
     private static RuntimeWiring scalarWiring() {

@@ -1,5 +1,6 @@
 package com.onevizion.scmdb;
 
+import com.onevizion.scmdb.dao.DdlDao;
 import com.onevizion.scmdb.exception.ScmdbException;
 import com.onevizion.scmdb.exception.ScriptExecException;
 import com.onevizion.scmdb.facade.DbScriptFacade;
@@ -37,6 +38,9 @@ public class DbManager {
 
     @Autowired
     private GraphqlSchemaGenerator graphqlSchemaGenerator;
+
+    @Autowired
+    private DdlDao ddlDao;
 
     @Autowired
     private ComponentStructureGenerator componentStructureGenerator;
@@ -298,9 +302,30 @@ public class DbManager {
     }
 
     public void generateGraphqlSchemas() {
-        logger.info("Generating Java GraphQL component schemas");
+        logger.info("Generating GraphQL component schemas");
         scriptsFacade.checkDbConnection();
-        graphqlSchemaGenerator.generate();
+        if (appArguments.isAll()) {
+            graphqlSchemaGenerator.generateAll();
+        } else {
+            graphqlSchemaGenerator.generateAffected(resolveChangedTableNames(findChangedDbObjects()));
+        }
+    }
+
+    private Set<String> resolveChangedTableNames(Collection<DbObject> dbObjects) {
+        return dbObjects.stream()
+                .map(this::resolveTableName)
+                .filter(StringUtils::isNotBlank)
+                .map(name -> name.toUpperCase(Locale.ROOT))
+                .collect(Collectors.toCollection(TreeSet::new));
+    }
+
+    private String resolveTableName(DbObject dbObject) {
+        return switch (dbObject.getType()) {
+            case TABLE -> dbObject.getName();
+            case COMMENT -> dbObject.getName().split("\\.", 2)[0];
+            case INDEX, TRIGGER, SEQUENCE -> ddlDao.getTableNameByDepObject(dbObject);
+            default -> null;
+        };
     }
 
     public void generateComponentSchemas() {

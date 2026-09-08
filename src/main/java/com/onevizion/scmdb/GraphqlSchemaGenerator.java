@@ -10,6 +10,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.onevizion.scmdb.ColorLogger.Color.GREEN;
@@ -35,17 +38,41 @@ public class GraphqlSchemaGenerator {
     }
 
     public GenerationResult generate() {
+        return generateAll();
+    }
+
+    public GenerationResult generateAll() {
         Path outputDirectory = appArguments.getGraphqlSchemasDirectory().toPath();
-        prepareOutputDirectory(outputDirectory);
+        prepareOutputDirectory(outputDirectory, true);
+        return generate(outputDirectory, component -> true);
+    }
+
+    public GenerationResult generateAffected(Set<String> changedTableNames) {
+        Set<String> normalizedTableNames = changedTableNames.stream()
+                .map(name -> name.toUpperCase(Locale.ROOT))
+                .collect(Collectors.toUnmodifiableSet());
+        Path outputDirectory = appArguments.getGraphqlSchemasDirectory().toPath();
+        prepareOutputDirectory(outputDirectory, false);
+        if (normalizedTableNames.isEmpty()) {
+            logger.info("No changed tables found; GraphQL component schemas are up to date");
+            return new GenerationResult(0, 0);
+        }
+        return generate(outputDirectory, component -> component.tables().stream()
+                .anyMatch(table -> normalizedTableNames.contains(table.name().toUpperCase(Locale.ROOT))));
+    }
+
+    private GenerationResult generate(Path outputDirectory, Predicate<ComponentMetadata> selector) {
         List<ComponentMetadata> components = componentStructureGenerator.buildModels();
         int generated = 0;
         int failed = 0;
-        for (ComponentMetadata component : components) {
+        for (ComponentMetadata component : components.stream().filter(selector).toList()) {
             Path output = outputDirectory.resolve("component_" + component.componentId() + "_"
                     + component.mainTable().toLowerCase(Locale.ROOT) + GRAPHQL_EXTENSION);
             try {
                 GraphqlSchemaRenderer renderer = new GraphqlSchemaRenderer(component, naming);
-                write(output, renderer.render());
+                String schema = renderer.render();
+                deletePreviousComponentSchema(outputDirectory, component.componentId());
+                write(output, schema);
                 generated++;
             } catch (RuntimeException e) {
                 failed++;
@@ -57,9 +84,12 @@ public class GraphqlSchemaGenerator {
         return new GenerationResult(generated, failed);
     }
 
-    private static void prepareOutputDirectory(Path outputDirectory) {
+    private static void prepareOutputDirectory(Path outputDirectory, boolean clear) {
         try {
             Files.createDirectories(outputDirectory);
+            if (!clear) {
+                return;
+            }
             try (Stream<Path> files = Files.list(outputDirectory)) {
                 for (Path file : files.filter(path -> path.getFileName().toString().endsWith(GRAPHQL_EXTENSION)).toList()) {
                     Files.delete(file);
@@ -67,6 +97,20 @@ public class GraphqlSchemaGenerator {
             }
         } catch (IOException e) {
             throw new IllegalStateException("Failed to prepare GraphQL output directory: " + outputDirectory, e);
+        }
+    }
+
+    private static void deletePreviousComponentSchema(Path outputDirectory, Integer componentId) {
+        String prefix = "component_" + componentId + "_";
+        try (Stream<Path> files = Files.list(outputDirectory)) {
+            for (Path file : files.filter(path -> {
+                String name = path.getFileName().toString();
+                return name.startsWith(prefix) && name.endsWith(GRAPHQL_EXTENSION);
+            }).toList()) {
+                Files.delete(file);
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to replace GraphQL schema for component " + componentId, e);
         }
     }
 
