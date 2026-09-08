@@ -20,6 +20,7 @@ import com.onevizion.scmdb.vo.ComponentRow;
 import com.onevizion.scmdb.vo.DbObject;
 import com.onevizion.scmdb.vo.DbObjectType;
 import com.onevizion.scmdb.vo.ForeignKey;
+import com.onevizion.scmdb.model.StaticValueMetadata;
 
 @Component
 public class DdlDao extends AbstractDaoOra {
@@ -246,12 +247,8 @@ public class DdlDao extends AbstractDaoOra {
              order by {pkColumn}
             """;
 
-    private static final RowMapper<Map<String, Object>> readTableDataRowMapper = (rs, rowNum) -> {
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("id", rs.getObject("id"));
-        row.put("name", rs.getObject("name"));
-        return row;
-    };
+    private static final RowMapper<StaticValueMetadata> staticValueRowMapper = (rs, rowNum) ->
+        new StaticValueMetadata(String.valueOf(rs.getObject("id")), rs.getString("name"));
 
     private final static RowMapper<DbObject> dbObjectRowMapper = (rs, rowNum) -> {
         DbObject dbObject = new DbObject();
@@ -383,7 +380,7 @@ public class DdlDao extends AbstractDaoOra {
                                          .toList();
     }
 
-    public List<Map<String, Object>> getTableData(String tableName, String pkColumn, String lookupColumn) {
+    public List<StaticValueMetadata> getTableData(String tableName, String pkColumn, String lookupColumn) {
         String whereClause = null;
         if ("GRID_PAGE".equalsIgnoreCase(tableName)) {
             whereClause = """
@@ -403,7 +400,7 @@ public class DdlDao extends AbstractDaoOra {
                                                   "whereClause", StringUtils.defaultIfBlank(whereClause, ""));
         String sql = StringPlaceholderUtils.replace(READ_TABLE_DATA, placeholders);
 
-        return jdbcTemplate.query(sql, readTableDataRowMapper);
+        return jdbcTemplate.query(sql, staticValueRowMapper);
     }
 
     public List<ComponentRow> findComponentRows(boolean hasBpdItemTypeId) {

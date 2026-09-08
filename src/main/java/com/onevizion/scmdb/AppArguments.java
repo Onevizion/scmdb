@@ -20,8 +20,7 @@ import static java.util.Arrays.asList;
 public class AppArguments {
     private File scriptsDirectory;
     private File ddlsDirectory;
-    private File jsonSchemasDirectory;
-    private File componentStructuresDirectory;
+    private File graphqlSchemasDirectory;
     private final Map<SchemaType, DbCnnCredentials> credentials = new HashMap<>();
     private boolean genDdl;
     private boolean executeScripts;
@@ -36,8 +35,7 @@ public class AppArguments {
     private String ghToken;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
-    private final static String JSON_SCHEMAS_DIRECTORY_NAME = "comp-schema-tables";
-    private final static String COMPONENT_STRUCTURES_DIRECTORY_NAME = "comp-schema-structure";
+    private final static String GRAPHQL_SCHEMAS_DIRECTORY_NAME = "comp-schema-graphql";
 
     private final static String DDL_DIRECTORY_NOT_FOUND_MSG =
             "Path [{0}] does not exist or is not a directory. Cannot find ddl directory";
@@ -150,9 +148,8 @@ public class AppArguments {
             throw new IllegalArgumentException(MessageFormat.format(DDL_DIRECTORY_NOT_FOUND_MSG,
                                                                     ddlsDirectory.getAbsolutePath()));
         }
-        jsonSchemasDirectory = ensureDirectory(dbDirectory, JSON_SCHEMAS_DIRECTORY_NAME, "component schema tables");
-        componentStructuresDirectory = ensureDirectory(dbDirectory, COMPONENT_STRUCTURES_DIRECTORY_NAME,
-                                                       "component schema structure");
+        graphqlSchemasDirectory = ensureDirectory(dbDirectory, GRAPHQL_SCHEMAS_DIRECTORY_NAME,
+                                                  "component GraphQL schemas");
     }
 
     private File ensureDirectory(File parentDirectory, String directoryName, String description) {
@@ -205,12 +202,8 @@ public class AppArguments {
         return ddlsDirectory;
     }
 
-    public File getJsonSchemasDirectory() {
-        return jsonSchemasDirectory;
-    }
-
-    public File getComponentStructuresDirectory() {
-        return componentStructuresDirectory;
+    public File getGraphqlSchemasDirectory() {
+        return graphqlSchemasDirectory;
     }
 
     public DbCnnCredentials getDbCredentials(SchemaType schemaType) {

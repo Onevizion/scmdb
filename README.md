@@ -32,7 +32,7 @@ When passwords for all schemas are the same (may be common for local dev env), o
 
 * ```--scripts-dir=<location of the directory with DB scripts>```
 * ```--gen-ddl``` generate DDL for objects created or modified with new scripts
-* ```--gen-comps-schema``` generate JSON schemas for changed component tables and component structure files using sibling ```ddl``` directory DDL files into sibling ```comp-schema-tables``` directory, and component structure files into sibling ```comp-schema-structure``` directory (requires Python 3.10+)
+* ```--gen-comps-schema``` generate GraphQL type-system SDL from canonical table DDL and component metadata into sibling ```comp-schema-graphql```. Generated input types keep physical ID fields and add typed reference inputs with names derived directly from DDL columns (for example ```program: { programId: ... }``` or ```program: { programName: ... }```). Nested GraphQL fields retain the complete child table name in camelCase (for example ```WIDGET_PARAM``` becomes ```widgetParam```).
 * ```--all``` regenerate all objects for ```--gen-ddl``` and/or ```--gen-comps-schema```
 * ```--exec``` execute new scripts
 * ```--omit-changed``` do not check for script changes. Script modifications detection is based on hash code calc, omiting this procedure may improove perfomance
@@ -59,11 +59,11 @@ To regenerate DDLs for all DB objects:
 
 ```java -jar scmdb.jar --owner-schema=vqs_p01_epm/vepm@localhost:1521:orclpdb --scripts-dir=./db/scripts --gen-ddl --all```
 
-To generate component schemas for changed tables and component structure files:
+To generate GraphQL component schemas for changed tables:
 
 ```java -jar scmdb.jar --owner-schema=vqs_p01_epm/vepm@localhost:1521:orclpdb --scripts-dir=./db/scripts --gen-comps-schema```
 
-To regenerate all component schemas and component structure files:
+To regenerate all GraphQL component schemas:
 
 ```java -jar scmdb.jar --owner-schema=vqs_p01_epm/vepm@localhost:1521:orclpdb --scripts-dir=./db/scripts --gen-comps-schema --all```
 

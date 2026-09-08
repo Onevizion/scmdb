@@ -127,6 +127,20 @@
         </dependency>
 
         <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.11.4</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.graphql-java</groupId>
+            <artifactId>graphql-java</artifactId>
+            <version>24.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
             <groupId>oracle.sqlcl</groupId>
             <artifactId>ucp11</artifactId>
             <version>${sqlcl.version}</version>

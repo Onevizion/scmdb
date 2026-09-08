@@ -36,7 +36,10 @@ public class DbManager {
     private DdlGenerator ddlGenerator;
 
     @Autowired
-    private JsonSchemaGenerator jsonSchemaGenerator;
+    private GraphqlSchemaGenerator graphqlSchemaGenerator;
+
+    @Autowired
+    private ComponentStructureGenerator componentStructureGenerator;
 
     @Autowired
     private AppArguments appArguments;
@@ -294,24 +297,14 @@ public class DbManager {
         ddlGenerator.generateDllsForAllDbObjects();
     }
 
-    public void generateJsonSchemasForNewOrChangedScripts() {
-        logger.info("Generating component schemas for new and updated scripts");
-
+    public void generateGraphqlSchemas() {
+        logger.info("Generating Java GraphQL component schemas");
         scriptsFacade.checkDbConnection();
-
-        jsonSchemaGenerator.generateSchemas(findChangedDbObjects());
+        graphqlSchemaGenerator.generate();
     }
 
-    public void generateJsonSchemas() {
-        if (appArguments.isAll()) {
-            generateJsonSchemasForAllTables();
-        } else {
-            generateJsonSchemasForNewOrChangedScripts();
-        }
-    }
-
-    public void generateJsonSchemasForAllTables() {
-        jsonSchemaGenerator.generateSchemasForAllTables();
+    public void generateComponentSchemas() {
+        generateGraphqlSchemas();
     }
 
     /**

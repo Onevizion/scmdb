@@ -59,7 +59,7 @@ public class Scmdb {
                     dbManager.generateDdl();
                 }
                 if (appArguments.isGenCompsSchema()) {
-                    dbManager.generateJsonSchemas();
+                    dbManager.generateComponentSchemas();
                 }
             } else {
                 dbManager.updateDb();
