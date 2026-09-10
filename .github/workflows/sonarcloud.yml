@@ -1,0 +1,61 @@
+name: Scan in SonarCloud
+
+# Required secrets:
+# OV_SONARCLOUD_TOKEN - SonarCloud authentication token
+#
+# Required variables:
+# OV_SONARCLOUD_HOST_URL - Host URL of SonarCloud
+# OV_SONARCLOUD_ORGANIZATION - Organization name in SonarCloud
+
+on:
+  push:
+
+concurrency:
+  group: sonar-scmdb-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Scan
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'Onevizion'
+    env:
+      SONAR_PROJECT_KEY: com.onevizion:scmdb
+      SONAR_HOST_URL: ${{ vars.OV_SONARCLOUD_HOST_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version: '17'
+
+      - name: Cache SonarCloud and Maven
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.sonar/cache
+            ~/.m2
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: SonarCloud scan
+        run: |
+          mvn -B -DskipTests \
+              --no-transfer-progress \
+              -Dsonar.organization=${{ vars.OV_SONARCLOUD_ORGANIZATION }} \
+              -Dsonar.projectKey=$SONAR_PROJECT_KEY \
+              -Dsonar.host.url=$SONAR_HOST_URL \
+              -Dsonar.token=${{ secrets.OV_SONARCLOUD_TOKEN }} \
+              -Dsonar.branch.name=${{ github.ref_name }} \
+              compile org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar
+
+      - name: Annotate summary
+        run: |
+          cat > "$GITHUB_STEP_SUMMARY" << EOF
+          [Link to SonarCloud scan results]($SONAR_HOST_URL/summary/new_code?id=$SONAR_PROJECT_KEY&branch=${{ github.ref_name }})
+          EOF

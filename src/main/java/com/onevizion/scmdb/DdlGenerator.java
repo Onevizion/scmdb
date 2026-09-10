@@ -180,7 +180,7 @@ public class DdlGenerator {
 
     private String generateTableCommentsDdl(DbObject table) {
         logger.info("Adding comments...");
-        List<DbObject> commentBlocks = ddlDao.extractTableDependentObjectsDdl(table.getName(), COMMENT);
+        List<DbObject> commentBlocks = ddlDao.findTableRelatedObjectDdlByTableNameAndObjectType(table.getName(), COMMENT);
         StringBuilder commentsDdl = new StringBuilder();
         for (DbObject commentBlock : commentBlocks) {
             String ddl = removeSchemaNameInDdl(commentBlock.getDdl());
@@ -213,7 +213,7 @@ public class DdlGenerator {
 
     private String generateIndexScripts(DbObject table) {
         logger.info("Adding indexes...");
-        List<DbObject> indexes = ddlDao.extractTableDependentObjectsDdl(table.getName(), INDEX);
+        List<DbObject> indexes = ddlDao.findTableRelatedObjectDdlByTableNameAndObjectType(table.getName(), INDEX);
         StringBuilder indexesDdl = new StringBuilder();
         for (int i = 0; i < indexes.size(); i++) {
             DbObject index = indexes.get(i);
@@ -231,7 +231,7 @@ public class DdlGenerator {
 
     private String generateSequenceScripts(DbObject table) {
         logger.info("Adding sequences...");
-        List<DbObject> sequences = ddlDao.extractTableDependentObjectsDdl(table.getName(), SEQUENCE);
+        List<DbObject> sequences = ddlDao.findTableRelatedObjectDdlByTableNameAndObjectType(table.getName(), SEQUENCE);
         StringBuilder sequencesDdl = new StringBuilder();
         for (DbObject sequence : sequences) {
             String ddl = removeSchemaNameInDdl(sequence.getDdl());
@@ -262,7 +262,7 @@ public class DdlGenerator {
 
     private String generateTriggerScripts(DbObject table) {
         logger.info("Adding triggers...");
-        List<DbObject> triggers = ddlDao.extractTableDependentObjectsDdl(table.getName(), TRIGGER);
+        List<DbObject> triggers = ddlDao.findTableRelatedObjectDdlByTableNameAndObjectType(table.getName(), TRIGGER);
         StringBuilder triggersDdl = new StringBuilder();
         if (!triggers.isEmpty()) {
             triggersDdl.append("\r\n");
@@ -294,7 +294,7 @@ public class DdlGenerator {
 
     private String generateViewCommentsScripts(DbObject view) {
         logger.info("Adding views comments...");
-        List<DbObject> comments = ddlDao.extractTableDependentObjectsDdl(view.getName(), COMMENT);
+        List<DbObject> comments = ddlDao.findTableRelatedObjectDdlByTableNameAndObjectType(view.getName(), COMMENT);
         StringBuilder commentsDdl = new StringBuilder();
         for (DbObject comment : comments) {
             String ddl = removeSchemaNameInDdl(comment.getDdl());
@@ -329,13 +329,14 @@ public class DdlGenerator {
         Set<DbObject> tables = new HashSet<>();
         for (DbObject dbObject : dbObjects) {
             if (dbObject.getType() == COMMENT && !skipGenDdlForDepObject) {
-                dbObject.setType(ddlDao.getObjectTypeByName(dbObject.getName()));
+                dbObject.setType(ddlDao.getDbObjectTypeByName(dbObject.getName()));
             }
 
             if ((dbObject.getType() == INDEX || dbObject.getType() == TRIGGER) && !skipGenDdlForDepObject) {
                 String tableName = ddlDao.getTableNameByDepObject(dbObject);
-                if (ddlDao.isExist(tableName, TABLE)) {
-                    tables.add(new DbObject(tableName, TABLE));
+                DbObject tableDbOjbect = new DbObject(tableName, TABLE);
+                if (ddlDao.isExist(tableDbOjbect)) {
+                    tables.add(tableDbOjbect);
                 } else {
                     logger.warn("Parent object not found for {} {}! Please, modify related DDL manually.", RED,
                             dbObject.getType(), dbObject.getName());
@@ -354,7 +355,7 @@ public class DdlGenerator {
                 }
             } else {
                 if (!checkAndDeleteRedundantDdl(dbObject)) {
-                    dbObject.setDdl(ddlDao.extractDdl(dbObject));
+                    dbObject.setDdl(ddlDao.getDdl(dbObject));
                     if (dbObject.getType() == PACKAGE_BODY) {
                         generatePackageBodyScripts(dbObject);
                     } else if (dbObject.getType() == PACKAGE_SPEC) {
@@ -370,7 +371,7 @@ public class DdlGenerator {
             }
         }
         for (DbObject table : tables) {
-            table.setDdl(ddlDao.extractDdl(table));
+            table.setDdl(ddlDao.getDdl(table));
             generateTableScripts(table);
         }
     }
@@ -395,7 +396,7 @@ public class DdlGenerator {
         boolean isDeletePkgOrTypeSpecWithBody = false;
         File fileDir = null;
         String fileName = null;
-        if (!ddlDao.isExist(dbObject.getName(), dbObject.getType())) {
+        if (!ddlDao.isExist(dbObject)) {
             if (dbObject.getType() == PACKAGE_BODY) {
                 fileDir = new File(appArguments.getDdlsDirectory() + PACKAGES_DDL_DIRECTORY_NAME);
                 fileName = dbObject.getName() + ".sql";
@@ -445,7 +446,7 @@ public class DdlGenerator {
     }
 
     public void generateDllsForAllDbObjects() {
-        generateDdls(ddlDao.extractAllDbObjectsWithoutDdl(), true);
+        generateDdls(ddlDao.findAllDbObjects(), true);
     }
 
     private String sortConstraintsInTableDdl(String sourceDdlScript) {
