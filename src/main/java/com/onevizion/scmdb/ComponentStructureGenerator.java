@@ -32,36 +32,39 @@ public class ComponentStructureGenerator {
     private final ColorLogger logger;
 
     @Autowired
-    public ComponentStructureGenerator(AppArguments appArguments, DdlDao ddlDao,
-                                       DdlTableMetadataProvider ddlTableMetadataProvider, ColorLogger logger) {
+    public ComponentStructureGenerator(DdlDao ddlDao,
+                                       DdlTableMetadataProvider ddlTableMetadataProvider,
+                                       ColorLogger logger) {
         this.ddlDao = ddlDao;
         this.ddlTableMetadataProvider = ddlTableMetadataProvider;
         this.logger = logger;
     }
 
-    public List<ComponentMetadata> buildModels() {
+    public BuildResult buildModels() {
         List<ComponentMetadata> models = new ArrayList<>();
-        int skipped = 0;
-        int failed = 0;
+        List<String> errors = new ArrayList<>();
         for (ComponentData component : loadComponents()) {
-            if (!component.tables().stream().anyMatch(table -> Objects.equals(table.tableName(), component.mainTable()))) {
-                skipped++;
-                logger.warn("Skipping component schema [{}]: main table [{}] is not in component tables",
-                        ColorLogger.Color.YELLOW, component.componentName(), component.mainTable());
+            if (component.tables().stream().noneMatch(table -> Objects.equals(table.tableName(), component.mainTable()))) {
+                errors.add(componentLabel(component) + ": main table [" + component.mainTable()
+                        + "] is not in component tables");
                 continue;
             }
             try {
                 models.add(buildModel(component));
             } catch (RuntimeException e) {
-                failed++;
-                logger.warn("Failed component schema [{}]: {}", ColorLogger.Color.YELLOW,
-                        component.componentName(), e.getMessage());
+                errors.add(componentLabel(component) + ": " + e.getMessage());
             }
         }
-        logger.info("Component metadata assembled: {}, skipped={}, failed={}", ColorLogger.Color.GREEN,
-                models.size(), skipped, failed);
-        return models;
+        errors.forEach(error -> logger.warn(error, ColorLogger.Color.YELLOW));
+        logger.info("Component metadata assembled: {}, errors={}", ColorLogger.Color.GREEN, models.size(), errors.size());
+        return new BuildResult(models, errors);
     }
+
+    private static String componentLabel(ComponentData component) {
+        return "Component " + component.componentId() + " (" + component.componentName() + ")";
+    }
+
+    public record BuildResult(List<ComponentMetadata> models, List<String> errors) { }
 
     private List<ComponentData> loadComponents() {
         boolean hasBpdItemTypeId = ddlDao.hasColumnInTable("V_COMPONENT", "BPD_ITEM_TYPE_ID");
@@ -150,7 +153,8 @@ public class ComponentStructureGenerator {
                         foreignKey.targetColumns(), targetReference.lookupColumns(), targetReference.staticValues());
         return new ColumnMetadata(column.name(), column.oracleType(), column.graphqlScalar(), column.nullable(),
                 column.precision(), column.scale(), column.maxLength(), column.description(), column.defaultValue(),
-                column.source(), column.readOnly(), column.readOnlyReason(), column.constraints(), reference);
+                column.source(), column.readOnly(), column.readOnlyReason(), column.constraints(), reference,
+                column.labelReference());
     }
 
     private static ComponentHierarchyNode hierarchyNode(String tableName, Set<String> componentTables,

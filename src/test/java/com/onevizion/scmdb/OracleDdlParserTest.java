@@ -77,7 +77,7 @@ class OracleDdlParserTest {
     }
 
     @Test
-    void parsesSingleCompositeAndSyntheticForeignKeys() {
+    void parsesSingleAndCompositeForeignKeysWithoutInventingLabelConvention() {
         TableMetadata table = parse("""
                 SAMPLE_ID NUMBER,
                 PARENT_ID NUMBER,
@@ -87,14 +87,37 @@ class OracleDdlParserTest {
                 CONSTRAINT FK_TENANT FOREIGN KEY (SAMPLE_ID, TENANT_ID) REFERENCES TENANT_ITEM (ITEM_ID, TENANT_ID)
                 """, "");
 
-        assertEquals(3, table.foreignKeys().size());
+        assertEquals(2, table.foreignKeys().size());
         assertFalse(table.foreignKeys().get(0).composite());
         assertEquals("FK_PARENT", table.foreignKeys().get(0).constraintName());
         assertEquals(List.of("SAMPLE_ID", "TENANT_ID"), table.foreignKeys().get(1).sourceColumns());
         assertEquals(List.of("ITEM_ID", "TENANT_ID"), table.foreignKeys().get(1).targetColumns());
         assertTrue(table.foreignKeys().get(1).composite());
-        assertEquals("LABEL_PROGRAM", table.foreignKeys().get(2).targetTable());
-        assertEquals("UN1_LABEL_PROGRAM", table.foreignKeys().get(2).uniqueIndex());
+    }
+
+    @Test
+    void parsesPrimaryKeyFromSubsequentAlterTableStatement() {
+        TableMetadata singleColumn = parser.parse("""
+                CREATE TABLE SAMPLE (
+                  SAMPLE_ID NUMBER NOT NULL,
+                  SAMPLE_NAME VARCHAR2(100)
+                );
+                ALTER TABLE SAMPLE
+                  ADD CONSTRAINT PK_SAMPLE
+                  PRIMARY KEY (SAMPLE_ID);
+                """);
+        assertEquals(List.of("SAMPLE_ID"), singleColumn.primaryKey());
+
+        TableMetadata composite = parser.parse("""
+                CREATE TABLE SAMPLE (
+                  APP_LANG_ID NUMBER NOT NULL,
+                  LABEL_SYSTEM_ID NUMBER NOT NULL
+                );
+                ALTER TABLE SAMPLE
+                  ADD CONSTRAINT PK_SAMPLE
+                  PRIMARY KEY (APP_LANG_ID, LABEL_SYSTEM_ID);
+                """);
+        assertEquals(List.of("APP_LANG_ID", "LABEL_SYSTEM_ID"), composite.primaryKey());
     }
 
     @Test

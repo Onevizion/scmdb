@@ -6,6 +6,7 @@ import com.onevizion.scmdb.model.ComponentHierarchyNode;
 import com.onevizion.scmdb.model.ComponentMetadata;
 import com.onevizion.scmdb.model.ConstraintMetadata;
 import com.onevizion.scmdb.model.ForeignKeyMetadata;
+import com.onevizion.scmdb.model.LabelReferenceMetadata;
 import com.onevizion.scmdb.model.ReferenceKind;
 import com.onevizion.scmdb.model.ReferenceMetadata;
 import com.onevizion.scmdb.model.RelationMetadata;
@@ -32,12 +33,18 @@ public class GraphqlSchemaRenderer {
               DYNAMIC
             }
 
+            enum LabelWriteDestination {
+              PROGRAM
+            }
+
             directive @table(name: String!) on OBJECT | INPUT_OBJECT
+            directive @primaryKey(columns: [String!]!) on OBJECT | INPUT_OBJECT
             directive @column(name: String!) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
             directive @source(value: String!) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
             directive @readOnly(reason: String) on FIELD_DEFINITION
             directive @reference(table: String!, column: [String!]!, lookup: [String!]!, kind: ReferenceKind, compositeKey: Boolean = false, uniqueIndex: String) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
             directive @referenceLookup(field: String!) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+            directive @labelReference(systemTable: String!, systemIdColumn: String!, programTable: String!, programIdColumn: String!, languageColumn: String!, programColumn: String, writeTarget: LabelWriteDestination!) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
             directive @relation(fromTable: String!, fromColumn: String!, toTable: String!, toColumn: String!, constraint: String!) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
             directive @check(name: String!, expression: String!, columns: [String!]!) repeatable on OBJECT | INPUT_OBJECT | FIELD_DEFINITION | INPUT_FIELD_DEFINITION
             directive @constraint(maxLength: Int, minimum: String, maximum: String, pattern: String, format: String, notEqual: String, precision: Int, scale: Int) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
@@ -113,6 +120,9 @@ public class GraphqlSchemaRenderer {
         description(lines, table.description(), "");
         StringBuilder declaration = new StringBuilder((input ? "input " : "type ") + naming.typeName(table.name())
                 + (input ? "Input" : "") + " @table(name: " + quote(table.name()) + ")");
+        if (!table.primaryKey().isEmpty()) {
+            declaration.append("\n  ").append(primaryKeyDirective(table.primaryKey()));
+        }
         for (CheckConstraintMetadata check : table.checks()) {
             declaration.append("\n  ").append(checkDirective(check));
         }
@@ -129,7 +139,7 @@ public class GraphqlSchemaRenderer {
             boolean nonNull = input ? requiredInput : !column.nullable();
             addField(lines, naming.fieldName(column.name()),
                     column.graphqlScalar().typeName() + (nonNull ? "!" : ""),
-                    column.description(), directives(table, column, input));
+                    fieldDescription(column, input), directives(table, column, input));
             addReferenceFields(lines, table, column, input, usedNames);
         }
         ComponentHierarchyNode hierarchy = hierarchyNode(component.hierarchy(), table.name());
@@ -210,6 +220,7 @@ public class GraphqlSchemaRenderer {
         if (column.source() != null) result.add("@source(value: " + quote(column.source().description()) + ")");
         if (!input && column.readOnly()) result.add("@readOnly(reason: " + quote(column.readOnlyReason()) + ")");
         if (column.reference() != null) result.add(referenceDirective(table, column));
+        if (column.labelReference() != null) result.add(labelReferenceDirective(column.labelReference()));
         String constraint = constraintDirective(column);
         if (constraint != null) result.add(constraint);
         if (column.defaultValue() != null && column.defaultValue().normalizedValue() != null) {
@@ -232,6 +243,29 @@ public class GraphqlSchemaRenderer {
         if (key != null && key.composite()) arguments.add("compositeKey: true");
         if (key != null && key.uniqueIndex() != null) arguments.add("uniqueIndex: " + quote(key.uniqueIndex()));
         return "@reference(" + String.join(", ", arguments) + ")";
+    }
+
+    private static String labelReferenceDirective(LabelReferenceMetadata label) {
+        return "@labelReference(systemTable: " + quote(label.systemTable())
+                + ", systemIdColumn: " + quote(label.systemIdColumn())
+                + ", programTable: " + quote(label.programTable())
+                + ", programIdColumn: " + quote(label.programIdColumn())
+                + ", languageColumn: " + quote(label.languageColumn())
+                + ", programColumn: " + quote(label.programColumn())
+                + ", writeTarget: " + label.writeTarget().name() + ")";
+    }
+
+    private static String fieldDescription(ColumnMetadata column, boolean input) {
+        if (column.labelReference() == null) {
+            return column.description();
+        }
+        LabelReferenceMetadata label = column.labelReference();
+        String labelDescription = input ? "New labels are stored in " + label.programTable()
+                                            + "; existing labels may also come from " + label.systemTable() + "."
+                                        : "Label from " + label.systemTable() + " or " + label.programTable() + ".";
+        return column.description() == null || column.description().isEmpty()
+                ? labelDescription
+                : column.description() + " " + labelDescription;
     }
 
     private static String constraintDirective(ColumnMetadata column) {
@@ -313,6 +347,10 @@ public class GraphqlSchemaRenderer {
     private static String checkDirective(CheckConstraintMetadata check) {
         return "@check(name: " + quote(check.name()) + ", expression: " + quote(check.expression())
                 + ", columns: " + quotedList(check.referencedColumns()) + ")";
+    }
+
+    private static String primaryKeyDirective(List<String> columns) {
+        return "@primaryKey(columns: " + quotedList(columns) + ")";
     }
 
     private static void addField(List<String> lines, String name, String type,

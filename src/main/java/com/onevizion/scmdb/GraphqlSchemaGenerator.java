@@ -1,5 +1,6 @@
 package com.onevizion.scmdb;
 
+import com.onevizion.scmdb.exception.ScmdbException;
 import com.onevizion.scmdb.model.ComponentMetadata;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -8,6 +9,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -37,10 +39,6 @@ public class GraphqlSchemaGenerator {
         this.logger = logger;
     }
 
-    public GenerationResult generate() {
-        return generateAll();
-    }
-
     public GenerationResult generateAll() {
         Path outputDirectory = appArguments.getGraphqlSchemasDirectory().toPath();
         prepareOutputDirectory(outputDirectory, true);
@@ -55,17 +53,17 @@ public class GraphqlSchemaGenerator {
         prepareOutputDirectory(outputDirectory, false);
         if (normalizedTableNames.isEmpty()) {
             logger.info("No changed tables found; GraphQL component schemas are up to date");
-            return new GenerationResult(0, 0);
+            return new GenerationResult(0);
         }
         return generate(outputDirectory, component -> component.tables().stream()
                 .anyMatch(table -> normalizedTableNames.contains(table.name().toUpperCase(Locale.ROOT))));
     }
 
     private GenerationResult generate(Path outputDirectory, Predicate<ComponentMetadata> selector) {
-        List<ComponentMetadata> components = componentStructureGenerator.buildModels();
+        ComponentStructureGenerator.BuildResult buildResult = componentStructureGenerator.buildModels();
+        List<String> errors = new ArrayList<>(buildResult.errors());
         int generated = 0;
-        int failed = 0;
-        for (ComponentMetadata component : components.stream().filter(selector).toList()) {
+        for (ComponentMetadata component : buildResult.models().stream().filter(selector).toList()) {
             Path output = outputDirectory.resolve("component_" + component.componentId() + "_"
                     + component.mainTable().toLowerCase(Locale.ROOT) + GRAPHQL_EXTENSION);
             try {
@@ -75,13 +73,17 @@ public class GraphqlSchemaGenerator {
                 write(output, schema);
                 generated++;
             } catch (RuntimeException e) {
-                failed++;
-                logger.warn("Failed GraphQL schema [{}]: {}", ColorLogger.Color.YELLOW,
-                        output.getFileName(), e.getMessage());
+                String message = "Component " + component.componentId() + " (" + component.componentName() + "): " + e.getMessage();
+                errors.add(message);
+                logger.warn(message, ColorLogger.Color.YELLOW);
             }
         }
-        logger.info("Generated GraphQL component schemas: {}, failed={}", GREEN, generated, failed);
-        return new GenerationResult(generated, failed);
+        logger.info("Generated GraphQL component schemas: {}, failed={}", GREEN, generated, errors.size());
+        if (!errors.isEmpty()) {
+            throw new ScmdbException("GraphQL schema generation failed for " + errors.size()
+                                   + " component(s); see warnings above for details.");
+        }
+        return new GenerationResult(generated);
     }
 
     private static void prepareOutputDirectory(Path outputDirectory, boolean clear) {
@@ -122,5 +124,5 @@ public class GraphqlSchemaGenerator {
         }
     }
 
-    public record GenerationResult(int generated, int failed) { }
+    public record GenerationResult(int generated) { }
 }

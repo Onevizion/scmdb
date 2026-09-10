@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
@@ -18,16 +19,18 @@ import java.util.Locale;
 public class DdlTableMetadataProvider {
     private final AppArguments appArguments;
     private final DdlDao ddlDao;
+    private final ColorLogger logger;
     private final OracleDdlParser parser;
 
     @Autowired
-    public DdlTableMetadataProvider(AppArguments appArguments, DdlDao ddlDao) {
-        this(appArguments, ddlDao, new OracleDdlParser());
+    public DdlTableMetadataProvider(AppArguments appArguments, DdlDao ddlDao, ColorLogger logger) {
+        this(appArguments, ddlDao, logger, new OracleDdlParser());
     }
 
-    DdlTableMetadataProvider(AppArguments appArguments, DdlDao ddlDao, OracleDdlParser parser) {
+    DdlTableMetadataProvider(AppArguments appArguments, DdlDao ddlDao, ColorLogger logger, OracleDdlParser parser) {
         this.appArguments = appArguments;
         this.ddlDao = ddlDao;
+        this.logger = logger;
         this.parser = parser;
     }
 
@@ -50,7 +53,7 @@ public class DdlTableMetadataProvider {
     }
 
     private TableMetadata enrich(TableMetadata table) {
-        List<String> primaryKey = ddlDao.findPrimaryKeyColumnNamesByTableName(table.name());
+        List<String> primaryKey = resolvePrimaryKey(table);
         ReferenceMetadata referenceData = null;
 
         if (primaryKey.size() == 1) {
@@ -70,7 +73,20 @@ public class DdlTableMetadataProvider {
             }
         }
 
-        return new TableMetadata(table.name(), table.description(), table.columns(), table.primaryKey(),
-                                 table.foreignKeys(), table.checks(), referenceData);
+        return LabelReferenceConventions.apply(new TableMetadata(table.name(), table.description(), table.columns(),
+                primaryKey, table.foreignKeys(), table.checks(), referenceData));
+    }
+
+    private List<String> resolvePrimaryKey(TableMetadata table) {
+        List<String> ddlPrimaryKey = table.primaryKey();
+        List<String> dbPrimaryKey = ddlDao.findPrimaryKeyColumnNamesByTableName(table.name());
+        if (ddlPrimaryKey.isEmpty()) {
+            return dbPrimaryKey;
+        }
+        if (!dbPrimaryKey.isEmpty() && !new LinkedHashSet<>(ddlPrimaryKey).equals(new LinkedHashSet<>(dbPrimaryKey))) {
+            logger.warn("Primary key mismatch for table [{}]: DDL declares {}, database reports {}. Using DDL-derived primary key.",
+                    ColorLogger.Color.YELLOW, table.name(), ddlPrimaryKey, dbPrimaryKey);
+        }
+        return ddlPrimaryKey;
     }
 }

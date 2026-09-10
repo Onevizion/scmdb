@@ -43,9 +43,6 @@ public class DbManager {
     private DdlDao ddlDao;
 
     @Autowired
-    private ComponentStructureGenerator componentStructureGenerator;
-
-    @Autowired
     private AppArguments appArguments;
 
     @Autowired

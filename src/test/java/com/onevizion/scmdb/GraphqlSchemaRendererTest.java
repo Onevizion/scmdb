@@ -6,6 +6,8 @@ import com.onevizion.scmdb.model.ComponentMetadata;
 import com.onevizion.scmdb.model.ConstraintMetadata;
 import com.onevizion.scmdb.model.ForeignKeyMetadata;
 import com.onevizion.scmdb.model.GraphqlScalar;
+import com.onevizion.scmdb.model.LabelReferenceMetadata;
+import com.onevizion.scmdb.model.LabelWriteDestination;
 import com.onevizion.scmdb.model.ReferenceKind;
 import com.onevizion.scmdb.model.ReferenceMetadata;
 import com.onevizion.scmdb.model.RelationMetadata;
@@ -29,20 +31,15 @@ class GraphqlSchemaRendererTest {
         ReferenceMetadata staticKind = new ReferenceMetadata(ReferenceKind.STATIC, "WIDGET_KIND",
                 List.of("WIDGET_KIND_ID"), List.of("WIDGET_KIND"),
                 List.of(new StaticValueMetadata("1", "Text")));
-        ReferenceMetadata label = new ReferenceMetadata(ReferenceKind.DYNAMIC, "LABEL_PROGRAM",
-                List.of("LABEL_PROGRAM_ID", "APP_LANG_ID"), List.of(), List.of());
         ForeignKeyMetadata configKey = foreignKey("FK_CONFIG", "WIDGET", "CONFIG_FIELD_ID", "CONFIG_FIELD", "CONFIG_FIELD_ID");
         ForeignKeyMetadata kindKey = foreignKey("FK_KIND", "WIDGET", "WIDGET_KIND_ID", "WIDGET_KIND", "WIDGET_KIND_ID");
-        ForeignKeyMetadata labelKey = new ForeignKeyMetadata("SYNTHETIC_WIDGET_DISPLAY_LABEL_ID", "WIDGET",
-                List.of("DISPLAY_LABEL_ID"), "LABEL_PROGRAM", List.of("LABEL_PROGRAM_ID", "APP_LANG_ID"),
-                true, "UN1_LABEL_PROGRAM");
         TableMetadata widget = table("WIDGET", "Widget definition", List.of(
                 column("WIDGET_ID", GraphqlScalar.ID, false, null),
                 column("WIDGET_NAME", GraphqlScalar.STRING, false, null),
                 column("CONFIG_FIELD_ID", GraphqlScalar.ID, false, dynamicConfig),
                 column("WIDGET_KIND_ID", GraphqlScalar.ID, false, staticKind),
-                column("DISPLAY_LABEL_ID", GraphqlScalar.ID, true, label)),
-                List.of(configKey, kindKey, labelKey));
+                labelColumn("DISPLAY_LABEL_ID")),
+                List.of(configKey, kindKey));
         TableMetadata parameter = table("WIDGET_PARAM", "Widget parameter", List.of(
                 column("WIDGET_PARAM_ID", GraphqlScalar.ID, false, null),
                 column("WIDGET_ID", GraphqlScalar.ID, false,
@@ -67,13 +64,23 @@ class GraphqlSchemaRendererTest {
 
         assertTrue(sdl.contains("scalar BigInt"));
         assertTrue(sdl.contains("directive @reference("));
-        assertTrue(sdl.contains("type Widget @table(name: \"WIDGET\")"));
+        assertTrue(sdl.contains("directive @primaryKey(columns: [String!]!) on OBJECT | INPUT_OBJECT"));
+        assertTrue(sdl.contains("type Widget @table(name: \"WIDGET\")\n  @primaryKey(columns: [\"WIDGET_ID\"]) {"));
+        assertTrue(sdl.contains("input WidgetInput @table(name: \"WIDGET\")\n  @primaryKey(columns: [\"WIDGET_ID\"]) {"));
         assertTrue(sdl.contains("widgetParam: [WidgetParam!] @relation(fromTable: \"WIDGET_PARAM\""));
         assertTrue(sdl.contains("configFieldId: ID! @column(name: \"CONFIG_FIELD_ID\") @reference(table: \"CONFIG_FIELD\", column: [\"CONFIG_FIELD_ID\"], lookup: [\"CONFIG_FIELD_NAME\"], kind: DYNAMIC)"));
         assertTrue(sdl.contains("configFieldName: String @referenceLookup(field: \"configFieldId\")"));
         assertTrue(sdl.contains("widgetKind: WidgetWidgetKind @referenceLookup(field: \"widgetKindId\")"));
         assertTrue(sdl.contains("TEXT @dbValue(id: \"1\")"));
-        assertTrue(sdl.contains("displayLabelId: ID @column(name: \"DISPLAY_LABEL_ID\") @reference(table: \"LABEL_PROGRAM\", column: [\"LABEL_PROGRAM_ID\", \"APP_LANG_ID\"], lookup: [], kind: DYNAMIC, compositeKey: true, uniqueIndex: \"UN1_LABEL_PROGRAM\")"));
+        assertTrue(sdl.contains("directive @labelReference("));
+        assertTrue(sdl.contains("displayLabelId: ID @column(name: \"DISPLAY_LABEL_ID\") "
+                + "@labelReference(systemTable: \"LABEL_SYSTEM\", systemIdColumn: \"LABEL_SYSTEM_ID\", "
+                + "programTable: \"LABEL_PROGRAM\", programIdColumn: \"LABEL_PROGRAM_ID\", "
+                + "languageColumn: \"APP_LANG_ID\", programColumn: \"PROGRAM_ID\", writeTarget: PROGRAM)"));
+        assertTrue(sdl.contains("Label from LABEL_SYSTEM or LABEL_PROGRAM."));
+        assertTrue(sdl.contains("New labels are stored in LABEL_PROGRAM; "
+                + "existing labels may also come from LABEL_SYSTEM."));
+        assertFalse(sdl.contains("SYNTHETIC_WIDGET_DISPLAY_LABEL_ID"));
         assertTrue(sdl.contains("input ConfigFieldReferenceInput"));
         assertFalse(sdl.contains("widget: [Widget!]"));
     }
@@ -121,7 +128,17 @@ class GraphqlSchemaRendererTest {
     private static ColumnMetadata column(String name, GraphqlScalar scalar, boolean nullable,
                                          ReferenceMetadata reference) {
         return new ColumnMetadata(name, scalar == GraphqlScalar.STRING ? "VARCHAR2" : "NUMBER", scalar,
-                nullable, null, null, null, null, null, null, false, null, ConstraintMetadata.empty(), reference);
+                                  nullable, null, null, null, null, null, null, false, null,
+                                  ConstraintMetadata.empty(), reference, null);
+    }
+
+    private static ColumnMetadata labelColumn(String name) {
+        LabelReferenceMetadata labelReference = new LabelReferenceMetadata("LABEL_SYSTEM", "LABEL_SYSTEM_ID",
+                                                                           "LABEL_PROGRAM", "LABEL_PROGRAM_ID",
+                                                                           "APP_LANG_ID", "PROGRAM_ID",
+                                                                           LabelWriteDestination.PROGRAM);
+        return new ColumnMetadata(name, "NUMBER", GraphqlScalar.ID, true, null, null, null, null, null, null,
+                false, null, ConstraintMetadata.empty(), null, labelReference);
     }
 
     private static ForeignKeyMetadata foreignKey(String name, String sourceTable, String sourceColumn,

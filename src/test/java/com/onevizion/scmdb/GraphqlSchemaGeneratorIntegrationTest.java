@@ -1,6 +1,7 @@
 package com.onevizion.scmdb;
 
 import com.onevizion.scmdb.dao.DdlDao;
+import com.onevizion.scmdb.exception.ScmdbException;
 import com.onevizion.scmdb.model.ColumnMetadata;
 import com.onevizion.scmdb.model.ComponentHierarchyNode;
 import com.onevizion.scmdb.model.ComponentMetadata;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -28,6 +30,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GraphqlSchemaGeneratorIntegrationTest {
@@ -65,16 +68,15 @@ class GraphqlSchemaGeneratorIntegrationTest {
                 componentRow(60, "XitorType", "XITOR_TYPE"),
                 componentRow(61, "WorkPlan", "WORK_PLAN")));
         SilentColorLogger logger = new SilentColorLogger();
-        DdlTableMetadataProvider provider = new DdlTableMetadataProvider(arguments, ddlDao);
-        ComponentStructureGenerator structures = new ComponentStructureGenerator(arguments, ddlDao, provider, logger);
+        DdlTableMetadataProvider provider = new DdlTableMetadataProvider(arguments, ddlDao, logger);
+        ComponentStructureGenerator structures = new ComponentStructureGenerator(ddlDao, provider, logger);
 
         GraphqlSchemaGenerator.GenerationResult result = new GraphqlSchemaGenerator(arguments,
                                                                                     structures,
                                                                                     new GraphqlNamingService(),
-                                                                                    logger).generate();
+                                                                                    logger).generateAll();
 
         assertEquals(5, result.generated());
-        assertEquals(0, result.failed());
         Path outputDirectory = arguments.getGraphqlSchemasDirectory().toPath();
         List<Path> files;
         try (var paths = Files.list(outputDirectory)) {
@@ -111,32 +113,85 @@ class GraphqlSchemaGeneratorIntegrationTest {
     }
 
     @Test
-    void continuesAfterOneComponentFails() throws Exception {
+    void failsTheWholeCommandWhenAnyComponentCannotBeBuiltButKeepsSuccessfulOutput() throws Exception {
         AppArguments arguments = arguments("failure");
         ComponentMetadata valid = component(1, "VALID", false);
         ComponentMetadata invalid = component(2, "INVALID", true);
-        ComponentStructureGenerator structures = new ComponentStructureGenerator(arguments,
+        ComponentStructureGenerator structures = new ComponentStructureGenerator(
                                                                                  new FixtureDdlDao(List.of()),
                                                                                  null,
                                                                                  new SilentColorLogger()) {
             @Override
-            public List<ComponentMetadata> buildModels() {
-                return List.of(valid, invalid);
+            public BuildResult buildModels() {
+                return new BuildResult(List.of(valid, invalid), List.of());
             }
         };
+        RecordingColorLogger logger = new RecordingColorLogger();
 
-        GraphqlSchemaGenerator.GenerationResult result = new GraphqlSchemaGenerator(arguments, structures,
-                                                                                    new GraphqlNamingService(),
-                                                                                    new SilentColorLogger()).generate();
+        GraphqlSchemaGenerator generator = new GraphqlSchemaGenerator(arguments, structures,
+                                                                      new GraphqlNamingService(),
+                                                                      logger);
 
-        assertEquals(1, result.generated());
-        assertEquals(1, result.failed());
+        ScmdbException exception = assertThrows(ScmdbException.class, generator::generateAll);
+
+        assertTrue(exception.getMessage().contains("failed for 1 component(s)"));
+        assertFalse(exception.getMessage().contains("Component 2 (INVALID)"));
+        assertEquals(1, logger.warnings.stream().filter(warning -> warning.contains("Component 2 (INVALID)")).count());
         assertTrue(Files.isRegularFile(arguments.getGraphqlSchemasDirectory()
                                                 .toPath()
                                                 .resolve("component_1_valid.graphql")));
         assertFalse(Files.exists(arguments.getGraphqlSchemasDirectory()
                                           .toPath()
                                           .resolve("component_2_invalid.graphql")));
+    }
+
+    @Test
+    void collectsErrorsFromEveryFailingComponentInsteadOfStoppingAtTheFirst() throws Exception {
+        AppArguments arguments = arguments("multi-failure");
+        ComponentMetadata valid = component(1, "VALID", false);
+        ComponentMetadata firstInvalid = component(2, "FIRST_INVALID", true);
+        ComponentMetadata secondInvalid = component(3, "SECOND_INVALID", true);
+        ComponentStructureGenerator structures = new ComponentStructureGenerator(new FixtureDdlDao(List.of()),
+                                                                                 null,
+                                                                                 new SilentColorLogger()) {
+            @Override
+            public BuildResult buildModels() {
+                return new BuildResult(List.of(valid, firstInvalid, secondInvalid), List.of());
+            }
+        };
+        RecordingColorLogger logger = new RecordingColorLogger();
+
+        GraphqlSchemaGenerator generator = new GraphqlSchemaGenerator(arguments, structures,
+                                                                      new GraphqlNamingService(),
+                                                                      logger);
+
+        ScmdbException exception = assertThrows(ScmdbException.class, generator::generateAll);
+
+        assertTrue(exception.getMessage().contains("failed for 2 component(s)"));
+        assertTrue(logger.warnings.stream().anyMatch(warning -> warning.contains("Component 2 (FIRST_INVALID)")));
+        assertTrue(logger.warnings.stream().anyMatch(warning -> warning.contains("Component 3 (SECOND_INVALID)")));
+        assertTrue(Files.isRegularFile(arguments.getGraphqlSchemasDirectory()
+                                                .toPath()
+                                                .resolve("component_1_valid.graphql")));
+    }
+
+    @Test
+    void failsWhenAComponentIsSkippedBecauseMainTableIsMissingFromComponentTables() throws Exception {
+        AppArguments arguments = arguments("missing-main-table");
+        FixtureDdlDao ddlDao = new FixtureDdlDao(List.of(
+                new ComponentRow(3, "Missing", "MISSING_TABLE", 0, 0, null, null, null, null, null)));
+        RecordingColorLogger logger = new RecordingColorLogger();
+        ComponentStructureGenerator structures = new ComponentStructureGenerator(ddlDao,
+                new DdlTableMetadataProvider(arguments, ddlDao, logger), logger);
+        GraphqlSchemaGenerator generator = new GraphqlSchemaGenerator(arguments, structures,
+                                                                      new GraphqlNamingService(), logger);
+
+        ScmdbException exception = assertThrows(ScmdbException.class, generator::generateAll);
+
+        assertTrue(exception.getMessage().contains("failed for 1 component(s)"));
+        assertEquals(1, logger.warnings.stream()
+                .filter(warning -> warning.contains("Component 3 (Missing)") && warning.contains("MISSING_TABLE"))
+                .count());
     }
 
     @Test
@@ -157,8 +212,8 @@ class GraphqlSchemaGeneratorIntegrationTest {
         FixtureDdlDao ddlDao = new FixtureDdlDao(List.of(componentRow(1, "Dependent", "DEPENDENT"),
                                                          componentRow(2, "Unrelated", "UNRELATED")));
         SilentColorLogger logger = new SilentColorLogger();
-        DdlTableMetadataProvider provider = new DdlTableMetadataProvider(arguments, ddlDao);
-        ComponentStructureGenerator structures = new ComponentStructureGenerator(arguments, ddlDao, provider, logger);
+        DdlTableMetadataProvider provider = new DdlTableMetadataProvider(arguments, ddlDao, logger);
+        ComponentStructureGenerator structures = new ComponentStructureGenerator(ddlDao, provider, logger);
         GraphqlSchemaGenerator generator = new GraphqlSchemaGenerator(arguments, structures,
                                                                       new GraphqlNamingService(), logger);
         Path outputDirectory = arguments.getGraphqlSchemasDirectory().toPath();
@@ -173,7 +228,6 @@ class GraphqlSchemaGeneratorIntegrationTest {
         GraphqlSchemaGenerator.GenerationResult result = generator.generateAffected(Set.of("shared_lookup"));
 
         assertEquals(1, result.generated());
-        assertEquals(0, result.failed());
         assertFalse(Files.exists(dependentOutput));
         assertTrue(Files.readString(outputDirectory.resolve("component_1_dependent.graphql")).contains("type Dependent"));
         assertEquals("unrelated schema", Files.readString(unrelatedOutput));
@@ -183,11 +237,11 @@ class GraphqlSchemaGeneratorIntegrationTest {
     @Test
     void doesNothingWhenNoChangedTablesWereResolved() throws Exception {
         AppArguments arguments = arguments("no-changes");
-        ComponentStructureGenerator structures = new ComponentStructureGenerator(arguments,
+        ComponentStructureGenerator structures = new ComponentStructureGenerator(
                                                                                  new FixtureDdlDao(List.of()),
                                                                                  null, new SilentColorLogger()) {
             @Override
-            public List<ComponentMetadata> buildModels() {
+            public BuildResult buildModels() {
                 throw new AssertionError("Models must not be loaded when there are no changed tables");
             }
         };
@@ -200,7 +254,6 @@ class GraphqlSchemaGeneratorIntegrationTest {
         GraphqlSchemaGenerator.GenerationResult result = generator.generateAffected(Set.of());
 
         assertEquals(0, result.generated());
-        assertEquals(0, result.failed());
         assertEquals("existing schema", Files.readString(output));
     }
 
@@ -226,10 +279,10 @@ class GraphqlSchemaGeneratorIntegrationTest {
                 """);
         FixtureDdlDao ddlDao = new FixtureDdlDao(List.of(new ComponentRow(9, "Cycle", "PARENT", 0, 0, null, 1, "PARENT", null, null),
                                                          new ComponentRow(9, "Cycle", "PARENT", 0, 0, null, 2, "CHILD", null, null)));
-        DdlTableMetadataProvider provider = new DdlTableMetadataProvider(arguments, ddlDao);
+        DdlTableMetadataProvider provider = new DdlTableMetadataProvider(arguments, ddlDao, new SilentColorLogger());
 
-        ComponentMetadata component = new ComponentStructureGenerator(arguments, ddlDao, provider,
-                                                                      new SilentColorLogger()).buildModels().get(0);
+        ComponentMetadata component = new ComponentStructureGenerator(ddlDao, provider,
+                                                                      new SilentColorLogger()).buildModels().models().get(0);
 
         assertEquals("CHILD", component.hierarchy().children().get(0).tableName());
         assertTrue(component.hierarchy().children().get(0).children().get(0).cycle());
@@ -263,7 +316,7 @@ class GraphqlSchemaGeneratorIntegrationTest {
     private static ComponentMetadata component(int id, String name, boolean invalidRelation) {
         ColumnMetadata idColumn = new ColumnMetadata(name + "_ID", "NUMBER", GraphqlScalar.ID,
                                                      false, null, null, null, null,
-                                                     null, null, false, null, ConstraintMetadata.empty(), null);
+                                                     null, null, false, null, ConstraintMetadata.empty(), null, null);
         TableMetadata table = new TableMetadata(name, null, List.of(idColumn), List.of(idColumn.name()),
                                                 List.of(), List.of(), null);
         if (!invalidRelation) {
@@ -330,5 +383,21 @@ class GraphqlSchemaGeneratorIntegrationTest {
 
         @Override
         public void warn(String message, Color color, Object... arguments) { }
+    }
+
+    private static class RecordingColorLogger extends ColorLogger {
+        private final List<String> warnings = new ArrayList<>();
+
+        @Override
+        public void info(String message, Color color, Object... arguments) { }
+
+        @Override
+        public void warn(String message, Color color, Object... arguments) {
+            String formatted = message;
+            for (Object argument : arguments) {
+                formatted = formatted.replaceFirst("\\{\\}", java.util.regex.Matcher.quoteReplacement(String.valueOf(argument)));
+            }
+            warnings.add(formatted);
+        }
     }
 }

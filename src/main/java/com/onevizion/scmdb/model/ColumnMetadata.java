@@ -15,7 +15,8 @@ public record ColumnMetadata(String name,
                              boolean readOnly,
                              String readOnlyReason,
                              ConstraintMetadata constraints,
-                             ReferenceMetadata reference) {
+                             ReferenceMetadata reference,
+                             LabelReferenceMetadata labelReference) {
     public ColumnMetadata {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(oracleType, "oracleType");

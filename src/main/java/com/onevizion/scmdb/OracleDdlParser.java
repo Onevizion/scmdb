@@ -25,6 +25,7 @@ public class OracleDdlParser {
     private static final Pattern COMMENT_COLUMN = Pattern.compile("COMMENT\\s+ON\\s+COLUMN\\s+\\w+\\.(\\w+)\\s+IS\\s+'((?:''|[^'])*)'", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static final Pattern FOREIGN_KEY = Pattern.compile("CONSTRAINT\\s+(\\w+)\\s+FOREIGN\\s+KEY\\s*\\(([^)]*)\\)\\s+REFERENCES\\s+(\\w+)\\s*\\(([^)]*)\\)", Pattern.CASE_INSENSITIVE);
     private static final Pattern PRIMARY_KEY = Pattern.compile("(?:CONSTRAINT\\s+\\w+\\s+)?PRIMARY\\s+KEY\\s*\\(([^)]*)\\)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ALTER_TABLE_PRIMARY_KEY = Pattern.compile("ALTER\\s+TABLE\\s+(\\w+)\\s+ADD\\s+CONSTRAINT\\s+\\w+\\s+PRIMARY\\s+KEY\\s*\\(([^)]*)\\)", Pattern.CASE_INSENSITIVE);
     private static final Pattern CHECK_PREFIX = Pattern.compile("CONSTRAINT\\s+(\\w+)\\s+CHECK\\s*", Pattern.CASE_INSENSITIVE);
     private static final Pattern IN_CHECK = Pattern.compile("^\\s*(?:NVL\\s*\\(\\s*)?(\\w+)(?:\\s*,\\s*[^)]+\\))?\\s+IN\\s*\\(([^()]*)\\)\\s*$", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static final Pattern RANGE_CHECK = Pattern.compile("^\\s*(\\w+)\\s+BETWEEN\\s+([^\\s]+)\\s+AND\\s+([^\\s]+)\\s*$", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
@@ -37,13 +38,11 @@ public class OracleDdlParser {
     private static final Pattern SEQUENCE = Pattern.compile("(\\w+)\\.NEXTVAL", Pattern.CASE_INSENSITIVE);
     private static final Pattern NUMBER_LITERAL = Pattern.compile("-?\\d+(?:\\.\\d+)?");
     private static final Pattern TYPE_PARAMETERS = Pattern.compile("\\((\\d+)(?:\\s*,\\s*(\\d+))?(?:\\s+(?:CHAR|BYTE))?\\)", Pattern.CASE_INSENSITIVE);
-    private static final Map<String, String> READ_ONLY_COLUMNS = Map.of(
-            "PROGRAM_ID", "Environment-specific program reference",
-            "COMPONENT_ID", "Environment-specific component ID",
-            "SYSTEM_ID", "Environment-specific system ID",
-            "COMPONENT_PACKAGES", "Package membership metadata, managed by platform",
-            "COMPONENTS_PACKAGE_ID", "Package membership, managed by platform"
-    );
+    private static final Map<String, String> READ_ONLY_COLUMNS = Map.of("PROGRAM_ID", "Environment-specific program reference",
+                                                                        "COMPONENT_ID", "Environment-specific component ID",
+                                                                        "SYSTEM_ID", "Environment-specific system ID",
+                                                                        "COMPONENT_PACKAGES", "Package membership metadata, managed by platform",
+                                                                        "COMPONENTS_PACKAGE_ID", "Package membership, managed by platform");
 
     public TableMetadata parse(String ddl) {
         Matcher create = CREATE_TABLE.matcher(ddl);
@@ -75,7 +74,9 @@ public class OracleDdlParser {
                 checks.add(check);
             }
         }
-        addSyntheticLabelReferences(tableName, columns, foreignKeys);
+        if (primaryKey.isEmpty()) {
+            primaryKey.addAll(findAlterTablePrimaryKey(ddl, tableName));
+        }
         applyComments(ddl, columns);
         applyTriggerMetadata(columns, triggerMetadata(ddl));
         return new TableMetadata(tableName, findDescription(ddl),
@@ -177,16 +178,14 @@ public class OracleDdlParser {
         return List.of();
     }
 
-    private static void addSyntheticLabelReferences(String tableName, Map<String, ColumnBuilder> columns,
-                                                     List<ForeignKeyMetadata> foreignKeys) {
-        for (String column : columns.keySet()) {
-            boolean hasForeignKey = foreignKeys.stream().anyMatch(key -> key.sourceColumns().contains(column));
-            if (column.endsWith("_LABEL_ID") && !hasForeignKey) {
-                foreignKeys.add(new ForeignKeyMetadata("SYNTHETIC_" + tableName + "_" + column,
-                        tableName, List.of(column), "LABEL_PROGRAM",
-                        List.of("LABEL_PROGRAM_ID", "APP_LANG_ID"), true, "UN1_LABEL_PROGRAM"));
+    private static List<String> findAlterTablePrimaryKey(String ddl, String tableName) {
+        Matcher alterPrimaryKey = ALTER_TABLE_PRIMARY_KEY.matcher(ddl);
+        while (alterPrimaryKey.find()) {
+            if (alterPrimaryKey.group(1).equalsIgnoreCase(tableName)) {
+                return identifiers(alterPrimaryKey.group(2));
             }
         }
+        return List.of();
     }
 
     private static void applyComments(String ddl, Map<String, ColumnBuilder> columns) {
@@ -389,7 +388,7 @@ public class OracleDdlParser {
                     minimum, maximum, notEqual, null, null, allowedValues);
             return new ColumnMetadata(name, oracleType, scalar(name, oracleType, precision, constraints),
                     nullable, precision, scale, maxLength, description, defaultValue, source,
-                    readOnly, readOnlyReason, constraints, null);
+                    readOnly, readOnlyReason, constraints, null, null);
         }
     }
 
