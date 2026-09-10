@@ -22,7 +22,7 @@ class DdlTableMetadataProviderTest {
     @Test
     void fallsBackToDatabasePrimaryKeyWhenDdlDeclaresNone() throws Exception {
         AppArguments arguments = arguments("fallback");
-        writeTable(arguments, "TEST_ROOT", """
+        writeTable(arguments, """
                 CREATE TABLE TEST_ROOT (
                   TEST_ROOT_ID NUMBER NOT NULL,
                   TEST_ROOT_NAME VARCHAR2(100)
@@ -41,7 +41,7 @@ class DdlTableMetadataProviderTest {
     @Test
     void warnsAndPrefersDdlPrimaryKeyOnMismatchWithDatabase() throws Exception {
         AppArguments arguments = arguments("mismatch");
-        writeTable(arguments, "TEST_ROOT", """
+        writeTable(arguments, """
                 CREATE TABLE TEST_ROOT (
                   TEST_ROOT_ID NUMBER NOT NULL,
                   TEST_ROOT_NAME VARCHAR2(100),
@@ -62,7 +62,7 @@ class DdlTableMetadataProviderTest {
     @Test
     void keepsDdlPrimaryKeyWithoutWarningWhenDatabaseAgrees() throws Exception {
         AppArguments arguments = arguments("agree");
-        writeTable(arguments, "TEST_ROOT", """
+        writeTable(arguments, """
                 CREATE TABLE TEST_ROOT (
                   TEST_ROOT_ID NUMBER NOT NULL,
                   TEST_ROOT_NAME VARCHAR2(100),
@@ -91,9 +91,9 @@ class DdlTableMetadataProviderTest {
         return arguments;
     }
 
-    private static void writeTable(AppArguments arguments, String tableName, String ddl) throws Exception {
+    private static void writeTable(AppArguments arguments, String ddl) throws Exception {
         Path tables = Files.createDirectories(arguments.getDdlsDirectory().toPath().resolve("tables"));
-        Files.writeString(tables.resolve(tableName.toLowerCase(java.util.Locale.ROOT) + ".sql"), ddl);
+        Files.writeString(tables.resolve("TEST_ROOT".toLowerCase(java.util.Locale.ROOT) + ".sql"), ddl);
     }
 
     private static class FixtureDdlDao extends DdlDao {
@@ -149,7 +149,7 @@ class DdlTableMetadataProviderTest {
         public void warn(String message, Color color, Object... arguments) {
             String formatted = message;
             for (Object argument : arguments) {
-                formatted = formatted.replaceFirst("\\{\\}", java.util.regex.Matcher.quoteReplacement(String.valueOf(argument)));
+                formatted = formatted.replaceFirst("\\{}", java.util.regex.Matcher.quoteReplacement(String.valueOf(argument)));
             }
             warnings.add(formatted);
         }

@@ -18,7 +18,7 @@ class LabelReferenceConventionsTest {
     @Test
     void appliesSystemProgramLabelConventionToPlainLabelIdColumn() {
         TableMetadata table = new TableMetadata("TEST_ROOT", null, List.of(
-                idColumn("TEST_ROOT_ID"), column("DISPLAY_LABEL_ID")),
+                idColumn(), column("DISPLAY_LABEL_ID")),
                 List.of("TEST_ROOT_ID"), List.of(), List.of(), null);
 
         TableMetadata enriched = LabelReferenceConventions.apply(table);
@@ -39,7 +39,7 @@ class LabelReferenceConventionsTest {
         ForeignKeyMetadata realForeignKey = new ForeignKeyMetadata("FK_OWNER_LABEL", "TEST_ROOT",
                 List.of("OWNER_LABEL_ID"), "TEST_LOOKUP", List.of("TEST_LOOKUP_ID"), false, null);
         TableMetadata table = new TableMetadata("TEST_ROOT", null, List.of(
-                idColumn("TEST_ROOT_ID"), column("OWNER_LABEL_ID")),
+                idColumn(), column("OWNER_LABEL_ID")),
                 List.of("TEST_ROOT_ID"), List.of(realForeignKey), List.of(), null);
 
         TableMetadata enriched = LabelReferenceConventions.apply(table);
@@ -50,7 +50,7 @@ class LabelReferenceConventionsTest {
     @Test
     void leavesColumnsNotEndingInLabelIdUnchanged() {
         TableMetadata table = new TableMetadata("TEST_ROOT", null, List.of(
-                idColumn("TEST_ROOT_ID"), column("TEST_ROOT_NAME")),
+                idColumn(), column("TEST_ROOT_NAME")),
                 List.of("TEST_ROOT_ID"), List.of(), List.of(), null);
 
         TableMetadata enriched = LabelReferenceConventions.apply(table);
@@ -58,8 +58,8 @@ class LabelReferenceConventionsTest {
         assertNull(enriched.column("TEST_ROOT_NAME").labelReference());
     }
 
-    private static ColumnMetadata idColumn(String name) {
-        return new ColumnMetadata(name, "NUMBER", GraphqlScalar.ID, false, null, null, null, null,
+    private static ColumnMetadata idColumn() {
+        return new ColumnMetadata("TEST_ROOT_ID", "NUMBER", GraphqlScalar.ID, false, null, null, null, null,
                 null, null, false, null, ConstraintMetadata.empty(), null, null);
     }
 

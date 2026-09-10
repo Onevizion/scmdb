@@ -43,7 +43,7 @@ final class LabelReferenceConventions {
                 PROGRAM_TABLE, PROGRAM_ID_COLUMN, LANGUAGE_COLUMN, PROGRAM_COLUMN, LabelWriteDestination.PROGRAM);
         return new ColumnMetadata(column.name(), column.oracleType(), column.graphqlScalar(), column.nullable(),
                 column.precision(), column.scale(), column.maxLength(), column.description(), column.defaultValue(),
-                column.source(), column.readOnly(), column.readOnlyReason(), column.constraints(), column.reference(),
+                column.source(), column.readOnly(), column.readOnlyReason(), column.constraints(), null,
                 labelReference);
     }
 }
