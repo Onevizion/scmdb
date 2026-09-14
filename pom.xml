@@ -10,10 +10,11 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring.version>7.0.8</spring.version>
-        <slf4j.version>2.0.12</slf4j.version>
+        <slf4j.version>2.0.16</slf4j.version>
         <logback.version>1.5.34</logback.version>
-        <jackson.version>2.22.0</jackson.version>
+        <jackson.version>2.22.1</jackson.version>
         <maven.build.timestamp.format>yyyy-MM-dd HH:mm</maven.build.timestamp.format>
+        <sqlcl.version>26.2.0</sqlcl.version>
     </properties>
 
     <dependencies>
@@ -42,18 +43,6 @@
         </dependency>
 
         <dependency>
-            <groupId>com.oracle.database.jdbc</groupId>
-            <artifactId>ojdbc8</artifactId>
-            <version>21.5.0.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.oracle.database.jdbc</groupId>
-            <artifactId>ucp</artifactId>
-            <version>21.5.0.0</version>
-        </dependency>
-
-        <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
             <version>2.18.0</version>
@@ -68,19 +57,19 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.1</version>
+            <version>3.18.0</version>
         </dependency>
 
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-collections4</artifactId>
-            <version>4.1</version>
+            <version>4.5.0</version>
         </dependency>
 
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-text</artifactId>
-            <version>1.13.1</version>
+            <version>1.14.0</version>
         </dependency>
 
         <dependency>
@@ -138,34 +127,45 @@
         </dependency>
 
         <dependency>
-            <groupId>com.oracle.database.xml</groupId>
-            <artifactId>xmlparserv2_sans_jaxp_services</artifactId>
-            <version>21.5.0.0</version>
+            <groupId>oracle.sqlcl</groupId>
+            <artifactId>ucp11</artifactId>
+            <version>${sqlcl.version}</version>
         </dependency>
 
         <dependency>
-            <groupId>com.oracle.database.xml</groupId>
-            <artifactId>xdb6</artifactId>
-            <version>18.3.0.0</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>com.oracle.database.xml</groupId>
-                    <artifactId>xmlparserv2</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-
-        <!--  dependency from local-repo  -->
-        <dependency>
-            <groupId>com.oracle.jdbc</groupId>
-            <artifactId>orai18n-mapping</artifactId>
-            <version>21.0.0</version>
+            <groupId>oracle.sqlcl</groupId>
+            <artifactId>ojdbc11</artifactId>
+            <version>${sqlcl.version}</version>
         </dependency>
 
         <dependency>
-            <groupId>oracle.dbtools</groupId>
+            <groupId>oracle.sqlcl</groupId>
             <artifactId>dbtools-common</artifactId>
-            <version>21.1.0</version>
+            <version>${sqlcl.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>oracle.sqlcl</groupId>
+            <artifactId>dbtools-core</artifactId>
+            <version>${sqlcl.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>oracle.sqlcl</groupId>
+            <artifactId>dbtools-arbori</artifactId>
+            <version>${sqlcl.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>oracle.sqlcl</groupId>
+            <artifactId>xmlparserv2_sans_jaxp_services</artifactId>
+            <version>${sqlcl.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>oracle.sqlcl</groupId>
+            <artifactId>xdb</artifactId>
+            <version>${sqlcl.version}</version>
         </dependency>
     </dependencies>
 
@@ -278,18 +278,14 @@ project.properties.setProperty('git.commit.id', 'git rev-parse --short HEAD'.exe
 
     <repositories>
         <repository>
-            <id>local-maven-repo</id>
-            <url>file:///${project.basedir}/local-maven-repo</url>
+            <id>scmdb</id>
+            <url>https://maven.pkg.github.com/Onevizion/scmdb</url>
         </repository>
     </repositories>
 
     <distributionManagement>
-        <snapshotRepository>
-            <id>github-snapshots</id>
-            <url>https://maven.pkg.github.com/Onevizion/scmdb</url>
-        </snapshotRepository>
         <repository>
-            <id>github-releases</id>
+            <id>scmdb</id>
             <url>https://maven.pkg.github.com/Onevizion/scmdb</url>
         </repository>
     </distributionManagement>

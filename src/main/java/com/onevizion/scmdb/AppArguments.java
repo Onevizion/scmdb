@@ -31,6 +31,7 @@ public class AppArguments {
     private boolean backport = false;
     private boolean rollbackDev = false;
     private RollbackMode rollbackMode;
+    private boolean dryRun = false;
     private String ghToken;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
@@ -57,6 +58,7 @@ public class AppArguments {
                                                       .withRequiredArg()
                                                       .ofType(RollbackMode.class)
                                                       .defaultsTo(RollbackMode.ASK);
+        OptionSpec dryRunOption = parser.accepts("dry-run");
         OptionSpec<String> ghTokenOption = parser.accepts("gh-token").withRequiredArg().ofType(String.class);
 
         OptionSet options = parser.parse(args);
@@ -99,6 +101,10 @@ public class AppArguments {
             throw new IllegalArgumentException("--backport cannot be combined with --exec or --gen-ddl.");
         }
 
+        if (options.has(dryRunOption) && (options.has(backportOption) || options.has(genDdlOption))) {
+            throw new IllegalArgumentException("--dry-run cannot be combined with --backport or --gen-ddl.");
+        }
+
         if (options.has(rollbackDevOption) && (options.has(execOption) || options.has(genDdlOption) || options.has(backportOption))) {
             throw new IllegalArgumentException("--rollback-dev cannot be combined with --exec, --gen-ddl or --backport.");
         }
@@ -110,6 +116,7 @@ public class AppArguments {
         omitChanged = options.has(omitChangedOption);
         ignoreErrors = options.has(ignoreErrorsOption);
         forceDisableJobs = options.has(forceDisableJobsOption);
+        dryRun = options.has(dryRunOption);
         rollbackDev = options.has(rollbackDevOption);
 
         backport = options.has(backportOption);
@@ -211,6 +218,10 @@ public class AppArguments {
 
     public RollbackMode getRollbackMode() {
         return rollbackMode;
+    }
+
+    public boolean isDryRun() {
+        return dryRun;
     }
 
     public String getGhToken() {

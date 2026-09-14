@@ -1,24 +1,80 @@
 name: Maven Deploy
 
+permissions:
+  contents: read
+  packages: write
+
 on:
   workflow_dispatch:
 
 jobs:
   build:
+    name: Build & Deploy to GitHub packages
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
-      with:
-        ref: ${{ github.event.inputs.source_branch_name }}
+      - name: Validate git ref
+        run: |
+          if [[ "${GITHUB_REF}" != "refs/heads/master" ]]; then
+            echo "Release will be performed on the master branch only. Current ref: ${GITHUB_REF}"
+            exit 1
+          fi
 
-    - name: Cache Maven packages
-      uses: actions/cache@v5
-      with:
-        path: ~/.m2/repository
-        key: m2repository
-        restore-keys: m2repository
+      - name: Checkout
+        uses: actions/checkout@v6
 
-    - name: Deploy
-      run: mvn -B deploy -Dmaven.test.skip=true -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/${{ github.repository }}
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: corretto
+          java-version: 21
+          cache: maven
+
+      - name: Setup Maven
+        uses: stCarolas/setup-maven@v5.1
+        with:
+          maven-version: 3.9.9
+
+      - name: Generate Maven settings.xml
+        run: |
+          mkdir -p ~/.m2
+          
+          cat <<'EOF' > ~/.m2/settings.xml
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+
+            <servers>
+              <server>
+                <id>scmdb</id>
+                <username>token</username>
+                <password>${env.GITHUB_TOKEN}</password>
+              </server>
+            </servers>
+
+            <profiles>
+              <profile>
+                <id>scmdb</id>
+                <repositories>
+                  <repository>
+                    <id>scmdb</id>
+                    <name>scmdb</name>
+                    <url>https://maven.pkg.github.com/${env.GITHUB_REPOSITORY}</url>
+                  </repository>
+                </repositories>
+              </profile>
+            </profiles>
+          </settings>
+          EOF
+
+      - name: Deploy
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: mvn package deploy -P scmdb "-DaltDeploymentRepository=scmdb::default::https://maven.pkg.github.com/$GITHUB_REPOSITORY"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          path: target/scmdb.jar
+          retention-days: 2
+          if-no-files-found: error
+          archive: false

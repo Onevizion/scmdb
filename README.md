@@ -37,6 +37,7 @@ When passwords for all schemas are the same (may be common for local dev env), o
 * ```--ignore-errors``` do not stop on errors 
 * ```--no-color``` do not color output
 * ```--force-disable-jobs``` automatically disable database jobs before executing scripts and re-enable them afterward.
+* ```--dry-run``` print the list of scripts (including rollbacks) that would be executed, without modifying the database or the ```db_script``` table, then exit with a non-zero code (3). Useful as a pre-deploy check. Cannot be combined with ```--gen-ddl``` or ```--backport```.
 * ```--backport``` run backport pipeline: cherry-pick PR commits, regenerate package scripts, execute them and generate DDL. Cannot be combined with ```--exec``` or ```--gen-ddl```. Requires GitHub token (see ```--gh-token```). PR number is prompted interactively.
 * ```--rollback-dev``` execute rollback scripts for development scripts (script order number < 100) from the current ```--scripts-dir``` without switching branches. Script files remain in ```--scripts-dir```, but after successful rollback related commit and rollback records are removed from ```db_script```, so the same scripts can be executed again with ```--exec```. Cannot be combined with ```--exec```, ```--gen-ddl``` or ```--backport```.
 * ```--gh-token=<token>``` GitHub personal access token for the backport pipeline. Can also be provided via ```GITHUB_TOKEN``` environment variables (env variables take priority over CLI argument).
@@ -72,3 +73,90 @@ The PR (Pull-Request) number will be prompted interactively after started. The p
 2. Regenerate package scripts from DDL sources;
 3. Execute new scripts (same as `--exec`);
 4. Generate DDL for changed objects (same as `--gen-ddl`);
+
+**6. Preview pending scripts before a deployment (dry-run):**
+
+```java -jar scmdb.jar --owner-schema=$ownerSchema --scripts-dir=db/scripts --no-color --dry-run```
+
+Prints the commit scripts and rollbacks that would be executed, does not modify the database or the ```db_script``` table, and exits with code 3. Intended as a pre-deploy check step in CI/CD: a non-zero exit code signals that this was only a preview and the database was NOT updated.
+
+## Deploy dependencies
+
+To deploy these JARs to GitHub Packages, configure Maven credentials for server id `scmdb` (e.g., in `~/.m2/settings.xml`). Keep the `-Dversion` values below in sync with `pom.xml` (`<sqlcl.version>`).
+
+```shell
+mvn deploy:deploy-file \
+  -DgroupId="oracle.sqlcl" \
+  -DartifactId="dbtools-common" \
+  -Dversion="26.2.0" \
+  -Dpackaging="jar" \
+  -Dfile="dbtools-common.jar" \
+  -DrepositoryId="scmdb" \
+  -Durl="https://maven.pkg.github.com/Onevizion/scmdb"
+```
+
+```shell
+mvn deploy:deploy-file \
+  -DgroupId="oracle.sqlcl" \
+  -DartifactId="ucp11" \
+  -Dversion="26.2.0" \
+  -Dpackaging="jar" \
+  -Dfile="ucp11.jar" \
+  -DrepositoryId="scmdb" \
+  -Durl="https://maven.pkg.github.com/Onevizion/scmdb"
+```
+
+```shell
+mvn deploy:deploy-file \
+  -DgroupId="oracle.sqlcl" \
+  -DartifactId="ojdbc11" \
+  -Dversion="26.2.0" \
+  -Dpackaging="jar" \
+  -Dfile="ojdbc11.jar" \
+  -DrepositoryId="scmdb" \
+  -Durl="https://maven.pkg.github.com/Onevizion/scmdb"
+```
+
+```shell
+mvn deploy:deploy-file \
+  -DgroupId="oracle.sqlcl" \
+  -DartifactId="dbtools-core" \
+  -Dversion="26.2.0" \
+  -Dpackaging="jar" \
+  -Dfile="dbtools-core.jar" \
+  -DrepositoryId="scmdb" \
+  -Durl="https://maven.pkg.github.com/Onevizion/scmdb"
+```
+
+```shell
+mvn deploy:deploy-file \
+  -DgroupId="oracle.sqlcl" \
+  -DartifactId="dbtools-arbori" \
+  -Dversion="26.2.0" \
+  -Dpackaging="jar" \
+  -Dfile="dbtools-arbori.jar" \
+  -DrepositoryId="scmdb" \
+  -Durl="https://maven.pkg.github.com/Onevizion/scmdb"
+```
+
+```shell
+mvn deploy:deploy-file \
+  -DgroupId="oracle.sqlcl" \
+  -DartifactId="xmlparserv2_sans_jaxp_services" \
+  -Dversion="26.2.0" \
+  -Dpackaging="jar" \
+  -Dfile="xmlparserv2_sans_jaxp_services.jar" \
+  -DrepositoryId="scmdb" \
+  -Durl="https://maven.pkg.github.com/Onevizion/scmdb"
+```
+
+```shell
+mvn deploy:deploy-file \
+  -DgroupId="oracle.sqlcl" \
+  -DartifactId="xdb" \
+  -Dversion="26.2.0" \
+  -Dpackaging="jar" \
+  -Dfile="xdb.jar" \
+  -DrepositoryId="scmdb" \
+  -Durl="https://maven.pkg.github.com/Onevizion/scmdb"
+```

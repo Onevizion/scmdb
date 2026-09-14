@@ -225,6 +225,38 @@ def _run_git(p_repo_root: str, p_args: list[str]) -> str:
     return res.stdout
 
 
+def _has_cherry_pick_head(p_repo_root: str) -> bool:
+    res = subprocess.run(
+        ["git", "-C", p_repo_root, "rev-parse", "--verify", "CHERRY_PICK_HEAD"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        timeout=GIT_TIMEOUT,
+    )
+    return res.returncode == 0
+
+
+def _has_diff(p_repo_root: str, p_args: list[str]) -> bool:
+    res = subprocess.run(
+        ["git", "-C", p_repo_root, "diff"] + p_args,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=GIT_TIMEOUT,
+    )
+    if res.returncode > 1:
+        raise RuntimeError(f"Git command failed: git -C {p_repo_root} diff {' '.join(p_args)}\n{(res.stderr or '').strip()}")
+    return res.returncode == 1
+
+
+def _is_empty_cherry_pick(p_repo_root: str) -> bool:
+    return (
+        _has_cherry_pick_head(p_repo_root)
+        and not _has_diff(p_repo_root, ["--cached", "--quiet"])
+        and not _has_diff(p_repo_root, ["--quiet"])
+    )
+
+
 def _cherry_pick_commits(p_repo_root: str, p_remote_branch_name: str, p_commit_ids: list[str]) -> None:
     if not p_commit_ids:
         return
@@ -240,7 +272,13 @@ def _cherry_pick_commits(p_repo_root: str, p_remote_branch_name: str, p_commit_i
 
     try:
         for sha in p_commit_ids:
-            _run_git(p_repo_root, ["cherry-pick", sha])
+            try:
+                _run_git(p_repo_root, ["cherry-pick", sha])
+            except RuntimeError:
+                if not _is_empty_cherry_pick(p_repo_root):
+                    raise
+                _log(f"empty cherry-pick skipped: {sha[:7]}")
+                _run_git(p_repo_root, ["cherry-pick", "--skip"])
     except Exception as e:
         try:
             subprocess.run(["git", "-C", p_repo_root, "cherry-pick", "--abort"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=GIT_TIMEOUT)
