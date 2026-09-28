@@ -12,7 +12,7 @@
         <spring.version>7.0.8</spring.version>
         <slf4j.version>2.0.16</slf4j.version>
         <logback.version>1.5.34</logback.version>
-        <jackson.version>2.22.1</jackson.version>
+        <jackson.version>2.22.2</jackson.version>
         <maven.build.timestamp.format>yyyy-MM-dd HH:mm</maven.build.timestamp.format>
         <sqlcl.version>26.2.0</sqlcl.version>
     </properties>
