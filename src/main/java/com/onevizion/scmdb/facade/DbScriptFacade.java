@@ -24,6 +24,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.onevizion.scmdb.vo.ScriptType.COMMIT;
+import static com.onevizion.scmdb.vo.ScriptType.ROLLBACK;
 
 @Component
 public class DbScriptFacade {
@@ -72,6 +73,21 @@ public class DbScriptFacade {
             newScripts.forEach(SqlScript::loadContentFromFile);
         }
         return newScripts;
+    }
+
+    public Map<String, SqlScript> getSavedScriptsMap() {
+        return sqlScriptDaoOra.readMap();
+    }
+
+    public List<SqlScript> getDevelopmentRollbackScriptsForSavedCommits(Map<String, SqlScript> savedScripts) {
+        return scriptsInDir.stream()
+                           .filter(script -> script.getType() == ROLLBACK)
+                           .filter(script -> script.getOrderNumber() != null)
+                           .filter(script -> script.getOrderNumber() < MAX_DEVELOPMENT_ORDER_NUMBER)
+                           .filter(rollback -> savedScripts.containsKey(rollback.getName()))
+                           .filter(rollback -> savedScripts.containsKey(rollback.getCommitName()))
+                           .peek(rollback -> rollback.setId(savedScripts.get(rollback.getName()).getId()))
+                           .collect(Collectors.toList());
     }
 
     public List<SqlScript> getDevelopmentScripts() {

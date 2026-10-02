@@ -39,6 +39,7 @@ When passwords for all schemas are the same (may be common for local dev env), o
 * ```--force-disable-jobs``` automatically disable database jobs before executing scripts and re-enable them afterward.
 * ```--dry-run``` print the list of scripts (including rollbacks) that would be executed, without modifying the database or the ```db_script``` table, then exit with a non-zero code (3). Useful as a pre-deploy check. Cannot be combined with ```--gen-ddl``` or ```--backport```.
 * ```--backport``` run backport pipeline: cherry-pick PR commits, regenerate package scripts, execute them and generate DDL. Cannot be combined with ```--exec``` or ```--gen-ddl```. Requires GitHub token (see ```--gh-token```). PR number is prompted interactively.
+* ```--rollback-dev``` execute rollback scripts for development scripts (script order number < 100) from the current ```--scripts-dir``` without switching branches. Script files remain in ```--scripts-dir```, but after successful rollback related commit and rollback records are removed from ```db_script```, so the same scripts can be executed again with ```--exec```. Cannot be combined with ```--exec```, ```--gen-ddl``` or ```--backport```.
 * ```--gh-token=<token>``` GitHub personal access token for the backport pipeline. Can also be provided via ```GITHUB_TOKEN``` environment variables (env variables take priority over CLI argument).
 
 ### Usage Scenarious
