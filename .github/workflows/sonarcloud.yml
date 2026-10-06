@@ -7,6 +7,10 @@ name: Scan in SonarCloud
 # OV_SONARCLOUD_HOST_URL - Host URL of SonarCloud
 # OV_SONARCLOUD_ORGANIZATION - Organization name in SonarCloud
 
+permissions:
+  contents: read
+  packages: read
+
 on:
   push:
 
@@ -32,7 +36,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'corretto'
-          java-version: '17'
+          java-version: '21'
 
       - name: Cache SonarCloud and Maven
         uses: actions/cache@v4
@@ -43,7 +47,26 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
+      - name: Generate Maven settings.xml
+        run: |
+          mkdir -p ~/.m2
+          cat <<'EOF' > ~/.m2/settings.xml
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+            <servers>
+              <server>
+                <id>scmdb</id>
+                <username>token</username>
+                <password>${env.GITHUB_TOKEN}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
       - name: SonarCloud scan
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           mvn -B -DskipTests \
               --no-transfer-progress \
