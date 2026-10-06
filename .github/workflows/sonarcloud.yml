@@ -67,6 +67,7 @@ jobs:
       - name: SonarCloud scan
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          SONAR_TOKEN: ${{ secrets.OV_SONARCLOUD_TOKEN }}
         run: |
           mvn -B -DskipTests \
               --no-transfer-progress \
