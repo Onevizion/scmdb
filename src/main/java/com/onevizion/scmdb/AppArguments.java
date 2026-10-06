@@ -30,6 +30,7 @@ public class AppArguments {
     private boolean ignoreErrors = false;
     private boolean forceDisableJobs = false;
     private boolean backport = false;
+    private boolean rollbackDev = false;
     private RollbackMode rollbackMode;
     private boolean dryRun = false;
     private boolean genCompsSchema = false;
@@ -63,6 +64,7 @@ public class AppArguments {
         OptionSpec<Void> ignoreErrorsOption = parser.acceptsAll(asList("i", "ignore-errors"));
         OptionSpec<Void> forceDisableJobsOption = parser.accepts("force-disable-jobs");
         OptionSpec<Void> backportOption = parser.accepts("backport");
+        OptionSpec rollbackDevOption = parser.accepts("rollback-dev");
         OptionSpec<RollbackMode> rollbackMode = parser.accepts("rollback-mode")
                                                       .withRequiredArg()
                                                       .ofType(RollbackMode.class)
@@ -122,6 +124,10 @@ public class AppArguments {
             throw new IllegalArgumentException("--dry-run cannot be combined with --backport or --gen-ddl.");
         }
 
+        if (options.has(rollbackDevOption) && (options.has(execOption) || options.has(genDdlOption) || options.has(backportOption))) {
+            throw new IllegalArgumentException("--rollback-dev cannot be combined with --exec, --gen-ddl or --backport.");
+        }
+
         executeScripts = options.has(execOption);
         genDdl = options.has(genDdlOption);
         all = options.has(allOption);
@@ -131,6 +137,7 @@ public class AppArguments {
         ignoreErrors = options.has(ignoreErrorsOption);
         forceDisableJobs = options.has(forceDisableJobsOption);
         dryRun = options.has(dryRunOption);
+        rollbackDev = options.has(rollbackDevOption);
 
         backport = options.has(backportOption);
         if (backport) {
@@ -242,7 +249,7 @@ public class AppArguments {
     }
 
     public boolean isReadAllFilesContent() {
-        return genDdl || genCompsSchema || backport || !omitChanged;
+        return genDdl || genCompsSchema || backport || rollbackDev || !omitChanged;
     }
 
     public boolean isForceDisableJobs() {
@@ -251,6 +258,10 @@ public class AppArguments {
 
     public boolean isBackport() {
         return backport;
+    }
+
+    public boolean isRollbackDev() {
+        return rollbackDev;
     }
 
     public RollbackMode getRollbackMode() {
