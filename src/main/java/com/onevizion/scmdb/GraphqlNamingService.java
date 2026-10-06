@@ -6,6 +6,12 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+/**
+ * Turns physical Oracle names into GraphQL names, consistently:
+ * types in PascalCase (CONFIG_FIELD → ConfigField), fields in camelCase (configField),
+ * lookup fields drop a trailing Id (programId → program), enum values are UPPER_SNAKE_CASE.
+ * Every name is made unique within its scope so the generated schema has no clashes.
+ */
 @Component
 public class GraphqlNamingService {
     private static final Pattern WORDS = Pattern.compile("[^0-9A-Za-z]+");
