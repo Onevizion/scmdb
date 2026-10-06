@@ -1,0 +1,85 @@
+name: Scan in SonarCloud
+
+# Required secrets:
+# OV_SONARCLOUD_TOKEN - SonarCloud authentication token
+#
+# Required variables:
+# OV_SONARCLOUD_HOST_URL - Host URL of SonarCloud
+# OV_SONARCLOUD_ORGANIZATION - Organization name in SonarCloud
+
+permissions:
+  contents: read
+  packages: read
+
+on:
+  push:
+
+concurrency:
+  group: sonar-scmdb-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Scan
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'Onevizion'
+    env:
+      SONAR_PROJECT_KEY: com.onevizion:scmdb
+      SONAR_HOST_URL: ${{ vars.OV_SONARCLOUD_HOST_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version: '21'
+
+      - name: Cache SonarCloud and Maven
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.sonar/cache
+            ~/.m2
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Generate Maven settings.xml
+        run: |
+          mkdir -p ~/.m2
+          cat <<'EOF' > ~/.m2/settings.xml
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+            <servers>
+              <server>
+                <id>scmdb</id>
+                <username>token</username>
+                <password>${env.GITHUB_TOKEN}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
+      - name: SonarCloud scan
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SONAR_TOKEN: ${{ secrets.OV_SONARCLOUD_TOKEN }}
+        run: |
+          mvn -B -DskipTests \
+              --no-transfer-progress \
+              -Dsonar.organization=${{ vars.OV_SONARCLOUD_ORGANIZATION }} \
+              -Dsonar.projectKey=$SONAR_PROJECT_KEY \
+              -Dsonar.host.url=$SONAR_HOST_URL \
+              -Dsonar.token=${{ secrets.OV_SONARCLOUD_TOKEN }} \
+              -Dsonar.branch.name=${{ github.ref_name }} \
+              compile org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar
+
+      - name: Annotate summary
+        run: |
+          cat > "$GITHUB_STEP_SUMMARY" << EOF
+          [Link to SonarCloud scan results]($SONAR_HOST_URL/summary/new_code?id=$SONAR_PROJECT_KEY&branch=${{ github.ref_name }})
+          EOF

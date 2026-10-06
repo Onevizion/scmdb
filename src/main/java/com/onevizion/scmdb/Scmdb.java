@@ -57,12 +57,8 @@ public class Scmdb {
                 dbManager.runBackport(backportRunner);
             } else if (appArguments.isRollbackDev()) {
                 dbManager.runRollback();
-            } else if (appArguments.isGenDdl()) {
-                if (appArguments.isAll()) {
-                    dbManager.generateDdlForAllObjects();
-                } else {
-                    dbManager.generateDdlForNewOrChangedScripts();
-                }
+            } else if (appArguments.isGenDdl() || appArguments.isGenCompsSchema()) {
+                generate(dbManager, appArguments);
             } else {
                 dbManager.updateDb();
                 if (appArguments.isDryRun()) {
@@ -78,5 +74,14 @@ public class Scmdb {
         }
         LOGGER.info("\nSCMDB complete");
         System.exit(EXIT_CODE_SUCCESS);
+    }
+
+    private static void generate(DbManager dbManager, AppArguments appArguments) {
+        if (appArguments.isGenDdl()) {
+            dbManager.generateDdl();
+        }
+        if (appArguments.isGenCompsSchema()) {
+            dbManager.generateComponentSchemas();
+        }
     }
 }

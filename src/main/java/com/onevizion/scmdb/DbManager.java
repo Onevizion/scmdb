@@ -1,5 +1,6 @@
 package com.onevizion.scmdb;
 
+import com.onevizion.scmdb.dao.DdlDao;
 import com.onevizion.scmdb.exception.ScmdbException;
 import com.onevizion.scmdb.exception.ScriptExecException;
 import com.onevizion.scmdb.facade.DbScriptFacade;
@@ -37,6 +38,12 @@ public class DbManager {
 
     @Autowired
     private DdlGenerator ddlGenerator;
+
+    @Autowired
+    private GraphqlSchemaGenerator graphqlSchemaGenerator;
+
+    @Autowired
+    private DdlDao ddlDao;
 
     @Autowired
     private AppArguments appArguments;
@@ -349,23 +356,29 @@ public class DbManager {
 
         scriptsFacade.checkDbConnection();
 
-        List<SqlScript> scripts = scriptsFacade.getDevelopmentScripts();
-        scripts.addAll(scriptsFacade.getUpdatedScripts());
-        List<SqlScript> scriptsToGenDdl = scripts.stream()
-                                                 .sorted()
-                                                 .filter(script -> script.getType() == ScriptType.COMMIT)
-                                                 .filter(script -> script.getSchemaType() == OWNER)
-                                                 .collect(Collectors.toList());
-
-        Set<DbObject> changedDbObjects = findChangedDbObjects(scriptsToGenDdl);
         ddlGenerator.executeSettingTransformParams();
-        ddlGenerator.generateDdls(changedDbObjects, false);
+        ddlGenerator.generateDdls(findChangedDbObjects(), false);
     }
 
-    private Set<DbObject> findChangedDbObjects(List<SqlScript> scripts) {
+    public void generateDdl() {
+        if (appArguments.isAll()) {
+            generateDdlForAllObjects();
+        } else {
+            generateDdlForNewOrChangedScripts();
+        }
+    }
+
+    private Set<DbObject> findChangedDbObjects() {
+        List<SqlScript> scripts = scriptsFacade.getDevelopmentScripts();
+        scripts.addAll(scriptsFacade.getUpdatedScripts());
+        List<SqlScript> scriptsToGenerate = scripts.stream()
+                                                   .sorted()
+                                                   .filter(script -> script.getType() == ScriptType.COMMIT)
+                                                   .filter(script -> script.getSchemaType() == OWNER)
+                                                   .toList();
         Set<DbObject> updatedDbObjects;
 
-        updatedDbObjects = scripts.stream()
+        updatedDbObjects = scriptsToGenerate.stream()
                                   .map(script -> ScriptHelper.removeSpecialFromScriptText(script.getText()))
                                   .flatMap(scriptText -> ScriptHelper.findChangedDbObjectsInScriptText(scriptText).stream())
                                   .collect(Collectors.toSet());
@@ -379,6 +392,37 @@ public class DbManager {
 
         ddlGenerator.executeSettingTransformParams();
         ddlGenerator.generateDllsForAllDbObjects();
+    }
+
+    public void generateGraphqlSchemas() {
+        logger.info("Generating GraphQL component schemas");
+        scriptsFacade.checkDbConnection();
+        if (appArguments.isAll()) {
+            graphqlSchemaGenerator.generateAll();
+        } else {
+            graphqlSchemaGenerator.generateAffected(resolveChangedTableNames(findChangedDbObjects()));
+        }
+    }
+
+    private Set<String> resolveChangedTableNames(Collection<DbObject> dbObjects) {
+        return dbObjects.stream()
+                .map(this::resolveTableName)
+                .filter(StringUtils::isNotBlank)
+                .map(name -> name.toUpperCase(Locale.ROOT))
+                .collect(Collectors.toCollection(TreeSet::new));
+    }
+
+    private String resolveTableName(DbObject dbObject) {
+        return switch (dbObject.getType()) {
+            case TABLE -> dbObject.getName();
+            case COMMENT -> dbObject.getName().split("\\.", 2)[0];
+            case INDEX, TRIGGER, SEQUENCE -> ddlDao.getTableNameByDepObject(dbObject);
+            default -> null;
+        };
+    }
+
+    public void generateComponentSchemas() {
+        generateGraphqlSchemas();
     }
 
     /**

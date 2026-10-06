@@ -20,6 +20,7 @@ import static java.util.Arrays.asList;
 public class AppArguments {
     private File scriptsDirectory;
     private File ddlsDirectory;
+    private File graphqlSchemasDirectory;
     private final Map<SchemaType, DbCnnCredentials> credentials = new HashMap<>();
     private boolean genDdl;
     private boolean executeScripts;
@@ -32,9 +33,16 @@ public class AppArguments {
     private boolean rollbackDev = false;
     private RollbackMode rollbackMode;
     private boolean dryRun = false;
+    private boolean genCompsSchema = false;
     private String ghToken;
 
     private final static String DDL_DIRECTORY_NAME = "ddl";
+    private final static String GRAPHQL_SCHEMAS_DIRECTORY_NAME = "comp-schema-graphql";
+
+    private final static String DDL_DIRECTORY_NOT_FOUND_MSG =
+            "Path [{0}] does not exist or is not a directory. Cannot find ddl directory";
+    private final static String CANNOT_CREATE_DIRECTORY_MSG = "Cannot create {0} directory [{1}]";
+    private final static String NOT_A_DIRECTORY_MSG = "Path [{0}] is not a directory";
 
     void parse(String[] args, boolean requireScriptsDirectory) {
         OptionParser parser = new OptionParser();
@@ -42,17 +50,20 @@ public class AppArguments {
         OptionSpec<String> userSchemaOption = parser.accepts("user-schema").withOptionalArg().ofType(String.class);
         OptionSpec<String> rptSchemaOption = parser.accepts("rpt-schema").withOptionalArg().ofType(String.class);
         OptionSpec<String> pkgSchemaOption = parser.accepts("pkg-schema").withOptionalArg().ofType(String.class);
-        OptionSpec<String> perfstatSchemaOption = parser.accepts("perfstat-schema").withOptionalArg().ofType(String.class);
+        OptionSpec<String> perfstatSchemaOption = parser.accepts("perfstat-schema")
+                                                        .withOptionalArg()
+                                                        .ofType(String.class);
         OptionSpec<File> scriptsDirectoryOption = parser.accepts("scripts-dir").withRequiredArg().ofType(File.class);
 
-        OptionSpec execOption = parser.acceptsAll(asList("e", "exec"));
-        OptionSpec genDdlOption = parser.acceptsAll(asList("d", "gen-ddl"));
-        OptionSpec allOption = parser.acceptsAll(asList("a", "all"));
-        OptionSpec noColorOption = parser.acceptsAll(asList("n", "no-color"));
-        OptionSpec omitChangedOption = parser.acceptsAll(asList("o", "omit-changed"));
-        OptionSpec ignoreErrorsOption = parser.acceptsAll(asList("i", "ignore-errors"));
-        OptionSpec forceDisableJobsOption = parser.accepts("force-disable-jobs");
-        OptionSpec backportOption = parser.accepts("backport");
+        OptionSpec<Void> execOption = parser.acceptsAll(asList("e", "exec"));
+        OptionSpec<Void> genDdlOption = parser.acceptsAll(asList("d", "gen-ddl"));
+        OptionSpec<Void> allOption = parser.acceptsAll(asList("a", "all"));
+        OptionSpec<Void> genCompsSchemaOption = parser.accepts("gen-comps-schema");
+        OptionSpec<Void> noColorOption = parser.acceptsAll(asList("n", "no-color"));
+        OptionSpec<Void> omitChangedOption = parser.acceptsAll(asList("o", "omit-changed"));
+        OptionSpec<Void> ignoreErrorsOption = parser.acceptsAll(asList("i", "ignore-errors"));
+        OptionSpec<Void> forceDisableJobsOption = parser.accepts("force-disable-jobs");
+        OptionSpec<Void> backportOption = parser.accepts("backport");
         OptionSpec rollbackDevOption = parser.accepts("rollback-dev");
         OptionSpec<RollbackMode> rollbackMode = parser.accepts("rollback-mode")
                                                       .withRequiredArg()
@@ -77,28 +88,36 @@ public class AppArguments {
         createCredentials(PERFSTAT, options, perfstatSchemaOption);
 
         scriptsDirectory = options.valueOf(scriptsDirectoryOption);
-        if (requireScriptsDirectory && (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory())) {
-            throw new IllegalArgumentException("Path [" + scriptsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
+        boolean requireSourceTreeDirectories = options.has(genDdlOption)
+                                               || options.has(genCompsSchemaOption)
+                                               || options.has(backportOption);
+
+        if (requireSourceTreeDirectories && scriptsDirectory == null) {
+            throw new IllegalArgumentException(
+                    "--scripts-dir is required for --gen-ddl, --gen-comps-schema and --backport modes.");
+        }
+
+        if ((requireScriptsDirectory || requireSourceTreeDirectories) &&
+            (!scriptsDirectory.exists() || !scriptsDirectory.isDirectory())) {
+            throw new IllegalArgumentException(
+                    "Path [" + scriptsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
                     " [--scripts-dir] should contains absolute path and points to scripts directory");
-        } else if (!requireScriptsDirectory && scriptsDirectory != null) {
-            throw new IllegalArgumentException("[--scripts-dir] parameter is not expected in this context, SCMDB has already migration scripts bundled.");
+        } else if (!requireScriptsDirectory && scriptsDirectory != null && !requireSourceTreeDirectories) {
+            throw new IllegalArgumentException(
+                    "[--scripts-dir] parameter is not expected in this context, SCMDB has already migration scripts bundled.");
         }
 
-        if(options.has(genDdlOption) || options.has(backportOption)){
-            ddlsDirectory = new File(scriptsDirectory.getParentFile().getAbsolutePath() + File.separator +
-                    DDL_DIRECTORY_NAME);
-            if (!ddlsDirectory.exists() || !ddlsDirectory.isDirectory()) {
-                throw new IllegalArgumentException("Path [" + ddlsDirectory.getAbsolutePath() + "] doesn't exists or isn't a directory." +
-                        " Can't find ddl directory");
-            }
+        if (requireSourceTreeDirectories) {
+            resolveSourceTreeDirectories();
         }
 
-        if (options.has(execOption) && options.has(genDdlOption)) {
-            throw new IllegalArgumentException("You can't specify both --gen-ddl and --exec arguments. Choose one.");
+        if (options.has(execOption) && (options.has(genDdlOption) || options.has(genCompsSchemaOption))) {
+            throw new IllegalArgumentException("You can't specify --exec together with --gen-ddl or --gen-comps-schema. Choose one mode.");
         }
 
-        if (options.has(backportOption) && (options.has(execOption) || options.has(genDdlOption))) {
-            throw new IllegalArgumentException("--backport cannot be combined with --exec or --gen-ddl.");
+        if (options.has(backportOption) &&
+            (options.has(execOption) || options.has(genDdlOption) || options.has(genCompsSchemaOption))) {
+            throw new IllegalArgumentException("--backport cannot be combined with --exec, --gen-ddl or --gen-comps-schema.");
         }
 
         if (options.has(dryRunOption) && (options.has(backportOption) || options.has(genDdlOption))) {
@@ -112,6 +131,7 @@ public class AppArguments {
         executeScripts = options.has(execOption);
         genDdl = options.has(genDdlOption);
         all = options.has(allOption);
+        genCompsSchema = options.has(genCompsSchemaOption);
         useColorLogging = !options.has(noColorOption);
         omitChanged = options.has(omitChangedOption);
         ignoreErrors = options.has(ignoreErrorsOption);
@@ -133,6 +153,29 @@ public class AppArguments {
         }
 
         this.rollbackMode = options.valueOf(rollbackMode);
+    }
+
+    private void resolveSourceTreeDirectories() {
+        File dbDirectory = scriptsDirectory.getAbsoluteFile().getParentFile();
+        ddlsDirectory = new File(dbDirectory, DDL_DIRECTORY_NAME);
+        if (!ddlsDirectory.exists() || !ddlsDirectory.isDirectory()) {
+            throw new IllegalArgumentException(MessageFormat.format(DDL_DIRECTORY_NOT_FOUND_MSG,
+                                                                    ddlsDirectory.getAbsolutePath()));
+        }
+        graphqlSchemasDirectory = ensureDirectory(dbDirectory, GRAPHQL_SCHEMAS_DIRECTORY_NAME,
+                                                  "component GraphQL schemas");
+    }
+
+    private File ensureDirectory(File parentDirectory, String directoryName, String description) {
+        File directory = new File(parentDirectory, directoryName);
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw new IllegalArgumentException(MessageFormat.format(CANNOT_CREATE_DIRECTORY_MSG,
+                                                                    description, directory.getAbsolutePath()));
+        }
+        if (!directory.isDirectory()) {
+            throw new IllegalArgumentException(MessageFormat.format(NOT_A_DIRECTORY_MSG, directory.getAbsolutePath()));
+        }
+        return directory;
     }
 
     public void fillDataSourceCredentials(PoolDataSource poolDataSource, SchemaType schemaType) {
@@ -159,8 +202,9 @@ public class AppArguments {
             }
         } else {
             String ownerConnectionString = credentials.get(OWNER).getConnectionString();
-            credentials.put(schemaType, DbCnnCredentials.create(DbCnnCredentials.genCnnStrForSchema(ownerConnectionString,
-                    schemaType)));
+            credentials.put(schemaType,
+                            DbCnnCredentials.create(DbCnnCredentials.genCnnStrForSchema(ownerConnectionString,
+                                                                                        schemaType)));
         }
     }
 
@@ -170,6 +214,10 @@ public class AppArguments {
 
     public File getDdlsDirectory() {
         return ddlsDirectory;
+    }
+
+    public File getGraphqlSchemasDirectory() {
+        return graphqlSchemasDirectory;
     }
 
     public DbCnnCredentials getDbCredentials(SchemaType schemaType) {
@@ -201,7 +249,7 @@ public class AppArguments {
     }
 
     public boolean isReadAllFilesContent() {
-        return genDdl || backport || rollbackDev || !omitChanged;
+        return genDdl || genCompsSchema || backport || rollbackDev || !omitChanged;
     }
 
     public boolean isForceDisableJobs() {
@@ -222,6 +270,10 @@ public class AppArguments {
 
     public boolean isDryRun() {
         return dryRun;
+    }
+
+    public boolean isGenCompsSchema() {
+        return genCompsSchema;
     }
 
     public String getGhToken() {
